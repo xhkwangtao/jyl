@@ -1,49 +1,21 @@
 const {
-  JYL_MARKER_POINTS
+  JYL_MARKER_POINTS,
+  JYL_ROUTE,
+  JYL_ROUTE_MARKER_POINTS,
+  JYL_ROUTE_POLYLINES,
+  JYL_MAP_META
 } = require('../../config/jyl-map-data.js')
 
-const MAP_INCLUDE_POINTS = JYL_MARKER_POINTS.map((point) => ({
-  latitude: point.latitude,
-  longitude: point.longitude
-}))
-
-const POINT_GUIDE_META = {
-  'ticket-gate': {
-    themeTag: '起点',
-    themeTone: 'forest',
-    stayText: '建议停留 5 分钟',
-    shortHint: '入园后先确认路线与补给',
-    sceneLine: '游客进入景区后的第一站，适合先辨认整体方向再开始游览。',
-    guideTip: '建议从这里先看一遍景区全览，再决定先去步道还是直接向主楼方向前进。'
-  },
-  'trail-start': {
-    themeTag: '步道',
-    themeTone: 'teal',
-    stayText: '建议停留 8 分钟',
-    shortHint: '正式进入山间步道',
-    sceneLine: '这里是由入口转入步道的重要节点，适合整理节奏后继续上行。',
-    guideTip: '如果是第一次来，建议在这里短暂停留，确认前往营盘遗址和主楼的方向。'
-  },
-  'huoyanshan-camp-site': {
-    themeTag: '遗址',
-    themeTone: 'stone',
-    stayText: '建议停留 10 分钟',
-    shortHint: '沿线遗迹与地势看点',
-    sceneLine: '更适合边走边看的一站，能感受到营盘遗址与沿线地势关系。',
-    guideTip: '适合把这里作为途中停留点，拍照后继续向主楼推进，节奏会更顺。'
-  },
-  'jiuyanlou-main-tower': {
-    themeTag: '主楼',
-    themeTone: 'gold',
-    stayText: '建议停留 15 分钟',
-    shortHint: '九眼楼最具代表性的观景点',
-    sceneLine: '九眼楼核心敌楼，通常是整段游览中最值得停留和观景的一站。',
-    guideTip: '建议把这里作为重点停留点，抵达后多留几分钟远眺和拍照。'
-  }
-}
+const MAP_INCLUDE_POINTS = [
+  ...JYL_ROUTE.pathPoints,
+  ...JYL_ROUTE_MARKER_POINTS.map((point) => ({
+    latitude: point.latitude,
+    longitude: point.longitude
+  }))
+]
 
 const DEFAULT_SCENIC_CENTER = buildCenter(MAP_INCLUDE_POINTS)
-const DEFAULT_SCENIC_SCALE = 15
+const DEFAULT_SCENIC_SCALE = 13
 
 function buildCenter(points) {
   const bounds = points.reduce((acc, point) => {
@@ -105,19 +77,19 @@ function buildMarkers(markerPoints, selectedPointId) {
   })
 }
 
-function getGuideMeta(point) {
-  return POINT_GUIDE_META[point.key] || {
-    themeTag: '景点',
-    themeTone: 'teal',
-    stayText: '建议停留 8 分钟',
-    shortHint: point.description,
-    sceneLine: point.description,
-    guideTip: '点击景点卡片可切换地图焦点。'
+function getPointMeta(point) {
+  return {
+    themeTag: point.themeTag || '导览',
+    themeTone: point.themeTone || 'teal',
+    stayText: point.stayText || '建议停留 5 分钟',
+    shortHint: point.shortHint || point.description,
+    sceneLine: point.sceneLine || point.description,
+    guideTip: point.guideTip || '点击下方导览点卡片可切换地图焦点。'
   }
 }
 
-function getMarkerById(markerId) {
-  return DISPLAY_MARKER_POINTS.find((item) => String(item.id) === String(markerId)) || null
+function getRouteMarkerById(markerId) {
+  return ROUTE_DISPLAY_POINTS.find((item) => String(item.id) === String(markerId)) || null
 }
 
 function toRadians(deg) {
@@ -155,26 +127,16 @@ function formatDistanceText(distance) {
   return `距我 ${distance} m`
 }
 
-function getPointOrderText(pointId) {
-  const index = DISPLAY_MARKER_POINTS.findIndex((point) => String(point.id) === String(pointId))
-
-  if (index < 0) {
-    return ''
-  }
-
-  return `第 ${String(index + 1).padStart(2, '0')} 站`
-}
-
 function buildPointCards(selectedPointId) {
-  return DISPLAY_MARKER_POINTS.map((point, index) => {
-    const guideMeta = getGuideMeta(point)
+  return DISPLAY_CARD_POINTS.map((point) => {
+    const guideMeta = getPointMeta(point)
 
     return {
       id: point.id,
       name: point.name,
       themeTag: guideMeta.themeTag,
       themeTone: guideMeta.themeTone,
-      orderText: String(index + 1).padStart(2, '0'),
+      orderText: point.orderText || '',
       isActive: String(point.id) === String(selectedPointId)
     }
   })
@@ -186,16 +148,17 @@ function buildSelectedPoint(point, userLocation) {
   }
 
   const distance = calculateDistanceMeters(userLocation, point)
-  const guideMeta = getGuideMeta(point)
+  const guideMeta = getPointMeta(point)
 
   return {
     ...point,
     themeTag: guideMeta.themeTag,
     themeTone: guideMeta.themeTone,
     stayText: guideMeta.stayText,
+    shortHint: guideMeta.shortHint,
     sceneLine: guideMeta.sceneLine,
     guideTip: guideMeta.guideTip,
-    sequenceText: getPointOrderText(point.id),
+    sequenceText: point.sequenceText || point.themeTag,
     distanceText: formatDistanceText(distance)
   }
 }
@@ -203,8 +166,10 @@ function buildSelectedPoint(point, userLocation) {
 function buildFocusSummary(selectedPoint, locationStatus) {
   if (!selectedPoint) {
     return {
-      title: '九眼楼景区全览',
-      subtitle: '点击下方景点卡片查看详情'
+      title: JYL_ROUTE.name,
+      subtitle: locationStatus === '我的位置已开启'
+        ? `${JYL_ROUTE.distanceText} · 已显示我的位置`
+        : `${JYL_ROUTE.distanceText} · ${JYL_MAP_META.cardCount} 个公开导览点`
     }
   }
 
@@ -217,11 +182,21 @@ function buildFocusSummary(selectedPoint, locationStatus) {
 
   return {
     title: selectedPoint.name,
-    subtitle: `${selectedPoint.themeTag} · 已切换到当前景点`
+    subtitle: `${selectedPoint.themeTag} · 已切换到当前导览点`
   }
 }
 
-const DISPLAY_MARKER_POINTS = JYL_MARKER_POINTS.map((point) => ({
+const ROUTE_DISPLAY_POINTS = JYL_ROUTE_MARKER_POINTS.map((point) => ({
+  ...point,
+  width: point.type === 'start' ? 34 : 32,
+  height: point.type === 'start' ? 34 : 32,
+  activeWidth: point.type === 'start' ? 42 : 40,
+  activeHeight: point.type === 'start' ? 42 : 40,
+  markerIconPath: point.iconPath,
+  activeMarkerIconPath: buildActiveIconPath(point.iconPath)
+}))
+
+const DISPLAY_CARD_POINTS = JYL_MARKER_POINTS.map((point) => ({
   ...point,
   width: 32,
   height: 32,
@@ -241,8 +216,10 @@ Page({
     latitude: DEFAULT_SCENIC_CENTER.latitude,
     scale: DEFAULT_SCENIC_SCALE,
     showLocation: false,
-    markers: buildMarkers(DISPLAY_MARKER_POINTS, DEFAULT_SELECTED_POINT_ID),
-    markerCount: DISPLAY_MARKER_POINTS.length,
+    routePolylines: JYL_ROUTE_POLYLINES,
+    markers: buildMarkers(ROUTE_DISPLAY_POINTS, DEFAULT_SELECTED_POINT_ID),
+    markerCount: DISPLAY_CARD_POINTS.length,
+    routeDistanceText: JYL_ROUTE.distanceText,
     locationStatus: '默认景区视角',
     focusSummary: buildFocusSummary(null, '默认景区视角'),
     detailCardPulseClass: '',
@@ -336,7 +313,7 @@ Page({
   },
 
   focusPointById(pointId, revealDetail = false) {
-    const selectedPoint = getMarkerById(pointId)
+    const selectedPoint = getRouteMarkerById(pointId)
 
     if (!selectedPoint) {
       return
@@ -345,7 +322,7 @@ Page({
     const detailPoint = buildSelectedPoint(selectedPoint, this.data.userLocation)
 
     this.setData({
-      markers: buildMarkers(DISPLAY_MARKER_POINTS, selectedPoint.id),
+      markers: buildMarkers(ROUTE_DISPLAY_POINTS, selectedPoint.id),
       selectedPoint: detailPoint,
       focusSummary: buildFocusSummary(detailPoint, this.data.locationStatus),
       pointCards: buildPointCards(selectedPoint.id),
@@ -361,7 +338,7 @@ Page({
 
   onResetView() {
     this.setData({
-      markers: buildMarkers(DISPLAY_MARKER_POINTS, null),
+      markers: buildMarkers(ROUTE_DISPLAY_POINTS, null),
       showLocation: false,
       locationStatus: '默认景区视角',
       focusSummary: buildFocusSummary(null, '默认景区视角'),

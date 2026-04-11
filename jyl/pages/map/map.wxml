@@ -17,6 +17,7 @@
         longitude="{{longitude}}"
         latitude="{{latitude}}"
         scale="{{scale}}"
+        polyline="{{routePolylines}}"
         markers="{{markers}}"
         show-location="{{showLocation}}"
         show-scale="{{true}}"
@@ -31,7 +32,7 @@
 
     <view class="quick-panel">
       <view class="quick-panel-copy">
-        <text class="quick-panel-label">当前景点</text>
+        <text class="quick-panel-label">当前导览点</text>
         <text class="quick-panel-title">{{focusSummary.title}}</text>
         <text class="quick-panel-meta">{{focusSummary.subtitle}}</text>
       </view>
@@ -47,8 +48,8 @@
 
     <view class="spot-panel">
       <view class="section-header">
-        <text class="section-title">景点切换</text>
-        <text class="section-caption">{{markerCount}} 个景点</text>
+        <text class="section-title">导览点切换</text>
+        <text class="section-caption">{{markerCount}} 个公开导览点</text>
       </view>
 
       <scroll-view
@@ -84,7 +85,7 @@
           <text class="detail-title">{{selectedPoint.name}}</text>
         </view>
         <view class="detail-tag">
-          <text class="detail-tag-text">当前景点</text>
+          <text class="detail-tag-text">当前导览点</text>
         </view>
       </view>
 

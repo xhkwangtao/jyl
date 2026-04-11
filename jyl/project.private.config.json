@@ -1,6 +1,7 @@
 {
-  "libVersion": "3.8.9",
-  "projectname": "huangyaguan-jyl",
+  "miniprogramRoot": "./",
+  "libVersion": "3.15.2",
+  "projectname": "jyl",
   "setting": {
     "urlCheck": false,
     "coverView": false,

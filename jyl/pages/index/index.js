@@ -14,8 +14,8 @@ Page({
     dialogText: '小九带您告别走马观花，长城不仅是照片里的背景，历史不再是书本里的文字，触摸长城砖石、解锁历史，让快乐旅途藏满文化与知识的重量。',
     aiNameDisplay: ['小', '九'],
     aiRoleDisplay: ['A', 'I', '使', '者'],
-    checkInTitle: '景点打卡',
-    checkInDescription: '4个景点已整理完成\n开始记录你的九眼楼旅程',
+    checkInTitle: '导览点打卡',
+    checkInDescription: '4个导览点已整理完成\n开始记录你的九眼楼旅程',
     checkInAction: '立即打卡',
     checkInTotalCount: JYL_MARKER_POINTS.length,
     checkInCompletedCount: 0
@@ -227,14 +227,14 @@ Page({
     const totalCount = JYL_MARKER_POINTS.length
     const completedCount = Object.keys(records).length
 
-    let checkInDescription = `${totalCount}个景点已整理完成\n开始记录你的九眼楼旅程`
+    let checkInDescription = `${totalCount}个导览点已整理完成\n开始记录你的九眼楼旅程`
     let checkInAction = '立即打卡'
 
     if (completedCount > 0 && completedCount < totalCount) {
-      checkInDescription = `已完成 ${completedCount}/${totalCount} 个景点\n继续点亮剩余打卡点`
+      checkInDescription = `已完成 ${completedCount}/${totalCount} 个导览点\n继续点亮剩余打卡点`
       checkInAction = '继续打卡'
     } else if (completedCount >= totalCount) {
-      checkInDescription = `${totalCount}个景点已全部点亮\n回看你的完整游览记录`
+      checkInDescription = `${totalCount}个导览点已全部点亮\n回看你的完整游览记录`
       checkInAction = '查看记录'
     }
 

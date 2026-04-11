@@ -39,7 +39,7 @@
 
       <view class="stats-grid">
         <view class="stat-card">
-          <text class="stat-label">全部景点</text>
+          <text class="stat-label">全部导览点</text>
           <text class="stat-value">{{totalCount}}</text>
         </view>
         <view class="stat-card stat-card-checked">
@@ -67,7 +67,7 @@
 
     <view class="section-head">
       <view>
-        <text class="section-title">全部景点</text>
+        <text class="section-title">全部导览点</text>
         <text class="section-caption">{{sectionCaption}}</text>
       </view>
       <text class="section-right">{{visibleCount}} 个结果</text>
@@ -119,7 +119,7 @@
     </view>
 
     <view class="empty-state" wx:else>
-      <text class="empty-title">当前筛选下暂无景点</text>
+      <text class="empty-title">当前筛选下暂无导览点</text>
       <text class="empty-desc">切换筛选后可查看其它打卡状态。</text>
     </view>
   </view>

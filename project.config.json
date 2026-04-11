@@ -1,15 +1,10 @@
 {
-  "description": "jyl 首页 UI 复刻小程序",
-  "miniprogramRoot": "./",
-  "packOptions": {
-    "ignore": [
-      {
-        "value": "node_modules",
-        "type": "folder"
-      }
-    ],
-    "include": []
-  },
+  "description": "jyl workspace root launcher",
+  "miniprogramRoot": "jyl/",
+  "projectname": "huangyaguan-jyl-home",
+  "appid": "wxf1d1b5eaf421b1ed",
+  "compileType": "miniprogram",
+  "libVersion": "3.8.9",
   "setting": {
     "urlCheck": false,
     "es6": true,
@@ -36,10 +31,15 @@
       "outputPath": ""
     }
   },
-  "compileType": "miniprogram",
-  "libVersion": "3.8.9",
-  "appid": "wxf1d1b5eaf421b1ed",
-  "projectname": "huangyaguan-jyl-home",
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "node_modules"
+      }
+    ],
+    "include": []
+  },
   "simulatorPluginLibVersion": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",

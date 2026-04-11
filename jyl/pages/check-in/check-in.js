@@ -12,34 +12,11 @@ const FILTER_OPTIONS = [
   { label: '未打卡', value: 'unchecked' }
 ]
 
-const POINT_UI_META = {
-  'ticket-gate': {
-    themeTag: '起点',
-    themeTone: 'forest',
-    shortHint: '入园后先确认路线与补给'
-  },
-  'trail-start': {
-    themeTag: '步道',
-    themeTone: 'teal',
-    shortHint: '正式进入山间步道'
-  },
-  'huoyanshan-camp-site': {
-    themeTag: '遗址',
-    themeTone: 'stone',
-    shortHint: '沿线遗迹与地势看点'
-  },
-  'jiuyanlou-main-tower': {
-    themeTag: '主楼',
-    themeTone: 'gold',
-    shortHint: '九眼楼最具代表性的观景点'
-  }
-}
-
 function getPointMeta(point) {
-  return POINT_UI_META[point.key] || {
-    themeTag: '景点',
-    themeTone: 'teal',
-    shortHint: point.description || '等待探索'
+  return {
+    themeTag: point.themeTag || '导览',
+    themeTone: point.themeTone || 'teal',
+    shortHint: point.shortHint || point.description || '等待探索'
   }
 }
 
@@ -78,8 +55,8 @@ function buildSpotList(records) {
       key: point.key,
       name: point.name,
       description: point.description,
-      orderText: formatOrderText(index),
-      sequenceText: formatSequenceText(index),
+      orderText: point.orderText || formatOrderText(index),
+      sequenceText: point.sequenceText || formatSequenceText(index),
       themeTag: meta.themeTag,
       themeTone: meta.themeTone,
       shortHint: meta.shortHint,
@@ -107,39 +84,39 @@ function filterSpotList(list, currentFilter) {
 function buildHeroCopy(totalCount, checkedCount) {
   if (checkedCount <= 0) {
     return {
-      heroTitle: `点亮九眼楼 ${totalCount} 个景点`,
-      heroDesc: '全部景点已整理完成。到达现场后可逐个记录你的游览进度，状态会保存在当前设备。'
+      heroTitle: `点亮九眼楼 ${totalCount} 个导览点`,
+      heroDesc: '公开导览点已整理完成。到达现场后可逐个记录你的游览进度，状态会保存在当前设备。'
     }
   }
 
   if (checkedCount >= totalCount) {
     return {
-      heroTitle: '全部景点已完成打卡',
-      heroDesc: '九眼楼景区的全部点位都已点亮，可以继续回看路线和个人游览记录。'
+      heroTitle: '全部导览点已完成打卡',
+      heroDesc: '九眼楼景区的公开导览点都已点亮，可以继续回看路线和个人游览记录。'
     }
   }
 
   return {
-    heroTitle: `还差 ${totalCount - checkedCount} 个景点完成`,
-    heroDesc: '已打卡景点和未打卡景点会明确区分，方便你按游览顺序继续推进。'
+    heroTitle: `还差 ${totalCount - checkedCount} 个导览点完成`,
+    heroDesc: '已打卡导览点和未打卡导览点会明确区分，方便你按游览顺序继续推进。'
   }
 }
 
 function buildSectionCaption(currentFilter, checkedCount, uncheckedCount) {
   if (currentFilter === 'checked') {
-    return `当前展示 ${checkedCount} 个已完成打卡的景点`
+    return `当前展示 ${checkedCount} 个已完成打卡的导览点`
   }
 
   if (currentFilter === 'unchecked') {
-    return `当前展示 ${uncheckedCount} 个尚未打卡的景点`
+    return `当前展示 ${uncheckedCount} 个尚未打卡的导览点`
   }
 
-  return '全部景点均来自当前九眼楼地图点位'
+  return '全部导览点均来自当前九眼楼地图公开点位'
 }
 
 Page({
   data: {
-    pageTitle: '景点打卡',
+    pageTitle: '导览点打卡',
     navFadeHeight: 50,
     navBackground: 'rgba(255,255,255,0)',
     navTheme: 'dark',
