@@ -1,0 +1,135 @@
+.header-container {
+  position: relative;
+  width: 100%;
+  max-width: 680rpx;
+  height: 124rpx;
+  margin: 0 auto 20rpx;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.background-card {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3csvg width='339' height='62' viewBox='0 0 339 62' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M325 0.5H91.375C86.1103 0.500066 81.3263 3.5611 79.1191 8.34082L77.6055 11.6182C75.2348 16.7518 70.096 20.0389 64.4414 20.0391H14C6.54416 20.0391 0.500005 26.0832 0.5 33.5391V48C0.5 55.4558 6.54416 61.5 14 61.5H325C332.456 61.5 338.5 55.4558 338.5 48V14C338.5 6.66072 332.643 0.689804 325.349 0.504883L325 0.5Z' fill='url(%23paint0_linear)' stroke='url(%23paint1_linear)'/%3e%3cdefs%3e%3clinearGradient id='paint0_linear' x1='-31.5' y1='-76.5' x2='362.5' y2='80.5' gradientUnits='userSpaceOnUse'%3e%3cstop offset='0.0721154' stop-color='%232CEDB8'/%3e%3cstop offset='0.504808' stop-color='%2393BAEA'/%3e%3cstop offset='0.923077' stop-color='%238F97D4'/%3e%3c/linearGradient%3e%3clinearGradient id='paint1_linear' x1='339' y1='9.35268' x2='0' y2='9.35268' gradientUnits='userSpaceOnUse'%3e%3cstop stop-color='%236786D5'/%3e%3cstop offset='0.519231' stop-color='%2364F3CB'/%3e%3cstop offset='1' stop-color='%23BFFFED'/%3e%3c/linearGradient%3e%3c/defs%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.avatar {
+  position: absolute;
+  left: 3vw;
+  bottom: 5rpx;
+  width: 132rpx;
+  height: 203rpx;
+  z-index: 1;
+}
+
+.text-content {
+  position: absolute;
+  left: 180rpx;
+  z-index: 1;
+  color: #ffffff;
+}
+
+.title {
+  font-size: 32rpx;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.subtitle {
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  font-weight: 400;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+.map-button {
+  position: absolute;
+  top: 50%;
+  right: 40rpx;
+  width: 120rpx;
+  height: 80rpx;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 16rpx;
+  box-sizing: border-box;
+  border-radius: 24rpx;
+  border: 1rpx solid rgba(44, 237, 184, 0.4);
+  background: linear-gradient(135deg, #9c27b0 0%, #3f51b5 50%, #03a9f4 100%);
+  background-size: 200% 200%;
+  box-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.4), 0 0 30rpx rgba(44, 237, 184, 0.3), 0 0 50rpx rgba(15, 52, 96, 0.2), inset 0 1rpx 0 rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  z-index: 1;
+  transition: all 0.3s ease;
+  animation: fusion-gradient 3s ease-in-out infinite;
+}
+
+.map-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, transparent 30%, rgba(44, 237, 184, 0.1) 50%, transparent 70%);
+  filter: blur(8rpx);
+  animation: fusion-sweep 3s ease-in-out infinite;
+}
+
+.map-button:active {
+  transform: translateY(-50%) scale(0.95);
+  box-shadow: 0 3rpx 12rpx rgba(0, 0, 0, 0.5), 0 0 20rpx rgba(44, 237, 184, 0.4), 0 0 40rpx rgba(15, 52, 96, 0.3), inset 0 1rpx 0 rgba(255, 255, 255, 0.1);
+}
+
+.map-button-text-container {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-button-text {
+  margin: 1rpx 0;
+  color: #ffffff;
+  font-size: 22rpx;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.5), 0 0 10rpx rgba(44, 237, 184, 0.3);
+}
+
+@keyframes fusion-gradient {
+  0%,
+  100% {
+    background-position: 0% 50%;
+    box-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.4), 0 0 30rpx rgba(44, 237, 184, 0.3), 0 0 50rpx rgba(15, 52, 96, 0.2), inset 0 1rpx 0 rgba(255, 255, 255, 0.1);
+  }
+
+  50% {
+    background-position: 100% 50%;
+    box-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.4), 0 0 40rpx rgba(44, 237, 184, 0.5), 0 0 70rpx rgba(15, 52, 96, 0.3), inset 0 1rpx 0 rgba(255, 255, 255, 0.2);
+  }
+}
+
+@keyframes fusion-sweep {
+  0% {
+    transform: translateX(-100%) translateY(-100%);
+  }
+
+  50% {
+    transform: translateX(0%) translateY(0%);
+  }
+
+  100% {
+    transform: translateX(100%) translateY(100%);
+  }
+}

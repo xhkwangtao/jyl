@@ -1,0 +1,114 @@
+<view class="map-page">
+  <universal-navigation
+    title=""
+    backgroundColor="transparent"
+    showHomeButton="{{false}}"
+    showUserAvatar="{{false}}"
+    useCapsuleStyle="{{true}}"
+    theme="light"
+    useDefaultBack="{{true}}"
+  />
+
+  <view class="page-body" style="padding-top: {{navigationBarTotalHeight}}px; padding-bottom: {{safeAreaBottom}}px;">
+    <view class="map-stage">
+      <map
+        id="jyl-map"
+        class="jyl-map"
+        longitude="{{longitude}}"
+        latitude="{{latitude}}"
+        scale="{{scale}}"
+        markers="{{markers}}"
+        show-location="{{showLocation}}"
+        show-scale="{{true}}"
+        show-compass="{{true}}"
+        enable-overlooking="{{false}}"
+        enable-zoom="{{true}}"
+        enable-scroll="{{true}}"
+        enable-rotate="{{false}}"
+        bindmarkertap="onMarkerTap"
+      />
+    </view>
+
+    <view class="quick-panel">
+      <view class="quick-panel-copy">
+        <text class="quick-panel-label">当前景点</text>
+        <text class="quick-panel-title">{{focusSummary.title}}</text>
+        <text class="quick-panel-meta">{{focusSummary.subtitle}}</text>
+      </view>
+      <view class="quick-panel-actions">
+        <view class="quick-action" bindtap="onResetView">
+          <text class="quick-action-text">景区全览</text>
+        </view>
+        <view class="quick-action quick-action-strong" bindtap="onLocateMe">
+          <text class="quick-action-text quick-action-text-strong">我的位置</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="spot-panel">
+      <view class="section-header">
+        <text class="section-title">景点切换</text>
+        <text class="section-caption">{{markerCount}} 个景点</text>
+      </view>
+
+      <scroll-view
+        class="spot-scroll"
+        scroll-x="{{true}}"
+        enhanced="{{true}}"
+        show-scrollbar="{{false}}"
+      >
+        <view class="spot-list">
+          <view
+            class="spot-card {{item.isActive ? 'spot-card-active' : ''}}"
+            wx:for="{{pointCards}}"
+            wx:key="id"
+            data-id="{{item.id}}"
+            bindtap="onPointCardTap"
+          >
+            <view class="spot-card-index">
+              <text class="spot-card-index-text">{{item.orderText}}</text>
+            </view>
+            <view class="spot-card-copy">
+              <text class="spot-card-tag spot-card-tag-{{item.themeTone}}">{{item.themeTag}}</text>
+              <text class="spot-card-name">{{item.name}}</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <view id="detail-card" class="detail-card {{detailCardPulseClass}}" wx:if="{{selectedPoint}}">
+      <view class="detail-top">
+        <view class="detail-copy">
+          <text class="detail-kicker">{{selectedPoint.sequenceText}} · {{selectedPoint.themeTag}}</text>
+          <text class="detail-title">{{selectedPoint.name}}</text>
+        </view>
+        <view class="detail-tag">
+          <text class="detail-tag-text">当前景点</text>
+        </view>
+      </view>
+
+      <text class="point-description">{{selectedPoint.description}}</text>
+      <text class="detail-scene-line">{{selectedPoint.sceneLine}}</text>
+
+      <view class="meta-grid">
+        <view class="meta-card">
+          <text class="meta-label">建议停留</text>
+          <text class="meta-value">{{selectedPoint.stayText}}</text>
+        </view>
+        <view class="meta-card">
+          <text class="meta-label">离我距离</text>
+          <text class="meta-value">{{selectedPoint.distanceText}}</text>
+        </view>
+      </view>
+
+      <view class="action-row">
+        <view class="primary-action" bindtap="onNavigateToSelectedPoint">
+          <text class="primary-action-text">导航到这里</text>
+        </view>
+      </view>
+
+      <text class="detail-tip">{{selectedPoint.guideTip}}</text>
+    </view>
+  </view>
+</view>

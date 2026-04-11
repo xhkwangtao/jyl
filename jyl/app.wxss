@@ -1,0 +1,7 @@
+page {
+  background-color: #f8f8f8;
+  font-family: 'Alibaba-PuHuiTi-Regular', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 28rpx;
+  line-height: 1.5;
+  color: #212121;
+}

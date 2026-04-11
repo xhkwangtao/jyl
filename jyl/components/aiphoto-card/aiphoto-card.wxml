@@ -1,0 +1,10 @@
+<view class="aiphoto-card" bindtap="onCardTap">
+  <view class="card-content">
+    <text class="card-title">网红拍照</text>
+    <text class="card-description">智能定位最佳&#10;拍照位置</text>
+  </view>
+
+  <view class="camera-icon-container">
+    <image class="camera-icon" src="/images/icons/aiphoto.svg" mode="aspectFit"></image>
+  </view>
+</view>

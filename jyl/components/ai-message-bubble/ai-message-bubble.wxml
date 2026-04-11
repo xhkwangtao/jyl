@@ -1,0 +1,21 @@
+<view class="ai-message-container">
+  <image class="avatar" src="{{message.avatar || '/images/xiaoying-avatar.png'}}" mode="aspectFill" />
+
+  <view class="content-wrapper">
+    <view class="bubble-container">
+      <text class="message-text">{{message.content}}</text>
+
+      <view class="toolbar">
+        <view class="toolbar-left">
+          <view class="toolbar-button" bind:tap="onCopyTap">
+            <image class="toolbar-icon" src="/images/icons/butle-button-copy.svg" mode="aspectFit" />
+          </view>
+          <view class="toolbar-button" bind:tap="onPlayAudioTap">
+            <image class="toolbar-icon" src="/images/icons/buble-button-play.svg" mode="aspectFit" />
+          </view>
+        </view>
+        <text class="ai-label">AI生成</text>
+      </view>
+    </view>
+  </view>
+</view>

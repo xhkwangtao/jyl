@@ -1,0 +1,88 @@
+<view class="ai-chat-page" wx:if="{{pageReady}}">
+  <view class="background-layer">
+    <view class="background-decorations">
+      <view class="pink-blur"></view>
+      <view class="blue-blur"></view>
+    </view>
+  </view>
+
+  <universal-navigation
+    title="AI 伴游"
+    backgroundColor="transparent"
+    theme="light"
+    showHomeButton="{{false}}"
+    showUserAvatar="{{false}}"
+  />
+
+  <view class="chat-main-container" style="padding-top: {{navHeight}}px;">
+    <view class="page-header">
+      <ai-chat-header bind:gotomap="onGoToMap" />
+    </view>
+
+    <scroll-view
+      class="chat-messages-area"
+      scroll-y="{{true}}"
+      enhanced="{{true}}"
+      scroll-top="{{scrollTop}}"
+      scroll-with-animation="{{true}}"
+      bind:scroll="onChatScroll"
+      bind:scrolltolower="onScrollToLower"
+    >
+      <chat-message-list
+        messages="{{messageList}}"
+        is-loading="{{isAILoading}}"
+        loading-text="{{loadingStateText}}"
+        bind:copyText="onCopyText"
+        bind:playAudio="onPlayAudio"
+      />
+    </scroll-view>
+
+    <view class="chat-input-area">
+      <view class="quick-questions-wrapper">
+        <quick-questions
+          visible="{{true}}"
+          disabled="{{isGenerating}}"
+          initialExpanded="{{false}}"
+          bind:questionSelect="onQuickQuestionSelect"
+          bind:expandChange="onQuickQuestionExpandChange"
+        />
+      </view>
+
+      <chat-input-bar
+        disabled="{{false}}"
+        isGenerating="{{isGenerating}}"
+        bind:send="onSendMessage"
+        bind:voiceSend="onVoiceSend"
+        bind:stopGeneration="cancelGeneration"
+      />
+    </view>
+  </view>
+
+  <view
+    class="scroll-to-bottom-btn"
+    wx:if="{{showScrollToBottom}}"
+    bind:tap="onScrollToBottomTap"
+  >
+    <view class="new-message-hint" wx:if="{{hasNewMessage}}">
+      <text>新消息</text>
+    </view>
+    <view class="arrow-down-icon">
+      <text>↓</text>
+    </view>
+  </view>
+</view>
+
+<view class="page-loading" wx:if="{{!pageReady}}">
+  <view class="loading-background-layer"></view>
+  <view class="loading-container">
+    <view class="loading-avatar">
+      <image class="avatar-image" src="/images/ai-assistant-xiaoying.png" mode="aspectFill" />
+    </view>
+    <text class="loading-text">AI助手正在准备中...</text>
+    <view class="loading-dots">
+      <view class="dot"></view>
+      <view class="dot"></view>
+      <view class="dot"></view>
+    </view>
+  </view>
+</view>

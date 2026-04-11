@@ -1,0 +1,40 @@
+.custom-nav-bar {
+  width: 100%;
+  background-color: transparent;
+  position: relative;
+  z-index: 10;
+}
+
+.nav-bar-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 32rpx;
+  box-sizing: border-box;
+}
+
+.left-content {
+  display: flex;
+  align-items: center;
+  padding: 8rpx 16rpx 8rpx 0;
+  border-radius: 50rpx;
+}
+
+.left-content:active {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.user-avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+}
+
+.user-name {
+  margin-left: 16rpx;
+  font-size: 28rpx;
+  color: #333333;
+  font-weight: 500;
+}

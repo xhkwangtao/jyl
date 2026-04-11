@@ -1,0 +1,180 @@
+<view class="scenic-detail-page">
+  <view class="background-layer">
+    <image class="background-svg" src="/images/ai-chat-bg.svg" mode="aspectFill"></image>
+  </view>
+
+  <view class="page-header">
+    <universal-navigation
+      title="{{pageTitle}}"
+      show-back="{{true}}"
+      showHomeButton="{{true}}"
+      background-color="{{navBackground}}"
+      theme="{{navTheme}}"
+      showUserAvatar="{{false}}"
+      useCapsuleStyle="{{false}}"
+      bind:back="onBackTap"
+      bind:home="onHomeTap"
+    />
+  </view>
+
+  <view class="content-layer">
+    <view class="detail-section">
+      <view class="bg-container">
+        <image class="bg-head" src="/images/poi-detail/head.png" mode="widthFix" />
+        <image class="bg-mid" src="/images/poi-detail/mid.png" mode="scaleToFill" />
+        <image class="bg-foot" src="/images/poi-detail/bottom.png" mode="widthFix" />
+      </view>
+
+      <view class="content-wrapper">
+        <view class="section-title">
+          <text class="decor-title">景点详解</text>
+          <view class="decor-location">
+            <image class="location-icon" src="/images/poi-detail/location.svg" mode="widthFix" />
+            <text class="decor-location-text">{{locationText}}</text>
+          </view>
+        </view>
+
+        <view class="info-block info-list-block">
+          <view class="info-list">
+            <view
+              class="audio-group"
+              wx:for="{{audioGroups}}"
+              wx:key="id"
+              wx:for-index="groupIndex"
+              wx:for-item="group"
+            >
+              <view class="group-header" bindtap="onGroupToggle" data-index="{{groupIndex}}">
+                <view class="group-left">
+                  <view class="group-icon">
+                    <image src="{{group.cover}}" mode="aspectFill" />
+                  </view>
+                  <view class="group-texts">
+                    <text class="group-title">{{group.title}}</text>
+                    <text class="group-subtitle">音频列表</text>
+                  </view>
+                </view>
+                <view class="group-right">
+                  <view class="group-meta">
+                    <text class="group-count">{{group.items.length}} 段</text>
+                    <text class="group-duration">{{group.summaryDuration}}</text>
+                  </view>
+                  <view class="group-arrow {{group.expanded ? 'expanded' : ''}}"></view>
+                </view>
+              </view>
+
+              <view class="group-divider"></view>
+
+              <view class="group-body" wx:if="{{group.expanded}}">
+                <view
+                  class="group-child"
+                  wx:for="{{group.items}}"
+                  wx:key="id"
+                  wx:for-index="childIndex"
+                  wx:for-item="child"
+                >
+                  <view class="child-left">
+                    <view
+                      class="child-cover"
+                      bindtap="onSubAudioPlay"
+                      data-group-index="{{groupIndex}}"
+                      data-item-index="{{childIndex}}"
+                    >
+                      <image class="child-cover-img" src="{{child.cover}}" mode="aspectFill" />
+                      <view class="child-cover-overlay">
+                        <image
+                          class="child-cover-play"
+                          src="{{(child.playing && audioPlaying) ? '/images/poi-detail/pause.svg' : '/images/poi-detail/play.svg'}}"
+                          mode="widthFix"
+                        />
+                      </view>
+                    </view>
+                    <view class="child-texts">
+                      <text class="child-title">{{child.title}}</text>
+                      <text class="child-desc">音频讲解</text>
+                    </view>
+                  </view>
+                  <text class="child-duration">{{child.duration}}</text>
+                </view>
+
+                <view wx:if="{{!group.items || !group.items.length}}" class="group-empty">暂无子集音频，敬请期待</view>
+              </view>
+            </view>
+
+            <view
+              class="flat-item-row"
+              wx:for="{{flatAudios}}"
+              wx:key="id"
+            >
+              <view class="list-item flat-item">
+                <view
+                  class="child-cover"
+                  bindtap="onFlatAudioPlay"
+                  data-id="{{item.id}}"
+                >
+                  <image class="child-cover-img" src="{{item.cover}}" mode="aspectFill"></image>
+                  <view class="child-cover-overlay">
+                    <image
+                      class="child-cover-play"
+                      src="{{(item.playing && audioPlaying) ? '/images/poi-detail/pause.svg' : '/images/poi-detail/play.svg'}}"
+                      mode="widthFix"
+                    />
+                  </view>
+                </view>
+                <view class="item-text">
+                  <text class="item-title">{{item.title}}</text>
+                  <text class="item-subtitle">音频讲解</text>
+                </view>
+                <text class="flat-duration">{{item.duration}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="audio-player">
+    <image class="player-bg-decor" src="/images/poi-detail/player-bg.svg" mode="scaleToFill" />
+    <view class="player-content">
+      <view class="player-left">
+        <image class="player-cover" src="{{audioCover}}" mode="aspectFill" />
+        <view class="player-controls" bindtap="toggleAudioPlay">
+          <image
+            wx:if="{{!audioPlaying}}"
+            class="player-control-icon"
+            src="/images/poi-detail/play.svg"
+            mode="widthFix"
+          />
+          <image
+            wx:else
+            class="player-control-icon"
+            src="/images/poi-detail/pause.svg"
+            mode="widthFix"
+          />
+        </view>
+      </view>
+
+      <view class="player-right">
+        <text class="player-title">{{audioTitle}}</text>
+        <view class="player-info-row">
+          <text class="player-duration">音频时长 {{audioDurationDisplay}}</text>
+          <text class="player-current">当前 {{audioCurrentDisplay}}</text>
+        </view>
+        <view class="progress-wrapper">
+          <slider
+            class="progress-slider"
+            min="0"
+            max="100"
+            step="1"
+            value="{{audioProgressPercent}}"
+            block-size="20"
+            activeColor="#2cedb8"
+            backgroundColor="#e5e5e5"
+            bindchanging="onSliderChanging"
+            bindchange="onSliderChange"
+          />
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

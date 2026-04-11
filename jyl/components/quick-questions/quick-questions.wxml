@@ -1,0 +1,77 @@
+<view class="quick-questions-container {{disabled ? 'disabled' : ''}}">
+  <scroll-view
+    wx:if="{{!isExpanded}}"
+    class="collapsed-view"
+    scroll-x="{{true}}"
+    show-scrollbar="{{false}}"
+    enhanced="{{true}}"
+  >
+    <view class="questions-row">
+      <view
+        wx:for="{{displayQuestions}}"
+        wx:key="id"
+        class="question-chip"
+        bind:tap="onQuestionTap"
+        data-question="{{item}}"
+      >
+        <text class="question-text">{{item.text}}</text>
+        <view wx:if="{{item.isImportant}}" class="chip-important">荐</view>
+      </view>
+
+      <view class="expand-btn" bind:tap="toggleExpand">
+        <image class="expand-icon" src="/images/icons/expand-more.svg" mode="aspectFit" />
+      </view>
+    </view>
+  </scroll-view>
+
+  <view wx:else class="expanded-view">
+    <view class="header">
+      <text class="title">快速提问</text>
+      <view class="collapse-btn" bind:tap="toggleExpand">
+        <image class="collapse-icon" src="/images/icons/expand-less.svg" mode="aspectFit" />
+      </view>
+    </view>
+
+    <scroll-view class="categories" scroll-x="{{true}}" show-scrollbar="{{false}}">
+      <view class="category-list">
+        <view
+          wx:for="{{categories}}"
+          wx:key="id"
+          class="category-tag {{selectedCategory === item.id ? 'active' : ''}}"
+          bind:tap="onCategoryChange"
+          data-id="{{item.id}}"
+        >
+          <text>{{item.name}}</text>
+        </view>
+      </view>
+    </scroll-view>
+
+    <scroll-view class="questions-grid" scroll-y="{{true}}" show-scrollbar="{{false}}">
+      <view class="questions-grid-inner">
+        <view
+          wx:for="{{filteredQuestions}}"
+          wx:key="id"
+          class="question-card {{item.isHot ? 'hot' : ''}}"
+          bind:tap="onQuestionTap"
+          data-category="{{item.category}}"
+          data-question="{{item}}"
+        >
+          <view wx:if="{{item.icon}}" class="question-icon">
+            <image src="{{item.icon}}" mode="aspectFit" />
+          </view>
+          <text class="question-card-text">{{item.text}}</text>
+          <view wx:if="{{item.isHot}}" class="hot-badge">热门</view>
+          <view wx:if="{{item.isNew}}" class="new-badge">新</view>
+          <view wx:if="{{item.isImportant}}" class="important-badge">荐</view>
+        </view>
+
+        <view wx:if="{{filteredQuestions.length < 4}}" class="empty-placeholder">
+          <view class="empty-placeholder-icon">?</view>
+          <view class="empty-placeholder-text">
+            {{selectedCategory === 'all' ? '暂无更多问题' : '此分类下问题较少\n可以切换到"全部"查看更多'}}
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</view>

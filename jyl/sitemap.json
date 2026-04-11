@@ -1,0 +1,9 @@
+{
+  "desc": "jyl 首页 UI 复刻小程序",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "*"
+    }
+  ]
+}

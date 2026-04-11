@@ -1,0 +1,171 @@
+<page-meta page-style="{{pageStyle}}"></page-meta>
+
+<view class="my-page {{isCardCollapsed ? 'compact-mode' : ''}}" wx:if="{{pageReady}}" style="{{navBarHeightStyle}}">
+  <view class="background-layer">
+    <image class="background-svg" src="/images/ai-chat-bg.svg" mode="aspectFill" />
+  </view>
+
+  <view class="page-header">
+    <universal-navigation
+      title="我的"
+      show-back="{{true}}"
+      showHomeButton="{{true}}"
+      background-color="rgba(255, 255, 255, 0.1)"
+      title-color="#333333"
+      showUserAvatar="{{false}}"
+      useCapsuleStyle="{{false}}"
+      bind:back="onBackTap"
+      bind:home="onHomeTap"
+    />
+  </view>
+
+  <view class="content-layer">
+    <view class="main-content" data-tab="{{currentTab}}">
+      <view
+        class="tab-content-container {{isCardCollapsed ? 'collapsed-mode' : 'expanded-mode'}} {{isDragging ? 'dragging' : ''}}"
+        style="transform: {{tabTransform}}; transition: {{tabTransition}};"
+        bindtouchstart="onTouchStart"
+        bindtouchmove="onTouchMove"
+        bindtouchend="onTouchEnd"
+      >
+        <view class="tab-container">
+          <tab-switch current-tab="{{currentTab}}" bind:tabChange="onTabChange" />
+        </view>
+
+        <view class="content-container">
+          <view class="badge-container" wx:if="{{currentTab === 'badge'}}">
+            <badge-grid badges="{{userBadges}}" bind:badgeTap="onBadgeTap" />
+          </view>
+
+          <view class="ranking-container" wx:if="{{currentTab === 'ranking'}}">
+            <view class="top-ranking-list">
+              <view class="list-header">
+                <text class="list-title">排行榜 TOP 10</text>
+              </view>
+
+              <view class="top-three-simple">
+                <view class="simple-podium-item {{topRankingList[1] && topRankingList[1].isSelf ? 'self-item' : ''}}" wx:if="{{topRankingList[1]}}">
+                  <view class="avatar-container">
+                    <image class="simple-avatar" src="{{topRankingList[1].avatar}}" mode="aspectFit" />
+                    <view class="simple-rank-badge">2</view>
+                  </view>
+                  <view class="simple-username">{{topRankingList[1].nickname}}</view>
+                  <view class="simple-score-container">
+                    <text class="simple-score-number">{{topRankingList[1].score}}</text>
+                    <text class="simple-score-label">积分</text>
+                  </view>
+                </view>
+
+                <view class="simple-podium-item first-place {{topRankingList[0] && topRankingList[0].isSelf ? 'self-item' : ''}}" wx:if="{{topRankingList[0]}}">
+                  <view class="avatar-container">
+                    <image class="simple-avatar" src="{{topRankingList[0].avatar}}" mode="aspectFit" />
+                    <view class="simple-rank-badge">1</view>
+                  </view>
+                  <view class="simple-username">{{topRankingList[0].nickname}}</view>
+                  <view class="simple-score-container">
+                    <text class="simple-score-number">{{topRankingList[0].score}}</text>
+                    <text class="simple-score-label">积分</text>
+                  </view>
+                </view>
+
+                <view class="simple-podium-item {{topRankingList[2] && topRankingList[2].isSelf ? 'self-item' : ''}}" wx:if="{{topRankingList[2]}}">
+                  <view class="avatar-container">
+                    <image class="simple-avatar" src="{{topRankingList[2].avatar}}" mode="aspectFit" />
+                    <view class="simple-rank-badge">3</view>
+                  </view>
+                  <view class="simple-username">{{topRankingList[2].nickname}}</view>
+                  <view class="simple-score-container">
+                    <text class="simple-score-number">{{topRankingList[2].score}}</text>
+                    <text class="simple-score-label">积分</text>
+                  </view>
+                </view>
+              </view>
+
+              <view class="ranking-items">
+                <block wx:for="{{topRankingList}}" wx:for-index="idx" wx:key="id">
+                  <view class="ranking-item {{item.isSelf ? 'self-item' : ''}}" wx:if="{{idx >= 3}}">
+                    <view class="rank-number-badge">
+                      <text class="rank-number">{{item.rank}}</text>
+                    </view>
+                    <image class="user-avatar" src="{{item.avatar}}" mode="aspectFit" />
+                    <view class="user-info">
+                      <text class="user-nickname">{{item.nickname}}</text>
+                      <text class="user-title">{{item.title}}</text>
+                    </view>
+                    <view class="score-display">
+                      <text class="score-number">{{item.score}}</text>
+                      <text class="score-label">分</text>
+                    </view>
+                  </view>
+                </block>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="quick-links-section bottom-fixed" wx:if="{{currentTab === 'badge'}}">
+    <button class="action-button primary" bindtap="openOrderCenter">
+      <text class="button-icon">📦</text>
+      <text>查看订单</text>
+    </button>
+    <button class="action-button secondary" bindtap="handleContact">
+      <text class="button-icon">💬</text>
+      <text>联系客服</text>
+    </button>
+  </view>
+
+  <view class="my-rank-card-container-fixed" wx:if="{{currentTab === 'ranking'}}">
+    <image class="rank-avatar" src="/images/xiaoying.png" mode="aspectFill"></image>
+
+    <view class="my-rank-card">
+      <view class="progress-dot"></view>
+
+      <view class="rank-content-new">
+        <text class="rank-title-new">我的排名</text>
+        <text class="my-name">{{userNickname || '游客'}}</text>
+        <text class="my-rank1">第</text>
+        <text class="my-rank">{{currentRank}}</text>
+        <text class="my-rank2">名</text>
+        <text class="score-count">{{currentPoints}}</text>
+        <text class="score-label">积分</text>
+        <text class="progress-text">{{percentileText}}</text>
+
+        <view class="challenge-btn" bindtap="goToQuiz">
+          <text class="challenge-btn-text">去挑战</text>
+          <view class="challenge-arrow"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="qrcode-modal" wx:if="{{showQrcodeModal}}">
+    <view class="qrcode-overlay" bindtap="hideQrcodeModal"></view>
+    <view class="qrcode-container">
+      <view class="qrcode-card">
+        <view class="qrcode-close" bindtap="hideQrcodeModal">
+          <text class="qrcode-close-icon">×</text>
+        </view>
+
+        <view class="qrcode-title">扫码添加客服微信</view>
+
+        <image
+          class="qrcode-image"
+          src="{{qrcodeImageUrl}}"
+          mode="aspectFit"
+          show-menu-by-longpress="true"
+          bindtap="previewQrcode"
+        />
+
+        <view class="qrcode-tips">
+          <text class="qrcode-tip-text">当前仅复刻 UI 展示效果</text>
+          <text class="qrcode-tip-text">保存与扫码能力暂未接入</text>
+        </view>
+
+        <button class="qrcode-save-btn" bindtap="saveQrcodeToAlbum">保存到相册</button>
+      </view>
+    </view>
+  </view>
+</view>

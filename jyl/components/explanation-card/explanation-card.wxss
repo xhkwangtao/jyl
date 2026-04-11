@@ -1,0 +1,67 @@
+.explanation-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, #E2FEF4, #ECFEF9);
+  background: -webkit-linear-gradient(#E2FEF4, #ECFEF9);
+  border-radius: 32rpx;
+  box-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  z-index: 1;
+}
+
+.explanation-card:active {
+  transform: scale(0.98);
+}
+
+.card-content {
+  position: relative;
+  z-index: 2;
+  padding: 26rpx 38rpx;
+}
+
+.decoration-ai-group {
+  position: absolute;
+  right: 0;
+  bottom: -10rpx;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.ai-avatar {
+  width: 15vw;
+  height: 12vh;
+  margin: 0;
+  padding: 0;
+  object-fit: cover;
+  border-bottom-right-radius: 32rpx;
+}
+
+.card-title {
+  display: block;
+  margin-bottom: 14rpx;
+  color: #000000;
+  font-size: 32rpx;
+  font-family: 'Alibaba-PuHuiTi-Medium', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-weight: 500;
+  line-height: 44rpx;
+  white-space: nowrap;
+}
+
+.card-description {
+  display: block;
+  color: #000000;
+  font-size: 20rpx;
+  font-family: 'Asap Condensed', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 400;
+  line-height: 28rpx;
+  white-space: pre-line;
+}
+
+.decoration-image {
+  width: 10vw;
+  height: 8vh;
+  object-fit: contain;
+}

@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "九眼楼地图",
+  "navigationStyle": "custom",
+  "enablePullDownRefresh": false,
+  "usingComponents": {
+    "universal-navigation": "/components/universal-navigation/universal-navigation"
+  }
+}

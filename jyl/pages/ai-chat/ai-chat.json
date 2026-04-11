@@ -1,0 +1,13 @@
+{
+  "navigationStyle": "custom",
+  "backgroundColor": "#f9f9f9",
+  "backgroundTextStyle": "dark",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "universal-navigation": "/components/universal-navigation/universal-navigation",
+    "ai-chat-header": "/components/ai-chat-header/ai-chat-header",
+    "chat-message-list": "/components/chat-message-list/chat-message-list",
+    "quick-questions": "/components/quick-questions/quick-questions",
+    "chat-input-bar": "/components/chat-input-bar/chat-input-bar"
+  }
+}

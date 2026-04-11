@@ -1,0 +1,154 @@
+.badge-grid-container {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20rpx 0;
+}
+
+.badge-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 40rpx;
+  box-sizing: border-box;
+}
+
+.badge-row:last-child {
+  margin-bottom: 0;
+}
+
+.first-row {
+  justify-content: center;
+}
+
+.single-badge {
+  width: 33.333%;
+  max-width: 180rpx;
+  min-width: 120rpx;
+}
+
+.normal-row {
+  justify-content: space-between;
+  padding: 0 10%;
+}
+
+.normal-row .badge-item {
+  width: 20%;
+  max-width: 140rpx;
+  min-width: 96rpx;
+}
+
+.badge-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 220rpx;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.badge-item:active {
+  transform: scale(0.96);
+}
+
+.badge-image-container {
+  position: relative;
+  width: 120rpx;
+  height: 120rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badge-image-container-big {
+  width: 176rpx;
+  height: 176rpx;
+}
+
+.badge-image,
+.badge-image-big {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.badge-name {
+  margin-top: 16rpx;
+  font-size: 20rpx;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #333333;
+  text-align: center;
+  max-width: 180rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.single-badge .badge-name {
+  margin-top: 20rpx;
+  font-size: 24rpx;
+}
+
+.badge-description {
+  margin-top: 8rpx;
+  font-size: 18rpx;
+  line-height: 1.35;
+  color: #7d7d7d;
+  text-align: center;
+  max-width: 180rpx;
+}
+
+.badge-locked {
+  opacity: 0.58;
+}
+
+.badge-locked .badge-name,
+.badge-locked .badge-description {
+  color: #919191;
+}
+
+.lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lock-icon {
+  min-width: 48rpx;
+  height: 48rpx;
+  padding: 0 16rpx;
+  border-radius: 999rpx;
+  background: rgba(0, 0, 0, 0.58);
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 48rpx;
+  text-align: center;
+}
+
+@media (max-width: 375px) {
+  .badge-row {
+    margin-bottom: 32rpx;
+  }
+
+  .badge-image-container {
+    width: 104rpx;
+    height: 104rpx;
+  }
+
+  .badge-image-container-big {
+    width: 160rpx;
+    height: 160rpx;
+  }
+
+  .badge-name {
+    font-size: 18rpx;
+  }
+
+  .single-badge .badge-name {
+    font-size: 22rpx;
+  }
+}

@@ -1,0 +1,8 @@
+<view class="custom-nav-bar" style="padding-top: {{statusBarHeight}}px;">
+  <view class="nav-bar-content" style="height: {{navBarHeight}}px;">
+    <view class="left-content" bind:tap="onUserAvatarTap">
+      <image class="user-avatar" src="/images/icons/user.svg" mode="aspectFit"></image>
+      <text class="user-name">{{guestText}}</text>
+    </view>
+  </view>
+</view>

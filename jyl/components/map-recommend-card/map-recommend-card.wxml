@@ -1,0 +1,22 @@
+<view class="route-recommendation">
+  <view class="route-card" bind:tap="onMapPreviewTap">
+    <view class="recommendation-text-container">
+      <view class="recommendation-title-container">
+        <text class="recommendation-title">{{recommendationTitle}}</text>
+        <image class="recommendation-icon" src="/images/icons/left.svg" mode="aspectFit" />
+      </view>
+      <text class="recommendation-subtitle">{{recommendationSubtitle}}</text>
+    </view>
+
+    <view class="texture-with-action-container">
+      <image class="texture-image" src="/images/route-recommendation-bg.svg" mode="widthFix"></image>
+
+      <view class="route-action" catch:tap="onStartRoute">
+        <text class="action-text">{{startRouteText}}</text>
+        <view class="badge">
+          <image class="badge-star" src="/images/icons/badge.svg" mode="aspectFit"></image>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

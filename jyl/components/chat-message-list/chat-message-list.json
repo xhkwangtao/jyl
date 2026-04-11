@@ -1,0 +1,7 @@
+{
+  "component": true,
+  "usingComponents": {
+    "ai-message-bubble": "/components/ai-message-bubble/ai-message-bubble",
+    "user-message-bubble": "/components/user-message-bubble/user-message-bubble"
+  }
+}

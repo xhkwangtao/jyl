@@ -1,0 +1,118 @@
+<view class="badge-grid-container" wx:if="{{displayBadges && displayBadges.length > 0}}">
+  <view class="badge-row first-row">
+    <view
+      class="badge-item single-badge {{displayBadges[0].unlocked ? 'badge-unlocked' : 'badge-locked'}}"
+      bind:tap="onBadgeTap"
+      data-index="0"
+      wx:if="{{displayBadges[0]}}"
+    >
+      <view class="badge-image-container badge-image-container-big">
+        <image class="badge-image-big" src="{{displayBadges[0].image}}" mode="aspectFit" binderror="onImageError" data-index="0"></image>
+        <view class="lock-overlay" wx:if="{{!displayBadges[0].unlocked}}">
+          <text class="lock-icon">🔒</text>
+        </view>
+      </view>
+      <text class="badge-name">{{displayBadges[0].name}}</text>
+      <text class="badge-description" wx:if="{{displayBadges[0].description}}">{{displayBadges[0].description}}</text>
+    </view>
+  </view>
+
+  <view class="badge-row normal-row">
+    <view class="badge-item {{displayBadges[1].unlocked ? 'badge-unlocked' : 'badge-locked'}}" bind:tap="onBadgeTap" data-index="1" wx:if="{{displayBadges[1]}}">
+      <view class="badge-image-container">
+        <image class="badge-image" src="{{displayBadges[1].image}}" mode="aspectFit" binderror="onImageError" data-index="1"></image>
+        <view class="lock-overlay" wx:if="{{!displayBadges[1].unlocked}}">
+          <text class="lock-icon">🔒</text>
+        </view>
+      </view>
+      <text class="badge-name">{{displayBadges[1].name}}</text>
+      <text class="badge-description" wx:if="{{displayBadges[1].description}}">{{displayBadges[1].description}}</text>
+    </view>
+    <view class="badge-item {{displayBadges[2].unlocked ? 'badge-unlocked' : 'badge-locked'}}" bind:tap="onBadgeTap" data-index="2" wx:if="{{displayBadges[2]}}">
+      <view class="badge-image-container">
+        <image class="badge-image" src="{{displayBadges[2].image}}" mode="aspectFit" binderror="onImageError" data-index="2"></image>
+        <view class="lock-overlay" wx:if="{{!displayBadges[2].unlocked}}">
+          <text class="lock-icon">🔒</text>
+        </view>
+      </view>
+      <text class="badge-name">{{displayBadges[2].name}}</text>
+      <text class="badge-description" wx:if="{{displayBadges[2].description}}">{{displayBadges[2].description}}</text>
+    </view>
+    <view class="badge-item {{displayBadges[3].unlocked ? 'badge-unlocked' : 'badge-locked'}}" bind:tap="onBadgeTap" data-index="3" wx:if="{{displayBadges[3]}}">
+      <view class="badge-image-container">
+        <image class="badge-image" src="{{displayBadges[3].image}}" mode="aspectFit" binderror="onImageError" data-index="3"></image>
+        <view class="lock-overlay" wx:if="{{!displayBadges[3].unlocked}}">
+          <text class="lock-icon">🔒</text>
+        </view>
+      </view>
+      <text class="badge-name">{{displayBadges[3].name}}</text>
+      <text class="badge-description" wx:if="{{displayBadges[3].description}}">{{displayBadges[3].description}}</text>
+    </view>
+  </view>
+
+  <view class="badge-row normal-row">
+    <view class="badge-item {{displayBadges[4].unlocked ? 'badge-unlocked' : 'badge-locked'}}" bind:tap="onBadgeTap" data-index="4" wx:if="{{displayBadges[4]}}">
+      <view class="badge-image-container">
+        <image class="badge-image" src="{{displayBadges[4].image}}" mode="aspectFit" binderror="onImageError" data-index="4"></image>
+        <view class="lock-overlay" wx:if="{{!displayBadges[4].unlocked}}">
+          <text class="lock-icon">🔒</text>
+        </view>
+      </view>
+      <text class="badge-name">{{displayBadges[4].name}}</text>
+      <text class="badge-description" wx:if="{{displayBadges[4].description}}">{{displayBadges[4].description}}</text>
+    </view>
+    <view class="badge-item {{displayBadges[5].unlocked ? 'badge-unlocked' : 'badge-locked'}}" bind:tap="onBadgeTap" data-index="5" wx:if="{{displayBadges[5]}}">
+      <view class="badge-image-container">
+        <image class="badge-image" src="{{displayBadges[5].image}}" mode="aspectFit" binderror="onImageError" data-index="5"></image>
+        <view class="lock-overlay" wx:if="{{!displayBadges[5].unlocked}}">
+          <text class="lock-icon">🔒</text>
+        </view>
+      </view>
+      <text class="badge-name">{{displayBadges[5].name}}</text>
+      <text class="badge-description" wx:if="{{displayBadges[5].description}}">{{displayBadges[5].description}}</text>
+    </view>
+    <view class="badge-item {{displayBadges[6].unlocked ? 'badge-unlocked' : 'badge-locked'}}" bind:tap="onBadgeTap" data-index="6" wx:if="{{displayBadges[6]}}">
+      <view class="badge-image-container">
+        <image class="badge-image" src="{{displayBadges[6].image}}" mode="aspectFit" binderror="onImageError" data-index="6"></image>
+        <view class="lock-overlay" wx:if="{{!displayBadges[6].unlocked}}">
+          <text class="lock-icon">🔒</text>
+        </view>
+      </view>
+      <text class="badge-name">{{displayBadges[6].name}}</text>
+      <text class="badge-description" wx:if="{{displayBadges[6].description}}">{{displayBadges[6].description}}</text>
+    </view>
+  </view>
+
+  <view class="badge-row normal-row">
+    <view class="badge-item {{displayBadges[7].unlocked ? 'badge-unlocked' : 'badge-locked'}}" bind:tap="onBadgeTap" data-index="7" wx:if="{{displayBadges[7]}}">
+      <view class="badge-image-container">
+        <image class="badge-image" src="{{displayBadges[7].image}}" mode="aspectFit" binderror="onImageError" data-index="7"></image>
+        <view class="lock-overlay" wx:if="{{!displayBadges[7].unlocked}}">
+          <text class="lock-icon">🔒</text>
+        </view>
+      </view>
+      <text class="badge-name">{{displayBadges[7].name}}</text>
+      <text class="badge-description" wx:if="{{displayBadges[7].description}}">{{displayBadges[7].description}}</text>
+    </view>
+    <view class="badge-item {{displayBadges[8].unlocked ? 'badge-unlocked' : 'badge-locked'}}" bind:tap="onBadgeTap" data-index="8" wx:if="{{displayBadges[8]}}">
+      <view class="badge-image-container">
+        <image class="badge-image" src="{{displayBadges[8].image}}" mode="aspectFit" binderror="onImageError" data-index="8"></image>
+        <view class="lock-overlay" wx:if="{{!displayBadges[8].unlocked}}">
+          <text class="lock-icon">🔒</text>
+        </view>
+      </view>
+      <text class="badge-name">{{displayBadges[8].name}}</text>
+      <text class="badge-description" wx:if="{{displayBadges[8].description}}">{{displayBadges[8].description}}</text>
+    </view>
+    <view class="badge-item {{displayBadges[9].unlocked ? 'badge-unlocked' : 'badge-locked'}}" bind:tap="onBadgeTap" data-index="9" wx:if="{{displayBadges[9]}}">
+      <view class="badge-image-container">
+        <image class="badge-image" src="{{displayBadges[9].image}}" mode="aspectFit" binderror="onImageError" data-index="9"></image>
+        <view class="lock-overlay" wx:if="{{!displayBadges[9].unlocked}}">
+          <text class="lock-icon">🔒</text>
+        </view>
+      </view>
+      <text class="badge-name">{{displayBadges[9].name}}</text>
+      <text class="badge-description" wx:if="{{displayBadges[9].description}}">{{displayBadges[9].description}}</text>
+    </view>
+  </view>
+</view>

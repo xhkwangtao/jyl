@@ -1,0 +1,16 @@
+<view class="header-container" style="top: {{topOffset}}px;">
+  <view class="background-card"></view>
+  <image class="avatar" src="{{avatarSrc}}" mode="aspectFit" />
+
+  <view class="text-content">
+    <text class="title">HI～我是小九</text>
+    <text class="subtitle">在这里可以随时问我景区的问题</text>
+  </view>
+
+  <view class="map-button" bind:tap="onGoToMapTap">
+    <view class="map-button-text-container">
+      <text class="map-button-text">去AI</text>
+      <text class="map-button-text">地图</text>
+    </view>
+  </view>
+</view>

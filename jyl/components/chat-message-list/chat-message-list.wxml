@@ -1,0 +1,34 @@
+<view class="chat-message-list-container">
+  <view class="messages-wrapper">
+    <view
+      class="message-item"
+      wx:for="{{messages}}"
+      wx:key="id"
+      id="message-{{index}}"
+    >
+      <view class="message-item-wrapper">
+        <ai-message-bubble
+          wx:if="{{item.type === 'ai'}}"
+          message="{{item}}"
+          bind:copyText="onCopyText"
+          bind:playAudio="onPlayAudio"
+        />
+        <user-message-bubble
+          wx:elif="{{item.type === 'user'}}"
+          message="{{item}}"
+        />
+      </view>
+    </view>
+
+    <view class="loading-indicator" wx:if="{{isLoading}}">
+      <view class="loading-dots">
+        <view class="dot dot-1"></view>
+        <view class="dot dot-2"></view>
+        <view class="dot dot-3"></view>
+      </view>
+      <text class="loading-text">{{loadingText || 'AI正在思考中...'}}</text>
+    </view>
+
+    <view class="bottom-safe-area"></view>
+  </view>
+</view>

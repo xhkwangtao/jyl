@@ -1,0 +1,95 @@
+.route-recommendation {
+  position: relative;
+  width: 100%;
+  z-index: 5;
+}
+
+.route-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 32rpx;
+  box-shadow: 0 10rpx 30rpx rgba(0, 0, 0, 0.08);
+}
+
+.texture-with-action-container {
+  position: relative;
+}
+
+.texture-image {
+  display: block;
+  width: 100%;
+}
+
+.recommendation-text-container {
+  position: absolute;
+  top: 1vh;
+  left: 5vw;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+
+.recommendation-title-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.recommendation-title {
+  color: #000000;
+  font-size: 16px;
+  font-family: 'Alibaba PuHuiTi', 'PingFang SC', sans-serif;
+  font-weight: 500;
+  word-wrap: break-word;
+}
+
+.recommendation-icon {
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+}
+
+.recommendation-subtitle {
+  color: #555555;
+  font-size: 12px;
+  font-family: 'Asap Condensed', 'PingFang SC', sans-serif;
+  font-weight: 400;
+  word-wrap: break-word;
+}
+
+.route-action {
+  position: absolute;
+  bottom: 40rpx;
+  left: 50%;
+  width: 80%;
+  height: 76rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #212121;
+  border-radius: 50rpx;
+  transform: translateX(-50%);
+}
+
+.route-action:active {
+  transform: translateX(-50%) scale(0.98);
+}
+
+.route-action .action-text {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 700;
+  font-size: 36rpx;
+  color: #ffffff;
+}
+
+.route-action .badge {
+  position: absolute;
+  top: -1%;
+  right: 20%;
+  transform: translate(50%, -50%);
+}
+
+.badge-star {
+  width: 120rpx;
+  height: 120rpx;
+}

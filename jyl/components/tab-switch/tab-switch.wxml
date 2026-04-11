@@ -1,0 +1,18 @@
+<view class="tab-switch-container">
+  <view class="tab-switch-list">
+    <view
+      class="tab-item {{currentTab === 'badge' ? 'active' : 'inactive'}}"
+      bind:tap="onTabTap"
+      data-tab="badge"
+    >
+      <text class="tab-text">我的徽章</text>
+    </view>
+    <view
+      class="tab-item {{currentTab === 'ranking' ? 'active' : 'inactive'}}"
+      bind:tap="onTabTap"
+      data-tab="ranking"
+    >
+      <text class="tab-text">排行榜</text>
+    </view>
+  </view>
+</view>

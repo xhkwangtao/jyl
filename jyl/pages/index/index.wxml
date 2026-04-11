@@ -1,0 +1,55 @@
+<view class="index-page">
+  <custom-status-bar bind:avatartap="onMyPageEntryTap" />
+
+  <view class="home-indicator"></view>
+
+  <view class="main-content">
+    <view class="ai-assistant-section">
+      <view class="ai-text-group-global">
+        <text class="welcome-title-global">{{welcomeTitle}}</text>
+        <view class="ai-dialog-bubble-global">
+          <text class="ai-dialog-text">{{dialogText}}</text>
+        </view>
+      </view>
+
+      <view class="ai-character-image-global" bind:tap="onAvatarTap">
+        <image class="ai-character-img" src="/images/xiaojiu.png" mode="aspectFit"></image>
+      </view>
+
+      <view class="ai-info-tag-global">
+        <view class="ai-name-container">
+          <text class="ai-name" wx:for="{{aiNameDisplay}}" wx:key="index">{{item}}</text>
+        </view>
+        <view class="ai-title-container">
+          <text class="ai-title" wx:for="{{aiRoleDisplay}}" wx:key="index">{{item}}</text>
+        </view>
+      </view>
+    </view>
+
+    <map-recommend-card bind:maptap="onMapPreviewTap" bind:startroute="onStartRoute" />
+
+    <explanation-cards-container
+      visible="{{true}}"
+      bind:cardclick="onFeatureCardClick"
+    ></explanation-cards-container>
+
+    <view class="check-in-section">
+      <view class="check-in-card" bindtap="onCheckInTap">
+        <view class="check-in-content">
+          <text class="check-in-title">{{checkInTitle}}</text>
+          <text class="check-in-desc">{{checkInDescription}}</text>
+          <view class="check-in-action">
+            <text class="action-text">{{checkInAction}}</text>
+          </view>
+        </view>
+
+        <view class="check-in-progress">
+          <text class="check-in-progress-label">已完成</text>
+          <text class="check-in-progress-value">{{checkInCompletedCount}}/{{checkInTotalCount}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="safe-area-bottom" style="height: {{safeAreaBottom}}px;"></view>
+</view>

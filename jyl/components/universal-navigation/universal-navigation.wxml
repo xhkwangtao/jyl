@@ -1,0 +1,56 @@
+<!--components/universal-navigation/universal-navigation.wxml-->
+<view class="universal-nav-bar theme-{{theme}}" style="background: {{backgroundColor}};">
+  <!-- 状态栏区域 -->
+  <view class="status-bar" style="height: {{statusBarHeight}}px;"></view>
+  
+  <!-- 导航内容区域 -->
+  <view class="nav-content" 
+        style="padding-top: {{navContentPaddingTop}}px; height: {{actualNavContentHeight}}px;">
+    
+    <!-- 左侧按钮组 - 使用胶囊位置精确对齐 -->
+    <view class="nav-left" style="top: {{capsulePosition.top}}px; height: {{capsulePosition.height}}px; left: {{capsulePosition.right}}px;">
+      <!-- 胶囊风格 - 只有在有两个按钮时才显示胶囊 -->
+      <view class="nav-buttons-capsule {{theme}}-capsule" wx:if="{{useCapsuleStyle && showHomeButton}}">
+        <!-- 返回按钮 -->
+        <view class="nav-button back-button capsule-left" bind:tap="onBackTap">
+          <image class="nav-icon" src="{{backIcon}}" mode="aspectFit"></image>
+        </view>
+        
+        <!-- 主页按钮 -->
+        <view class="nav-button home-button capsule-right" bind:tap="onHomeTap">
+          <image class="nav-icon" src="{{homeIcon}}" mode="aspectFit"></image>
+        </view>
+      </view>
+      
+      <!-- 单按钮圆形风格 - 只有返回按钮时 -->
+      <view class="nav-button back-button single-button {{theme}}-single" wx:elif="{{useCapsuleStyle && !showHomeButton}}" bind:tap="onBackTap">
+        <image class="nav-icon" src="{{backIcon}}" mode="aspectFit"></image>
+      </view>
+      
+      <!-- 普通风格 -->
+      <block wx:else>
+        <!-- 返回按钮 -->
+        <view class="nav-button back-button normal-style" bind:tap="onBackTap">
+          <image class="nav-icon" src="{{backIcon}}" mode="aspectFit"></image>
+        </view>
+        
+        <!-- 主页按钮 -->
+        <view class="nav-button home-button normal-style" wx:if="{{showHomeButton}}" bind:tap="onHomeTap">
+          <image class="nav-icon" src="{{homeIcon}}" mode="aspectFit"></image>
+        </view>
+      </block>
+    </view>
+    
+    <!-- 中间标题 - 绝对定位居中 -->
+    <view class="nav-title {{theme}}-title" style="height: {{actualNavContentHeight}}px; line-height: {{actualNavContentHeight}}px;">
+      {{title}}
+    </view>
+    
+    <!-- 右侧用户头像 - 使用胶囊位置精确对齐 -->  
+    <view class="nav-right" style="right: {{rightButtonDistanceVw}}vw; top: {{capsulePosition.top}}px; height: {{capsulePosition.height}}px;">
+      <view class="nav-button user-button {{useCapsuleStyle ? 'capsule-style' : 'normal-style'}} {{theme}}-button" wx:if="{{showUserAvatar}}" bind:tap="onUserTap">
+        <image class="nav-icon user-avatar" src="{{userIcon}}" mode="aspectFit"></image>
+      </view>
+    </view>
+  </view>
+</view>

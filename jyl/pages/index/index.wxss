@@ -1,0 +1,336 @@
+:root {
+  --spacing-sm: 2vh;
+  --page-padding-bottom: 5vh;
+  --page-padding-side: 40rpx;
+}
+
+.index-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.index-page::before,
+.index-page::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+}
+
+.index-page::before {
+  background-image: linear-gradient(248.45deg, rgb(130, 161, 233) 1.11%, rgb(150, 251, 252) 16.01%, rgb(187, 255, 214) 52.63%, rgb(245, 253, 220) 64.11%);
+}
+
+.index-page::after {
+  background-image: linear-gradient(197.14deg, rgba(243, 254, 254, 0) 15.34%, rgba(254, 255, 230, 0.3) 26.07%, rgb(233, 255, 254) 34.02%, rgb(255, 255, 255) 41.3%),
+    radial-gradient(ellipse at 80% 30%, rgb(247, 245, 245) 0%, rgba(243, 240, 240, 0.8) 15%, rgba(255, 255, 255, 0.1) 20%, rgba(0, 0, 0, 0) 100%);
+}
+
+.home-indicator {
+  position: fixed;
+  bottom: 16rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 270rpx;
+  height: 10rpx;
+  background: #000000;
+  border-radius: 20rpx;
+  z-index: 100;
+}
+
+.main-content {
+  position: relative;
+  z-index: 1;
+  padding: 0 var(--page-padding-side) var(--page-padding-bottom);
+  animation: fadeInUp 0.8s ease-out;
+}
+
+.ai-assistant-section {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0;
+  margin-bottom: -4.5vh;
+  padding: 0;
+  z-index: 50;
+}
+
+.ai-text-group-global {
+  position: relative;
+  left: 1vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  width: 55vw;
+  max-width: 65vw;
+  align-items: flex-start;
+  justify-content: flex-end;
+  margin-bottom: calc(10vh - 40rpx);
+  z-index: 55;
+  box-sizing: border-box;
+}
+
+.welcome-title-global {
+  position: relative;
+  width: 100%;
+  color: #000000;
+  font-size: 50rpx;
+  font-family: 'Alibaba-PuHuiTi-Bold', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-weight: 700;
+  line-height: 1;
+  white-space: normal;
+  word-wrap: break-word;
+  word-break: break-word;
+  text-align: left;
+  text-shadow: 0 2rpx 4rpx rgba(255, 255, 255, 0.8);
+  box-sizing: border-box;
+}
+
+.ai-dialog-bubble-global {
+  position: relative;
+  width: 100%;
+  min-height: 60rpx;
+  max-height: 280rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.ai-dialog-text {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  color: #555555;
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', 'Arial', sans-serif;
+  font-size: 22rpx;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.5rpx;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-word;
+  box-sizing: border-box;
+}
+
+.ai-character-image-global {
+  position: relative;
+  display: block;
+  width: 30vw;
+  height: calc(30vw / 0.644);
+  right: -1vw;
+  flex-shrink: 0;
+  z-index: 60;
+  border-radius: 12rpx;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ai-character-image-global:active {
+  transform: scale(0.96) translateY(2rpx);
+}
+
+.ai-character-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.ai-info-tag-global {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0;
+  width: 12vw;
+  margin: 0;
+  z-index: 55;
+  bottom: 12vh;
+}
+
+.ai-name-container,
+.ai-title-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  min-width: 32rpx;
+  min-height: 32rpx;
+  max-width: 120rpx;
+  max-height: 200rpx;
+  padding: 8rpx 12rpx;
+  overflow: visible;
+  box-sizing: border-box;
+  white-space: nowrap;
+  border-radius: 999rpx;
+}
+
+.ai-name-container {
+  background-color: #ffffff;
+  box-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.1);
+}
+
+.ai-name {
+  display: block;
+  color: #000000;
+  font-size: 24rpx;
+  font-family: 'Alibaba-PuHuiTi-Bold', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-weight: 700;
+  line-height: 29rpx;
+  word-wrap: break-word;
+}
+
+.ai-title {
+  display: block;
+  color: #555555;
+  font-size: 20rpx;
+  font-family: 'Asap Condensed', sans-serif;
+  font-weight: 400;
+  line-height: 22rpx;
+  word-wrap: break-word;
+}
+
+.safe-area-bottom {
+  background: transparent;
+}
+
+.check-in-section {
+  margin-top: var(--spacing-sm);
+  padding: 0 20rpx 20rpx;
+}
+
+.check-in-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 26rpx 32rpx;
+  border-radius: 32rpx;
+  background: linear-gradient(180deg, #9dffb6 0%, #d1fff0 71.15%);
+  box-shadow: 0 10rpx 30rpx rgba(0, 0, 0, 0.08);
+}
+
+.check-in-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.check-in-title {
+  display: block;
+  font-size: 32rpx;
+  line-height: 44rpx;
+  font-weight: 500;
+  color: #000000;
+}
+
+.check-in-desc {
+  display: block;
+  margin-top: 10rpx;
+  margin-bottom: 22rpx;
+  font-size: 20rpx;
+  line-height: 30rpx;
+  color: #000000;
+  white-space: pre-line;
+}
+
+.check-in-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 168rpx;
+  height: 60rpx;
+  padding: 0 28rpx;
+  border-radius: 50rpx;
+  background: #212121;
+}
+
+.action-text {
+  font-size: 24rpx;
+  line-height: 32rpx;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.check-in-progress {
+  flex-shrink: 0;
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 32rpx;
+  background: rgba(255, 255, 255, 0.46);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.48);
+}
+
+.check-in-progress-label {
+  display: block;
+  font-size: 22rpx;
+  color: #2f5d4f;
+}
+
+.check-in-progress-value {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 36rpx;
+  line-height: 1;
+  font-weight: 700;
+  color: #111111;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(60rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 375px) {
+  .main-content {
+    padding-left: 30rpx;
+    padding-right: 30rpx;
+  }
+
+  .welcome-title-global {
+    font-size: 44rpx;
+  }
+
+  .ai-dialog-text {
+    font-size: 20rpx;
+  }
+
+  .check-in-section {
+    padding-left: 16rpx;
+    padding-right: 16rpx;
+  }
+
+  .check-in-card {
+    padding-left: 24rpx;
+    padding-right: 24rpx;
+  }
+
+  .check-in-progress {
+    width: 132rpx;
+    height: 132rpx;
+  }
+}

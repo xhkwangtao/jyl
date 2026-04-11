@@ -1,0 +1,20 @@
+<view class="explanation-cards-container" wx:if="{{visible}}">
+  <view class="left-card">
+    <explanation-card
+      title="{{explanationTitle}}"
+      description="{{explanationDescription}}"
+      decorationImage="{{explanationImage}}"
+      bind:cardtap="onExplanationCardTap"
+    ></explanation-card>
+  </view>
+
+  <view class="right-cards">
+    <view class="top-card">
+      <aichat-card bind:cardtap="onAiChatCardTap"></aichat-card>
+    </view>
+
+    <view class="bottom-card">
+      <aiphoto-card bind:cardtap="onAiPhotoCardTap"></aiphoto-card>
+    </view>
+  </view>
+</view>

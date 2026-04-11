@@ -1,0 +1,50 @@
+.explanation-cards-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 20rpx;
+  padding: 20rpx;
+  width: 100%;
+  height: 350rpx;
+  box-sizing: border-box;
+  position: relative;
+  margin-top: var(--spacing-sm, 2vh);
+  z-index: 5;
+  background: transparent;
+}
+
+.left-card {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+}
+
+.right-cards {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 12rpx;
+}
+
+.top-card {
+  grid-row: 1;
+}
+
+.bottom-card {
+  grid-row: 2;
+}
+
+@media (max-width: 375px) {
+  .explanation-cards-container {
+    height: 320rpx;
+    gap: 16rpx;
+    padding: 16rpx;
+  }
+
+  .right-cards {
+    gap: 10rpx;
+  }
+}

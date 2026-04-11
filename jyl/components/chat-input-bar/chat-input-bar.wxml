@@ -1,0 +1,61 @@
+<view class="input-bar-container">
+  <view class="input-bar-wrapper">
+    <view class="icon-button" bind:tap="onModeChange">
+      <image class="icon" src="{{isVoiceMode ? '/images/ai-chat/button-text-keyboard.svg' : '/images/ai-chat/micphone.svg'}}" mode="aspectFit" />
+    </view>
+
+    <view class="input-core">
+      <input
+        wx:if="{{!isVoiceMode}}"
+        class="text-input"
+        type="text"
+        value="{{inputValue}}"
+        placeholder="询问任何问题"
+        confirm-type="send"
+        focus="{{isFocused}}"
+        cursor-spacing="120"
+        bindinput="onInput"
+        bindconfirm="onTextConfirm"
+        bindfocus="onFocus"
+        bindblur="onBlur"
+        disabled="{{isGenerating || disabled}}"
+      />
+
+      <view
+        wx:else
+        class="voice-input-button {{isRecording ? 'recording' : ''}}"
+        hover-class="voice-input-button-hover"
+        bind:touchstart="onVoiceStart"
+        bind:touchmove="onVoiceMove"
+        bind:touchend="onVoiceEnd"
+        bind:touchcancel="onVoiceCancel"
+      >
+        <view wx:if="{{!isRecording}}" class="voice-hint">
+          <text>按住 说话</text>
+        </view>
+        <view wx:else class="recording-status">
+          <view class="recording-dot"></view>
+          <text>正在录音... {{recordingTime}}s</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="button-group">
+      <view class="icon-button send-button {{inputValue ? 'active' : 'inactive'}} {{isGenerating ? 'hidden' : ''}}" bind:tap="onSendTap">
+        <image class="icon" src="/images/ai-chat/send.svg" mode="aspectFit" />
+      </view>
+
+      <view class="icon-button stop-button {{!isGenerating ? 'hidden' : ''}}" bind:tap="onStopTap">
+        <image class="icon stop-icon" src="/images/ai-chat/stop.svg" mode="aspectFit" />
+      </view>
+
+      <view class="icon-button hidden" bind:tap="onAddTap" style="display: none;">
+        <image class="icon" src="/images/ai-chat/add.svg" mode="aspectFit" />
+      </view>
+    </view>
+  </view>
+
+  <view class="ai-disclaimer">
+    <text class="ai-disclaimer-text">本服务为AI生成内容，结果仅供参考</text>
+  </view>
+</view>

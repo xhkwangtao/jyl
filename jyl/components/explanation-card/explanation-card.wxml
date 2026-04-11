@@ -1,0 +1,11 @@
+<view class="explanation-card" bindtap="onCardTap">
+  <view class="card-content">
+    <text class="card-title">{{title}}</text>
+    <text class="card-description">{{description}}</text>
+  </view>
+
+  <view class="decoration-ai-group">
+    <image class="decoration-image" src="{{decorationImage}}" mode="aspectFit" lazy-load="true"></image>
+    <image class="ai-avatar" src="/images/xiaojiu.png" mode="aspectFit" lazy-load="true"></image>
+  </view>
+</view>

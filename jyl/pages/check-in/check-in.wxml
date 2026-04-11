@@ -1,0 +1,126 @@
+<view class="checkin-page">
+  <view class="background-layer">
+    <image class="background-svg" src="/images/ai-chat-bg.svg" mode="aspectFill"></image>
+  </view>
+
+  <view class="page-header">
+    <universal-navigation
+      title="{{pageTitle}}"
+      show-back="{{true}}"
+      showHomeButton="{{true}}"
+      background-color="{{navBackground}}"
+      theme="{{navTheme}}"
+      showUserAvatar="{{false}}"
+      useCapsuleStyle="{{false}}"
+      bind:back="onBackTap"
+      bind:home="onHomeTap"
+    />
+  </view>
+
+  <view class="content-layer">
+    <view class="hero-card">
+      <view class="hero-copy">
+        <text class="hero-kicker">JYL CHECK-IN</text>
+        <text class="hero-title">{{heroTitle}}</text>
+        <text class="hero-desc">{{heroDesc}}</text>
+      </view>
+
+      <view class="hero-progress-row">
+        <view class="hero-progress-copy">
+          <text class="hero-progress-label">当前进度</text>
+          <text class="hero-progress-value">{{checkedCount}} / {{totalCount}}</text>
+        </view>
+        <text class="hero-progress-percent">{{progressPercentText}}</text>
+      </view>
+
+      <view class="progress-track">
+        <view class="progress-fill" style="width: {{progressPercent}}%;"></view>
+      </view>
+
+      <view class="stats-grid">
+        <view class="stat-card">
+          <text class="stat-label">全部景点</text>
+          <text class="stat-value">{{totalCount}}</text>
+        </view>
+        <view class="stat-card stat-card-checked">
+          <text class="stat-label">已打卡</text>
+          <text class="stat-value">{{checkedCount}}</text>
+        </view>
+        <view class="stat-card">
+          <text class="stat-label">未打卡</text>
+          <text class="stat-value">{{uncheckedCount}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="filter-shell">
+      <view
+        class="filter-chip {{currentFilter === item.value ? 'filter-chip-active' : ''}}"
+        wx:for="{{filterOptions}}"
+        wx:key="value"
+        data-value="{{item.value}}"
+        bindtap="onFilterTap"
+      >
+        <text class="filter-chip-text">{{item.label}}</text>
+      </view>
+    </view>
+
+    <view class="section-head">
+      <view>
+        <text class="section-title">全部景点</text>
+        <text class="section-caption">{{sectionCaption}}</text>
+      </view>
+      <text class="section-right">{{visibleCount}} 个结果</text>
+    </view>
+
+    <view class="spot-list" wx:if="{{visibleScenicList.length}}">
+      <view
+        class="spot-card {{item.checked ? 'spot-card-checked' : 'spot-card-pending'}}"
+        wx:for="{{visibleScenicList}}"
+        wx:key="id"
+      >
+        <view class="spot-card-top">
+          <view class="spot-sequence">
+            <text class="spot-sequence-text">{{item.orderText}}</text>
+          </view>
+
+          <view class="spot-copy">
+            <view class="spot-meta-row">
+              <text class="spot-tag spot-tag-{{item.themeTone}}">{{item.themeTag}}</text>
+              <view class="spot-status {{item.checked ? 'spot-status-checked' : 'spot-status-pending'}}">
+                <text class="spot-status-text">{{item.statusText}}</text>
+              </view>
+            </view>
+
+            <text class="spot-title">{{item.name}}</text>
+
+            <view class="spot-location-row">
+              <image class="spot-location-icon" src="/images/poi-detail/location.svg" mode="widthFix"></image>
+              <text class="spot-location-text">{{item.sequenceText}} · {{item.shortHint}}</text>
+            </view>
+
+            <text class="spot-desc">{{item.description}}</text>
+          </view>
+        </view>
+
+        <view class="spot-bottom-row">
+          <text class="spot-time {{item.checked ? 'spot-time-checked' : ''}}">{{item.timeText}}</text>
+
+          <view class="spot-actions">
+            <view class="spot-action spot-action-ghost" data-id="{{item.id}}" bindtap="onMapTap">
+              <text class="spot-action-text spot-action-text-ghost">地图查看</text>
+            </view>
+            <view class="spot-action {{item.checked ? 'spot-action-secondary' : 'spot-action-primary'}}" data-id="{{item.id}}" bindtap="onToggleCheckin">
+              <text class="spot-action-text {{item.checked ? 'spot-action-text-secondary' : 'spot-action-text-primary'}}">{{item.actionText}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:else>
+      <text class="empty-title">当前筛选下暂无景点</text>
+      <text class="empty-desc">切换筛选后可查看其它打卡状态。</text>
+    </view>
+  </view>
+</view>

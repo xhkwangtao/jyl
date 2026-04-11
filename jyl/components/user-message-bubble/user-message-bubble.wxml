@@ -1,0 +1,8 @@
+<view class="user-message-container">
+  <view class="content-wrapper">
+    <view class="bubble-container text-bubble" bind:tap="onBubbleTap">
+      <text class="message-text">{{message.content}}</text>
+    </view>
+  </view>
+  <image class="avatar" src="{{message.avatar || '/images/icons/user.svg'}}" mode="aspectFill" />
+</view>
