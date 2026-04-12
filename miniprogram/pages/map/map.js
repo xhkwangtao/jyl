@@ -16,6 +16,14 @@ const MAP_INCLUDE_POINTS = [
 
 const DEFAULT_SCENIC_CENTER = buildCenter(MAP_INCLUDE_POINTS)
 const DEFAULT_SCENIC_SCALE = 13
+const DEFAULT_ENTRY_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => point.type === 'start') || JYL_ROUTE_MARKER_POINTS[0] || null
+const DEFAULT_ENTRY_CENTER = DEFAULT_ENTRY_POINT
+  ? {
+    latitude: DEFAULT_ENTRY_POINT.latitude,
+    longitude: DEFAULT_ENTRY_POINT.longitude
+  }
+  : DEFAULT_SCENIC_CENTER
+const DEFAULT_ENTRY_SCALE = 17
 
 function buildCenter(points) {
   const bounds = points.reduce((acc, point) => {
@@ -65,15 +73,20 @@ function buildMarkers(markerPoints, selectedPointId) {
   return markerPoints.map((point) => {
     const isActive = String(point.id) === String(selectedPointId)
 
-    return {
-      id: point.id,
+    const marker = {
+      id: point.markerId,
       latitude: point.latitude,
       longitude: point.longitude,
       width: isActive ? point.activeWidth : point.width,
       height: isActive ? point.activeHeight : point.height,
-      iconPath: isActive ? point.activeMarkerIconPath : point.markerIconPath,
-      label: buildMarkerLabel(point, isActive)
+      iconPath: isActive ? point.activeMarkerIconPath : point.markerIconPath
     }
+
+    if (isActive) {
+      marker.label = buildMarkerLabel(point, true)
+    }
+
+    return marker
   })
 }
 
@@ -86,10 +99,6 @@ function getPointMeta(point) {
     sceneLine: point.sceneLine || point.description,
     guideTip: point.guideTip || '点击下方导览点卡片可切换地图焦点。'
   }
-}
-
-function getRouteMarkerById(markerId) {
-  return ROUTE_DISPLAY_POINTS.find((item) => String(item.id) === String(markerId)) || null
 }
 
 function toRadians(deg) {
@@ -165,11 +174,18 @@ function buildSelectedPoint(point, userLocation) {
 
 function buildFocusSummary(selectedPoint, locationStatus) {
   if (!selectedPoint) {
+    if (locationStatus === '入口视角') {
+      return {
+        title: DEFAULT_ENTRY_POINT?.name || '路线入口',
+        subtitle: `入口视角 · ${JYL_MAP_META.markerCount} 个地图点位，${JYL_MAP_META.cardCount} 个打卡点`
+      }
+    }
+
     return {
       title: JYL_ROUTE.name,
       subtitle: locationStatus === '我的位置已开启'
         ? `${JYL_ROUTE.distanceText} · 已显示我的位置`
-        : `${JYL_ROUTE.distanceText} · ${JYL_MAP_META.cardCount} 个公开导览点`
+        : `${JYL_ROUTE.distanceText} · ${JYL_MAP_META.markerCount} 个地图点位，${JYL_MAP_META.cardCount} 个打卡点`
     }
   }
 
@@ -186,15 +202,49 @@ function buildFocusSummary(selectedPoint, locationStatus) {
   }
 }
 
-const ROUTE_DISPLAY_POINTS = JYL_ROUTE_MARKER_POINTS.map((point) => ({
-  ...point,
-  width: point.type === 'start' ? 34 : 32,
-  height: point.type === 'start' ? 34 : 32,
-  activeWidth: point.type === 'start' ? 42 : 40,
-  activeHeight: point.type === 'start' ? 42 : 40,
-  markerIconPath: point.iconPath,
-  activeMarkerIconPath: buildActiveIconPath(point.iconPath)
-}))
+function createDisplayPoint(point) {
+  return {
+    ...point,
+    width: point.type === 'start' ? 34 : 32,
+    height: point.type === 'start' ? 34 : 32,
+    activeWidth: point.type === 'start' ? 42 : 40,
+    activeHeight: point.type === 'start' ? 42 : 40,
+    markerIconPath: point.iconPath,
+    activeMarkerIconPath: buildActiveIconPath(point.iconPath)
+  }
+}
+
+function isBaseMapMarker(point) {
+  return point.type !== 'guide'
+}
+
+const ALL_ROUTE_DISPLAY_POINTS = JYL_ROUTE_MARKER_POINTS.map(createDisplayPoint)
+
+const BASE_ROUTE_DISPLAY_POINTS = ALL_ROUTE_DISPLAY_POINTS.filter(isBaseMapMarker)
+
+function getMapMarkerPoints(selectedPointId) {
+  if (!selectedPointId) {
+    return BASE_ROUTE_DISPLAY_POINTS
+  }
+
+  const selectedPoint = ALL_ROUTE_DISPLAY_POINTS.find((point) => String(point.id) === String(selectedPointId))
+  if (!selectedPoint) {
+    return BASE_ROUTE_DISPLAY_POINTS
+  }
+
+  const existsInBase = BASE_ROUTE_DISPLAY_POINTS.some((point) => String(point.id) === String(selectedPoint.id))
+  if (existsInBase) {
+    return BASE_ROUTE_DISPLAY_POINTS
+  }
+
+  return [...BASE_ROUTE_DISPLAY_POINTS, selectedPoint].sort((left, right) => left.routeIndex - right.routeIndex)
+}
+
+function getRouteMarkerById(markerId) {
+  return ALL_ROUTE_DISPLAY_POINTS.find((item) => (
+    String(item.id) === String(markerId) || String(item.markerId) === String(markerId)
+  )) || null
+}
 
 const DISPLAY_CARD_POINTS = JYL_MARKER_POINTS.map((point) => ({
   ...point,
@@ -210,18 +260,20 @@ const DEFAULT_SELECTED_POINT_ID = null
 
 Page({
   data: {
+    mapMounted: false,
     navigationBarTotalHeight: 64,
     safeAreaBottom: 20,
-    longitude: DEFAULT_SCENIC_CENTER.longitude,
-    latitude: DEFAULT_SCENIC_CENTER.latitude,
-    scale: DEFAULT_SCENIC_SCALE,
+    longitude: DEFAULT_ENTRY_CENTER.longitude,
+    latitude: DEFAULT_ENTRY_CENTER.latitude,
+    scale: DEFAULT_ENTRY_SCALE,
     showLocation: false,
-    routePolylines: JYL_ROUTE_POLYLINES,
-    markers: buildMarkers(ROUTE_DISPLAY_POINTS, DEFAULT_SELECTED_POINT_ID),
-    markerCount: DISPLAY_CARD_POINTS.length,
+    routePolylines: [],
+    markers: [],
+    visibleMarkerCount: JYL_MAP_META.markerCount,
+    cardCount: JYL_MAP_META.cardCount,
     routeDistanceText: JYL_ROUTE.distanceText,
-    locationStatus: '默认景区视角',
-    focusSummary: buildFocusSummary(null, '默认景区视角'),
+    locationStatus: '入口视角',
+    focusSummary: buildFocusSummary(null, '入口视角'),
     detailCardPulseClass: '',
     userLocation: null,
     selectedPoint: null,
@@ -250,9 +302,11 @@ Page({
     this.setData({
       navigationBarTotalHeight,
       safeAreaBottom,
-      latitude: DEFAULT_SCENIC_CENTER.latitude,
-      longitude: DEFAULT_SCENIC_CENTER.longitude,
-      scale: DEFAULT_SCENIC_SCALE
+      latitude: DEFAULT_ENTRY_CENTER.latitude,
+      longitude: DEFAULT_ENTRY_CENTER.longitude,
+      scale: DEFAULT_ENTRY_SCALE,
+      locationStatus: '入口视角',
+      focusSummary: buildFocusSummary(null, '入口视角')
     }, () => {
       if (initialPointId) {
         this.focusPointById(initialPointId)
@@ -261,14 +315,54 @@ Page({
   },
 
   onReady() {
-    this.mapCtx = wx.createMapContext('jyl-map', this)
+    this.mapMountTimer = setTimeout(() => {
+      this.setData({
+        mapMounted: true
+      }, () => {
+        this.mapCtx = wx.createMapContext('jyl-map', this)
+        this.initializeMapOverlays()
+      })
+    }, 80)
   },
 
   onUnload() {
+    if (this.mapMountTimer) {
+      clearTimeout(this.mapMountTimer)
+      this.mapMountTimer = null
+    }
+
+    if (this.polylineTimer) {
+      clearTimeout(this.polylineTimer)
+      this.polylineTimer = null
+    }
+
+    if (this.markerTimer) {
+      clearTimeout(this.markerTimer)
+      this.markerTimer = null
+    }
+
     if (this.detailCardPulseTimer) {
       clearTimeout(this.detailCardPulseTimer)
       this.detailCardPulseTimer = null
     }
+  },
+
+  initializeMapOverlays() {
+    const selectedPointId = this.data.selectedPoint?.id || DEFAULT_SELECTED_POINT_ID
+
+    this.polylineTimer = setTimeout(() => {
+      this.setData({
+        routePolylines: JYL_ROUTE_POLYLINES
+      })
+      this.polylineTimer = null
+    }, 60)
+
+    this.markerTimer = setTimeout(() => {
+      this.setData({
+        markers: buildMarkers(getMapMarkerPoints(selectedPointId), selectedPointId)
+      })
+      this.markerTimer = null
+    }, 180)
   },
 
   loadUserLocation(moveToUserLocation = false) {
@@ -280,23 +374,37 @@ Page({
           longitude: res.longitude
         }
 
-        this.setData({
+        const nextData = {
           userLocation,
           showLocation: true,
           locationStatus: '我的位置已开启',
           focusSummary: buildFocusSummary(this.data.selectedPoint, '我的位置已开启'),
           selectedPoint: buildSelectedPoint(this.data.selectedPoint, userLocation),
           pointCards: buildPointCards(this.data.selectedPoint?.id)
-        })
-
-        if (moveToUserLocation && this.mapCtx) {
-          this.mapCtx.moveToLocation()
         }
+
+        if (moveToUserLocation) {
+          nextData.latitude = userLocation.latitude
+          nextData.longitude = userLocation.longitude
+          nextData.scale = 15
+        }
+
+        this.setData(nextData)
       },
-      fail: () => {
+      fail: (error) => {
         this.setData({
           locationStatus: '未开启定位权限',
           focusSummary: buildFocusSummary(this.data.selectedPoint, '未开启定位权限')
+        })
+
+        const message = typeof error?.errMsg === 'string' && error.errMsg.includes('timeout')
+          ? '定位超时，请在开发者工具中设置模拟位置后重试'
+          : '未获取到当前位置，请检查定位权限'
+
+        wx.showToast({
+          title: message,
+          icon: 'none',
+          duration: 2200
         })
       }
     })
@@ -322,13 +430,13 @@ Page({
     const detailPoint = buildSelectedPoint(selectedPoint, this.data.userLocation)
 
     this.setData({
-      markers: buildMarkers(ROUTE_DISPLAY_POINTS, selectedPoint.id),
+      markers: buildMarkers(getMapMarkerPoints(selectedPoint.id), selectedPoint.id),
       selectedPoint: detailPoint,
       focusSummary: buildFocusSummary(detailPoint, this.data.locationStatus),
       pointCards: buildPointCards(selectedPoint.id),
       latitude: selectedPoint.latitude,
       longitude: selectedPoint.longitude,
-      scale: 16
+      scale: DEFAULT_ENTRY_SCALE
     }, () => {
       if (revealDetail) {
         this.revealDetailCard()
@@ -337,8 +445,27 @@ Page({
   },
 
   onResetView() {
+    this.onShowOverview()
+  },
+
+  onFocusEntry() {
     this.setData({
-      markers: buildMarkers(ROUTE_DISPLAY_POINTS, null),
+      markers: buildMarkers(getMapMarkerPoints(null), null),
+      showLocation: false,
+      locationStatus: '入口视角',
+      focusSummary: buildFocusSummary(null, '入口视角'),
+      detailCardPulseClass: '',
+      latitude: DEFAULT_ENTRY_CENTER.latitude,
+      longitude: DEFAULT_ENTRY_CENTER.longitude,
+      scale: DEFAULT_ENTRY_SCALE,
+      selectedPoint: null,
+      pointCards: buildPointCards(null)
+    })
+  },
+
+  onShowOverview() {
+    this.setData({
+      markers: buildMarkers(getMapMarkerPoints(null), null),
       showLocation: false,
       locationStatus: '默认景区视角',
       focusSummary: buildFocusSummary(null, '默认景区视角'),
@@ -419,7 +546,18 @@ Page({
       longitude: selectedPoint.longitude,
       name: selectedPoint.name,
       address: selectedPoint.description,
-      scale: 18
+      scale: 18,
+      fail: (error) => {
+        const message = typeof error?.errMsg === 'string' && error.errMsg.includes('timeout')
+          ? '当前环境无法直接拉起导航，请在真机中重试'
+          : '打开导航失败，请稍后重试'
+
+        wx.showToast({
+          title: message,
+          icon: 'none',
+          duration: 2200
+        })
+      }
     })
   }
 })

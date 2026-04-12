@@ -28,6 +28,7 @@ Page({
 
   onShow() {
     this.syncCheckInEntry()
+    this.pendingAIChatNavigation = false
     this.setData({
       isLoggingIn: true
     })
@@ -35,8 +36,19 @@ Page({
     this.silentLogin().finally(() => {
       this.setData({
         isLoggingIn: false
+      }, () => {
+        if (!this.pendingAIChatNavigation) {
+          return
+        }
+
+        this.pendingAIChatNavigation = false
+        this.navigateToAIChat()
       })
     })
+  },
+
+  onUnload() {
+    this.pendingAIChatNavigation = false
   },
 
   onPullDownRefresh() {
@@ -158,26 +170,13 @@ Page({
 
   onAIChatTap() {
     if (this.data.isLoggingIn) {
+      this.pendingAIChatNavigation = true
+
       wx.showToast({
         title: '正在登录中，请稍候...',
         icon: 'loading',
         duration: 2000
       })
-
-      const checkInterval = setInterval(() => {
-        if (!this.data.isLoggingIn) {
-          clearInterval(checkInterval)
-          this.navigateToAIChat()
-        }
-      }, 500)
-
-      setTimeout(() => {
-        clearInterval(checkInterval)
-        if (this.data.isLoggingIn) {
-          wx.hideToast()
-          this.navigateToAIChat()
-        }
-      }, 5000)
 
       return
     }
@@ -216,7 +215,7 @@ Page({
 
   async silentLogin() {
     try {
-      return await auth.checkAndAutoLogin()
+      return await auth.checkAndAutoLogin(2500)
     } catch (error) {
       return false
     }

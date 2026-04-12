@@ -1,8 +1,29 @@
+const DEFAULT_LOGIN_TIMEOUT_MS = 2500
+
 class Auth {
-  async wxLogin() {
+  async wxLogin(options = {}) {
+    const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : DEFAULT_LOGIN_TIMEOUT_MS
+
     return new Promise((resolve, reject) => {
+      let settled = false
+      const timeoutId = setTimeout(() => {
+        if (settled) {
+          return
+        }
+
+        settled = true
+        reject(new Error('微信登录超时'))
+      }, timeoutMs)
+
       wx.login({
         success: (res) => {
+          if (settled) {
+            return
+          }
+
+          clearTimeout(timeoutId)
+          settled = true
+
           if (!res.code) {
             reject(new Error('获取微信code失败'))
             return
@@ -17,8 +38,14 @@ class Auth {
             code: res.code
           })
         },
-        fail: () => {
-          reject(new Error('微信登录失败'))
+        fail: (error) => {
+          if (settled) {
+            return
+          }
+
+          clearTimeout(timeoutId)
+          settled = true
+          reject(new Error(error?.errMsg || '微信登录失败'))
         }
       })
     })
@@ -51,13 +78,13 @@ class Auth {
     }
   }
 
-  async checkAndAutoLogin() {
+  async checkAndAutoLogin(timeoutMs = DEFAULT_LOGIN_TIMEOUT_MS) {
     const existingToken = this.getToken()
     const loginTime = wx.getStorageSync('loginTime')
 
     if (!existingToken) {
       try {
-        await this.wxLogin()
+        await this.wxLogin({ timeoutMs })
         return true
       } catch (error) {
         return false
@@ -69,7 +96,7 @@ class Auth {
       if (hoursSinceLogin > 23) {
         this.logout()
         try {
-          await this.wxLogin()
+          await this.wxLogin({ timeoutMs })
           return true
         } catch (error) {
           return false

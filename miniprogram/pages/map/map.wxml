@@ -12,6 +12,7 @@
   <view class="page-body" style="padding-top: {{navigationBarTotalHeight}}px; padding-bottom: {{safeAreaBottom}}px;">
     <view class="map-stage">
       <map
+        wx:if="{{mapMounted}}"
         id="jyl-map"
         class="jyl-map"
         longitude="{{longitude}}"
@@ -28,6 +29,9 @@
         enable-rotate="{{false}}"
         bindmarkertap="onMarkerTap"
       />
+      <view wx:else class="map-placeholder">
+        <text class="map-placeholder-text">地图加载中...</text>
+      </view>
     </view>
 
     <view class="quick-panel">
@@ -37,7 +41,10 @@
         <text class="quick-panel-meta">{{focusSummary.subtitle}}</text>
       </view>
       <view class="quick-panel-actions">
-        <view class="quick-action" bindtap="onResetView">
+        <view class="quick-action" bindtap="onFocusEntry">
+          <text class="quick-action-text">入口位置</text>
+        </view>
+        <view class="quick-action" bindtap="onShowOverview">
           <text class="quick-action-text">景区全览</text>
         </view>
         <view class="quick-action quick-action-strong" bindtap="onLocateMe">
@@ -49,7 +56,7 @@
     <view class="spot-panel">
       <view class="section-header">
         <text class="section-title">导览点切换</text>
-        <text class="section-caption">{{markerCount}} 个公开导览点</text>
+        <text class="section-caption">{{visibleMarkerCount}} 个地图点位 · {{cardCount}} 个打卡点</text>
       </view>
 
       <scroll-view

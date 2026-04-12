@@ -12,6 +12,8 @@ import xml.etree.ElementTree as ET
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_KMZ_PATH = ROOT_DIR / 'docs/tracks/2026-03-10 09 45 15.kmz'
+DEFAULT_TRACK_KMZ_PATH = ROOT_DIR / 'docs/tracks/jyl_tracks.kmz'
+DEFAULT_POINTS_KMZ_PATH = ROOT_DIR / 'docs/tracks/jyl_points.kmz'
 DEFAULT_OUTPUT_PATH = ROOT_DIR / 'miniprogram/config/jyl-map-data.generated.js'
 
 KML_NS = {
@@ -234,38 +236,74 @@ POI_SPECS = [
 
 def read_kmz_root(path: Path) -> ET.Element:
     with zipfile.ZipFile(path) as zip_file:
-        with zip_file.open('doc.kml') as file_handle:
+        kml_entries = [name for name in zip_file.namelist() if name.lower().endswith('.kml')]
+        if not kml_entries:
+            raise ValueError(f'No KML file found in KMZ: {path}')
+        with zip_file.open(kml_entries[0]) as file_handle:
             return ET.fromstring(file_handle.read())
+
+
+def normalize_name(value: str) -> str:
+    return ''.join(value.replace('\r', '').replace('\n', '').split())
+
+
+def prettify_name(value: str) -> str:
+    return normalize_name(value).replace('&&', ' · ')
+
+
+def parse_coordinate_text(value: str | None) -> list[tuple[float, float]]:
+    if not value:
+        return []
+
+    coordinates: list[tuple[float, float]] = []
+    for token in value.replace('\r', ' ').replace('\n', ' ').split():
+        parts = token.split(',')
+        if len(parts) < 2:
+            continue
+        try:
+            coordinates.append((float(parts[0]), float(parts[1])))
+        except ValueError:
+            continue
+    return coordinates
 
 
 def extract_track(root: ET.Element) -> list[tuple[float, float]]:
     coords: list[tuple[float, float]] = []
     for coord in root.findall('.//gx:Track/gx:coord', KML_NS):
-        raw_parts = coord.text.split()
-        lon = float(raw_parts[0])
-        lat = float(raw_parts[1])
-        coords.append((lon, lat))
+        raw_parts = coord.text.split() if coord.text else []
+        if len(raw_parts) >= 2:
+            lon = float(raw_parts[0])
+            lat = float(raw_parts[1])
+            coords.append((lon, lat))
+    if coords:
+        return coords
+
+    for line in root.findall('.//k:LineString/k:coordinates', KML_NS):
+        coords.extend(parse_coordinate_text(''.join(line.itertext())))
     if not coords:
-        raise ValueError('No gx:Track coordinates found in KMZ file.')
+        raise ValueError('No track coordinates found in KMZ file.')
     return coords
 
 
 def extract_named_points(root: ET.Element) -> dict[str, tuple[float, float]]:
     points: dict[str, tuple[float, float]] = {}
-    placemarks = root.findall('.//k:Folder[@id="TbuluHisPointFolder"]/k:Placemark', KML_NS)
+    placemarks = root.findall('.//k:Placemark', KML_NS)
     for placemark in placemarks:
         point = placemark.find('k:Point', KML_NS)
         if point is None:
             continue
         coords_node = point.find('k:coordinates', KML_NS)
-        if coords_node is None or not coords_node.text:
+        point_coordinates = parse_coordinate_text(coords_node.text if coords_node is not None else None)
+        if not point_coordinates:
             continue
         name_node = placemark.find('k:name', KML_NS)
-        name = ''.join(name_node.itertext()).strip() if name_node is not None else ''
+        name = normalize_name(''.join(name_node.itertext()) if name_node is not None else '')
         if not name:
             continue
-        lon_text, lat_text, *_ = coords_node.text.strip().split(',')
-        points[name] = (float(lon_text), float(lat_text))
+        lon, lat = point_coordinates[0]
+        if math.isclose(lon, 0.0, abs_tol=1e-9) and math.isclose(lat, 0.0, abs_tol=1e-9):
+            continue
+        points.setdefault(name, (lon, lat))
     return points
 
 
@@ -413,19 +451,149 @@ def nearest_track_index(target: tuple[float, float], track: list[tuple[float, fl
     return best_index
 
 
-def build_output(kmz_path: Path, simplify_tolerance_meters: float) -> dict:
-    root = read_kmz_root(kmz_path)
-    track_wgs84 = extract_track(root)
-    named_points_wgs84 = extract_named_points(root)
+def build_source_label(path: Path) -> str:
+    try:
+        return path.relative_to(ROOT_DIR).as_posix()
+    except ValueError:
+        return str(path)
 
-    missing_names = [spec.source_name for spec in POI_SPECS if spec.source_name not in named_points_wgs84]
-    if missing_names:
-        raise ValueError(f'Missing expected POI names in KMZ: {missing_names}')
 
-    simplified_track_wgs84 = douglas_peucker(track_wgs84, simplify_tolerance_meters)
-    simplified_track_gcj02 = [wgs84_to_gcj02(lon, lat) for lon, lat in simplified_track_wgs84]
+def infer_generic_poi_type(name: str, order_index: int) -> str:
+    if order_index == 0:
+        return 'start'
+    if any(keyword in name for keyword in ('卫生间', '游客中心', '服务', '检票口')):
+        return 'service'
+    if any(keyword in name for keyword in ('分叉', '岔路', '汇合', '路口')):
+        return 'junction'
+    if any(keyword in name for keyword in ('九眼楼', '石碑', '碑刻', '小景', '亭', '战鼓车', '避雷针', '大门', '陈列处')):
+        return 'scenic'
+    if any(keyword in name for keyword in ('牌', '二维码', '地图', '入口')):
+        return 'guide'
+    return 'scenic'
 
-    pois = []
+
+def infer_generic_theme(name: str, point_type: str) -> tuple[str, str]:
+    if point_type == 'start':
+        return '起点', 'forest'
+    if point_type == 'service':
+        return '服务', 'teal'
+    if point_type == 'junction':
+        return '岔路', 'forest'
+    if point_type == 'guide':
+        if '二维码' in name:
+            return '提示', 'stone'
+        return '导览', 'stone'
+
+    if any(keyword in name for keyword in ('九眼楼', '石碑', '碑刻', '营盘', '军中帐')):
+        return '遗迹', 'stone'
+    if any(keyword in name for keyword in ('大门', '亭', '桥', '战鼓车', '避雷针', '陈列处')):
+        return '地标', 'gold'
+    return '观景', 'gold'
+
+
+def infer_generic_visibility(name: str, point_type: str) -> tuple[bool, bool, bool]:
+    if point_type == 'start':
+        return True, False, False
+    if point_type == 'guide':
+        return False, False, False
+    if point_type == 'junction':
+        return True, False, False
+    if point_type == 'service':
+        return True, True, True
+    if point_type == 'scenic':
+        return True, True, True
+    return True, True, True
+
+
+def build_generic_meta(name: str, point_type: str) -> dict[str, str | int]:
+    theme_tag, theme_tone = infer_generic_theme(name, point_type)
+
+    if point_type == 'start':
+        return {
+            'themeTag': theme_tag,
+            'themeTone': theme_tone,
+            'shortHint': '从这里进入整条步行导览路线。',
+            'description': f'{name} 作为路线起始参考点，适合在这里确认方向后再出发。',
+            'stayText': '建议停留 3 分钟',
+            'sceneLine': '可以在这里整理节奏、确认轨迹方向，再沿路线继续前进。',
+            'guideTip': '建议先看一眼地图全线，再开始步行导览。',
+            'triggerRadiusM': 45,
+        }
+    if point_type == 'service':
+        return {
+            'themeTag': theme_tag,
+            'themeTone': theme_tone,
+            'shortHint': '沿线可补给或短暂停留的服务节点。',
+            'description': f'{name} 适合作为沿线服务补给点，便于调整游览节奏。',
+            'stayText': '建议停留 5 分钟',
+            'sceneLine': '如果需要休整或补给，这类点位比普通观景点更适合短暂停留。',
+            'guideTip': '可在这里短暂停留，再继续沿主线前进。',
+            'triggerRadiusM': 45,
+        }
+    if point_type == 'junction':
+        return {
+            'themeTag': theme_tag,
+            'themeTone': theme_tone,
+            'shortHint': '靠近分叉或汇合位置，适合做方向提醒。',
+            'description': f'{name} 位于路线分流节点，更适合作为方向判断提示点。',
+            'stayText': '建议停留 2 分钟',
+            'sceneLine': '这里的重点是避免走错方向，不需要长时间停留。',
+            'guideTip': '经过这里时建议确认前进方向，再继续行进。',
+            'triggerRadiusM': 35,
+        }
+    if point_type == 'guide':
+        return {
+            'themeTag': theme_tag,
+            'themeTone': theme_tone,
+            'shortHint': '沿线标识或讲解信息点，更适合作为隐藏触发提示。',
+            'description': f'{name} 更适合作为路线提示或信息补充点，不建议作为公开打卡点单独展示。',
+            'stayText': '建议停留 3 分钟',
+            'sceneLine': '这类点位更偏向讲解和识别，适合放到自动触发或补充说明里。',
+            'guideTip': '如果后续需要更细的导览播报，可在游客靠近时自动触发。',
+            'triggerRadiusM': 30,
+        }
+
+    if theme_tag == '遗迹':
+        return {
+            'themeTag': theme_tag,
+            'themeTone': theme_tone,
+            'shortHint': '沿线值得停留了解历史信息的遗迹点位。',
+            'description': f'{name} 更适合作为历史遗迹类导览点，可在这里补充沿线背景和故事。',
+            'stayText': '建议停留 7 分钟',
+            'sceneLine': '这里不只是经过点，更适合停下来讲一段与现场相关的内容。',
+            'guideTip': '如果是第一次来，建议把这里作为重点停留点之一。',
+            'triggerRadiusM': 40,
+        }
+
+    if theme_tag == '地标':
+        return {
+            'themeTag': theme_tag,
+            'themeTone': theme_tone,
+            'shortHint': '现场辨识度较高的地标或装置点位。',
+            'description': f'{name} 作为沿线辨识度较高的地标点，更适合停留拍照或做位置确认。',
+            'stayText': '建议停留 5 分钟',
+            'sceneLine': '这类点位通常更容易被游客记住，适合作为节奏上的小停留。',
+            'guideTip': '适合用来确认自己所处位置，也适合做简短讲解。',
+            'triggerRadiusM': 38,
+        }
+
+    return {
+        'themeTag': theme_tag,
+        'themeTone': theme_tone,
+        'shortHint': '沿线值得停留浏览的景观点位。',
+        'description': f'{name} 是沿线可停留浏览的点位，适合补充风景或现场讲解。',
+        'stayText': '建议停留 6 分钟',
+        'sceneLine': '这里更适合慢一点走，留出时间看环境、拍照或补充讲解。',
+        'guideTip': '如果同行里有人第一次来，这类点位更适合稍微多停一会儿。',
+        'triggerRadiusM': 40,
+    }
+
+
+def build_curated_pois(
+    named_points_wgs84: dict[str, tuple[float, float]],
+    track_wgs84: list[tuple[float, float]],
+) -> list[dict]:
+    pois: list[dict] = []
     for spec in POI_SPECS:
         source_point = named_points_wgs84[spec.source_name]
         route_index = nearest_track_index(source_point, track_wgs84)
@@ -453,8 +621,60 @@ def build_output(kmz_path: Path, simplify_tolerance_meters: float) -> dict:
                 'locationWgs84': round_coordinate_pair(source_point),
             }
         )
+    return pois
 
-    pois.sort(key=lambda item: item['routeIndex'])
+
+def build_generic_pois(
+    named_points_wgs84: dict[str, tuple[float, float]],
+    track_wgs84: list[tuple[float, float]],
+) -> list[dict]:
+    ordered_points = sorted(
+        (
+            {
+                'sourceName': source_name,
+                'routeIndex': nearest_track_index(source_point, track_wgs84),
+                'locationWgs84': source_point,
+            }
+            for source_name, source_point in named_points_wgs84.items()
+        ),
+        key=lambda item: (item['routeIndex'], item['sourceName']),
+    )
+
+    pois: list[dict] = []
+    for order_index, point in enumerate(ordered_points):
+        point_type = infer_generic_poi_type(point['sourceName'], order_index)
+        display_name = prettify_name(point['sourceName'])
+        meta = build_generic_meta(display_name, point_type)
+        visible, card_visible, checkin_visible = infer_generic_visibility(display_name, point_type)
+        gcj02_point = wgs84_to_gcj02(*point['locationWgs84'])
+        pois.append(
+            {
+                'id': f'poi-{order_index + 1:02d}',
+                'key': f'poi-{order_index + 1:02d}',
+                'sourceName': point['sourceName'],
+                'name': display_name,
+                'type': point_type,
+                'visible': visible,
+                'cardVisible': card_visible,
+                'checkinVisible': checkin_visible,
+                'themeTag': meta['themeTag'],
+                'themeTone': meta['themeTone'],
+                'shortHint': meta['shortHint'],
+                'description': meta['description'],
+                'stayText': meta['stayText'],
+                'sceneLine': meta['sceneLine'],
+                'guideTip': meta['guideTip'],
+                'triggerRadiusM': meta['triggerRadiusM'],
+                'routeIndex': point['routeIndex'],
+                'locationGcj02': round_coordinate_pair(gcj02_point),
+                'locationWgs84': round_coordinate_pair(point['locationWgs84']),
+            }
+        )
+    return pois
+
+
+def finalize_pois(pois: list[dict]) -> list[dict]:
+    pois.sort(key=lambda item: (item['routeIndex'], item['name']))
 
     visible_card_order = 1
     for poi in pois:
@@ -472,14 +692,35 @@ def build_output(kmz_path: Path, simplify_tolerance_meters: float) -> dict:
         else:
             poi['orderText'] = ''
             poi['sequenceText'] = poi['themeTag']
+    return pois
+
+
+def build_output(track_kmz_path: Path, points_kmz_path: Path, simplify_tolerance_meters: float) -> dict:
+    track_root = read_kmz_root(track_kmz_path)
+    points_root = read_kmz_root(points_kmz_path)
+    track_wgs84 = extract_track(track_root)
+    named_points_wgs84 = extract_named_points(points_root)
+    if not named_points_wgs84:
+        raise ValueError('No named points found in KMZ file.')
+
+    simplified_track_wgs84 = douglas_peucker(track_wgs84, simplify_tolerance_meters)
+    simplified_track_gcj02 = [wgs84_to_gcj02(lon, lat) for lon, lat in simplified_track_wgs84]
+
+    has_curated_names = all(spec.source_name in named_points_wgs84 for spec in POI_SPECS)
+    pois = build_curated_pois(named_points_wgs84, track_wgs84) if has_curated_names else build_generic_pois(named_points_wgs84, track_wgs84)
+    pois = finalize_pois(pois)
 
     route_distance_m = round(total_distance_meters(track_wgs84))
     visible_count = sum(1 for poi in pois if poi['visible'])
     card_count = sum(1 for poi in pois if poi['cardVisible'])
     hidden_trigger_count = sum(1 for poi in pois if not poi['visible'])
 
+    source_label = build_source_label(track_kmz_path)
+    if track_kmz_path != points_kmz_path:
+        source_label = f'{build_source_label(track_kmz_path)} + {build_source_label(points_kmz_path)}'
+
     return {
-        'sourceFile': kmz_path.relative_to(ROOT_DIR).as_posix() if kmz_path.is_relative_to(ROOT_DIR) else str(kmz_path),
+        'sourceFile': source_label,
         'sourceCoordinateSystem': 'WGS84',
         'outputCoordinateSystem': 'GCJ-02',
         'route': {
@@ -514,8 +755,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--input',
         dest='input_path',
-        default=str(DEFAULT_KMZ_PATH),
-        help='Input KMZ file path. Default: docs/tracks/2026-03-10 09 45 15.kmz',
+        default=None,
+        help='Single KMZ file path containing both track and points.',
+    )
+    parser.add_argument(
+        '--track-input',
+        dest='track_input_path',
+        default=None,
+        help='Track KMZ file path. Default: docs/tracks/jyl_tracks.kmz when present.',
+    )
+    parser.add_argument(
+        '--points-input',
+        dest='points_input_path',
+        default=None,
+        help='Point KMZ file path. Default: docs/tracks/jyl_points.kmz when present.',
     )
     parser.add_argument(
         '--output',
@@ -533,17 +786,35 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_input_paths(args: argparse.Namespace) -> tuple[Path, Path]:
+    if args.input_path:
+        combined_path = Path(args.input_path).expanduser().resolve()
+        return combined_path, combined_path
+
+    if args.track_input_path or args.points_input_path:
+        track_path = Path(args.track_input_path or args.points_input_path).expanduser().resolve()
+        points_path = Path(args.points_input_path or args.track_input_path).expanduser().resolve()
+        return track_path, points_path
+
+    if DEFAULT_TRACK_KMZ_PATH.exists() and DEFAULT_POINTS_KMZ_PATH.exists():
+        return DEFAULT_TRACK_KMZ_PATH.resolve(), DEFAULT_POINTS_KMZ_PATH.resolve()
+
+    return DEFAULT_KMZ_PATH.resolve(), DEFAULT_KMZ_PATH.resolve()
+
+
 def main() -> None:
     args = parse_args()
-    input_path = Path(args.input_path).expanduser().resolve()
+    track_input_path, points_input_path = resolve_input_paths(args)
     output_path = Path(args.output_path).expanduser().resolve()
 
-    output = build_output(input_path, args.tolerance_meters)
+    output = build_output(track_input_path, points_input_path, args.tolerance_meters)
     write_output(output, output_path)
 
     route = output['route']
     summary = output['poiSummary']
     print(f'Generated {output_path}')
+    print(f'Track source: {track_input_path}')
+    print(f'Point source: {points_input_path}')
     print(
         'Route:',
         f"{route['sourcePointCount']} raw points -> {route['simplifiedPointCount']} simplified points",

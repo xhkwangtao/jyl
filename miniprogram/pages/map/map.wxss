@@ -99,9 +99,10 @@
 
 .quick-action {
   display: flex;
+  flex: 1 1 150rpx;
   align-items: center;
   justify-content: center;
-  min-width: 170rpx;
+  min-width: 150rpx;
   min-height: 72rpx;
   padding: 0 24rpx;
   border-radius: 999rpx;
@@ -180,6 +181,26 @@
 .jyl-map {
   width: 100%;
   height: 900rpx;
+}
+
+.map-placeholder {
+  width: 100%;
+  height: 900rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #43656e;
+  font-size: 28rpx;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.45), transparent 24%),
+    linear-gradient(180deg, #dfece8 0%, #cfddd8 100%);
+}
+
+.map-placeholder-text {
+  padding: 18rpx 28rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 251, 246, 0.82);
+  border: 1px solid rgba(36, 72, 92, 0.08);
 }
 
 .map-toolbar {
