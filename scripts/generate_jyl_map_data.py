@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_KMZ_PATH = ROOT_DIR / 'docs/tracks/2026-03-10 09 45 15.kmz'
-DEFAULT_OUTPUT_PATH = ROOT_DIR / 'jyl/config/jyl-map-data.generated.js'
+DEFAULT_OUTPUT_PATH = ROOT_DIR / 'miniprogram/config/jyl-map-data.generated.js'
 
 KML_NS = {
     'k': 'http://www.opengis.net/kml/2.2',
@@ -521,7 +521,7 @@ def parse_args() -> argparse.Namespace:
         '--output',
         dest='output_path',
         default=str(DEFAULT_OUTPUT_PATH),
-        help='Output JS data file path. Default: jyl/config/jyl-map-data.generated.js',
+        help='Output JS data file path. Default: miniprogram/config/jyl-map-data.generated.js',
     )
     parser.add_argument(
         '--tolerance',

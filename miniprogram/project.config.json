@@ -6,6 +6,14 @@
       {
         "value": "node_modules",
         "type": "folder"
+      },
+      {
+        "value": "backend",
+        "type": "folder"
+      },
+      {
+        "value": "docs",
+        "type": "folder"
       }
     ],
     "include": []

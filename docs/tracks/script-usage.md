@@ -10,7 +10,7 @@
 
 默认输出文件：
 
-`/Users/mac/Developer/Work/jyl/jyl/config/jyl-map-data.generated.js`
+`/Users/mac/Developer/Work/jyl/miniprogram/config/jyl-map-data.generated.js`
 
 ## 这个脚本做了什么
 
@@ -45,7 +45,7 @@ uv run python3 scripts/generate_jyl_map_data.py \
 
 ```bash
 uv run python3 scripts/generate_jyl_map_data.py \
-  --output "jyl/config/custom-map-data.generated.js"
+  --output "miniprogram/config/custom-map-data.generated.js"
 ```
 
 ## 同时指定输入和输出
@@ -53,7 +53,7 @@ uv run python3 scripts/generate_jyl_map_data.py \
 ```bash
 uv run python3 scripts/generate_jyl_map_data.py \
   --input "docs/tracks/你的轨迹.kmz" \
-  --output "jyl/config/custom-map-data.generated.js"
+  --output "miniprogram/config/custom-map-data.generated.js"
 ```
 
 ## 调整路线简化强度
@@ -76,6 +76,6 @@ uv run python3 scripts/generate_jyl_map_data.py --tolerance 12
 
 脚本生成的文件会被这个入口文件读取：
 
-`/Users/mac/Developer/Work/jyl/jyl/config/jyl-map-data.js`
+`/Users/mac/Developer/Work/jyl/miniprogram/config/jyl-map-data.js`
 
 地图页和打卡页都会继续从这个入口文件拿数据。
