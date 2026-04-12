@@ -21,7 +21,7 @@ KML_NS = {
     'gx': 'http://www.google.com/kml/ext/2.2',
 }
 
-SIMPLIFY_TOLERANCE_METERS = 8.0
+SIMPLIFY_TOLERANCE_METERS = 0.0
 
 
 @dataclass(frozen=True)
@@ -382,6 +382,13 @@ def douglas_peucker(points: list[tuple[float, float]], tolerance_meters: float) 
     return left[:-1] + right
 
 
+def simplify_track(points: list[tuple[float, float]], tolerance_meters: float) -> list[tuple[float, float]]:
+    if tolerance_meters <= 0:
+        return points[:]
+
+    return douglas_peucker(points, tolerance_meters)
+
+
 def out_of_china(lon: float, lat: float) -> bool:
     return not (73.66 < lon < 135.05 and 3.86 < lat < 53.55)
 
@@ -703,7 +710,7 @@ def build_output(track_kmz_path: Path, points_kmz_path: Path, simplify_tolerance
     if not named_points_wgs84:
         raise ValueError('No named points found in KMZ file.')
 
-    simplified_track_wgs84 = douglas_peucker(track_wgs84, simplify_tolerance_meters)
+    simplified_track_wgs84 = simplify_track(track_wgs84, simplify_tolerance_meters)
     simplified_track_gcj02 = [wgs84_to_gcj02(lon, lat) for lon, lat in simplified_track_wgs84]
 
     has_curated_names = all(spec.source_name in named_points_wgs84 for spec in POI_SPECS)
@@ -781,7 +788,7 @@ def parse_args() -> argparse.Namespace:
         dest='tolerance_meters',
         type=float,
         default=SIMPLIFY_TOLERANCE_METERS,
-        help='Route simplification tolerance in meters. Default: 8.0',
+        help='Route simplification tolerance in meters. Default: 0.0 (preserve raw track)',
     )
     return parser.parse_args()
 

@@ -85,18 +85,26 @@ uv run python3 scripts/generate_jyl_map_data.py \
 
 ## 调整路线简化强度
 
-默认简化阈值是 `8` 米。
+默认简化阈值是 `0` 米，也就是默认保留原始轨迹，不主动压缩路线形状。
+
+如果你确认轨迹点很多，想换取更轻量的地图渲染，可以手动指定简化阈值。
+
+例如，保留大部分路线形状，同时适度减少点数：
+
+```bash
+uv run python3 scripts/generate_jyl_map_data.py --tolerance 2
+```
 
 如果你想保留更多路线细节：
 
 ```bash
-uv run python3 scripts/generate_jyl_map_data.py --tolerance 5
+uv run python3 scripts/generate_jyl_map_data.py --tolerance 1
 ```
 
 如果你想让路线更简洁：
 
 ```bash
-uv run python3 scripts/generate_jyl_map_data.py --tolerance 12
+uv run python3 scripts/generate_jyl_map_data.py --tolerance 5
 ```
 
 ## 输出结果在哪里用
