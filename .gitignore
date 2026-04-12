@@ -1,1 +1,7 @@
 .DS_Store
+editor/.env.local
+editor/node_modules
+editor/dist
+editor/*.tsbuildinfo
+editor/vite.config.js
+editor/vite.config.d.ts
