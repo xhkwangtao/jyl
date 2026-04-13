@@ -20,15 +20,15 @@
   <view class="content-layer">
     <view class="hero-card">
       <view class="hero-copy">
-        <text class="hero-kicker">JYL CHECK-IN</text>
+        <text class="hero-kicker">QR COLLECTION</text>
         <text class="hero-title">{{heroTitle}}</text>
         <text class="hero-desc">{{heroDesc}}</text>
       </view>
 
       <view class="hero-progress-row">
         <view class="hero-progress-copy">
-          <text class="hero-progress-label">当前进度</text>
-          <text class="hero-progress-value">{{checkedCount}} / {{totalCount}}</text>
+          <text class="hero-progress-label">当前已收集</text>
+          <text class="hero-progress-value">{{collectedCount}} / {{totalCount}}</text>
         </view>
         <text class="hero-progress-percent">{{progressPercentText}}</text>
       </view>
@@ -39,18 +39,29 @@
 
       <view class="stats-grid">
         <view class="stat-card">
-          <text class="stat-label">全部导览点</text>
+          <text class="stat-label">全部暗号</text>
           <text class="stat-value">{{totalCount}}</text>
         </view>
         <view class="stat-card stat-card-checked">
-          <text class="stat-label">已打卡</text>
-          <text class="stat-value">{{checkedCount}}</text>
+          <text class="stat-label">已收集</text>
+          <text class="stat-value">{{collectedCount}}</text>
         </view>
         <view class="stat-card">
-          <text class="stat-label">未打卡</text>
-          <text class="stat-value">{{uncheckedCount}}</text>
+          <text class="stat-label">未收集</text>
+          <text class="stat-value">{{pendingCount}}</text>
         </view>
       </view>
+
+      <view class="hero-actions">
+        <view class="hero-action hero-action-primary" bindtap="onScanCollect">
+          <text class="hero-action-text hero-action-text-primary">扫码收集</text>
+        </view>
+        <view class="hero-action hero-action-secondary" bindtap="onMyPageTap">
+          <text class="hero-action-text hero-action-text-secondary">我的档案</text>
+        </view>
+      </view>
+
+      <text class="scan-tip">{{scanTip}}</text>
     </view>
 
     <view class="filter-shell">
@@ -67,27 +78,27 @@
 
     <view class="section-head">
       <view>
-        <text class="section-title">全部导览点</text>
+        <text class="section-title">全部暗号点</text>
         <text class="section-caption">{{sectionCaption}}</text>
       </view>
       <text class="section-right">{{visibleCount}} 个结果</text>
     </view>
 
-    <view class="spot-list" wx:if="{{visibleScenicList.length}}">
+    <view class="spot-list" wx:if="{{visibleSecretList.length}}">
       <view
-        class="spot-card {{item.checked ? 'spot-card-checked' : 'spot-card-pending'}}"
-        wx:for="{{visibleScenicList}}"
+        class="spot-card {{item.collected ? 'spot-card-checked' : 'spot-card-pending'}}"
+        wx:for="{{visibleSecretList}}"
         wx:key="id"
       >
         <view class="spot-card-top">
           <view class="spot-sequence">
-            <text class="spot-sequence-text">{{item.orderText}}</text>
+            <text class="spot-sequence-text">{{item.secretIndexText}}</text>
           </view>
 
           <view class="spot-copy">
             <view class="spot-meta-row">
-              <text class="spot-tag spot-tag-{{item.themeTone}}">{{item.themeTag}}</text>
-              <view class="spot-status {{item.checked ? 'spot-status-checked' : 'spot-status-pending'}}">
+              <text class="spot-tag spot-tag-{{item.themeTone}}">{{item.patternLabel}}</text>
+              <view class="spot-status {{item.collected ? 'spot-status-checked' : 'spot-status-pending'}}">
                 <text class="spot-status-text">{{item.statusText}}</text>
               </view>
             </view>
@@ -96,22 +107,22 @@
 
             <view class="spot-location-row">
               <image class="spot-location-icon" src="/images/poi-detail/location.svg" mode="widthFix"></image>
-              <text class="spot-location-text">{{item.sequenceText}} · {{item.shortHint}}</text>
+              <text class="spot-location-text">{{item.sequenceText}} · {{item.themeTag}}</text>
             </view>
 
-            <text class="spot-desc">{{item.description}}</text>
+            <text class="spot-desc">{{item.collectionHint}}</text>
           </view>
         </view>
 
         <view class="spot-bottom-row">
-          <text class="spot-time {{item.checked ? 'spot-time-checked' : ''}}">{{item.timeText}}</text>
+          <text class="spot-time {{item.collected ? 'spot-time-checked' : ''}}">{{item.timeText}}</text>
 
           <view class="spot-actions">
             <view class="spot-action spot-action-ghost" data-id="{{item.id}}" bindtap="onMapTap">
               <text class="spot-action-text spot-action-text-ghost">地图查看</text>
             </view>
-            <view class="spot-action {{item.checked ? 'spot-action-secondary' : 'spot-action-primary'}}" data-id="{{item.id}}" bindtap="onToggleCheckin">
-              <text class="spot-action-text {{item.checked ? 'spot-action-text-secondary' : 'spot-action-text-primary'}}">{{item.actionText}}</text>
+            <view class="spot-action {{item.collected ? 'spot-action-secondary' : 'spot-action-primary'}}" data-id="{{item.id}}" bindtap="onToggleCheckin">
+              <text class="spot-action-text {{item.collected ? 'spot-action-text-secondary' : 'spot-action-text-primary'}}">{{item.actionText}}</text>
             </view>
           </view>
         </view>
@@ -119,8 +130,8 @@
     </view>
 
     <view class="empty-state" wx:else>
-      <text class="empty-title">当前筛选下暂无导览点</text>
-      <text class="empty-desc">切换筛选后可查看其它打卡状态。</text>
+      <text class="empty-title">当前筛选下暂无暗号点</text>
+      <text class="empty-desc">切换筛选后可查看其它暗号的收集状态。</text>
     </view>
   </view>
 </view>

@@ -14,9 +14,9 @@ Page({
     dialogText: '小九带您告别走马观花，长城不仅是照片里的背景，历史不再是书本里的文字，触摸长城砖石、解锁历史，让快乐旅途藏满文化与知识的重量。',
     aiNameDisplay: ['小', '九'],
     aiRoleDisplay: ['A', 'I', '使', '者'],
-    checkInTitle: '导览点打卡',
-    checkInDescription: '4个导览点已整理完成\n开始记录你的九眼楼旅程',
-    checkInAction: '立即打卡',
+    checkInTitle: '研学暗号收集',
+    checkInDescription: '暗号点已整理完成\n到景点扫码后可逐个解锁图案',
+    checkInAction: '去收集',
     checkInTotalCount: JYL_MARKER_POINTS.length,
     checkInCompletedCount: 0
   },
@@ -132,11 +132,15 @@ Page({
   },
 
   onCheckInTap() {
+    const targetUrl = this.data.checkInCompletedCount >= this.data.checkInTotalCount
+      ? '/pages/my-page/my-page'
+      : '/pages/check-in/check-in'
+
     wx.navigateTo({
-      url: '/pages/check-in/check-in',
+      url: targetUrl,
       fail: () => {
         wx.redirectTo({
-          url: '/pages/check-in/check-in'
+          url: targetUrl
         })
       }
     })
@@ -226,15 +230,15 @@ Page({
     const totalCount = JYL_MARKER_POINTS.length
     const completedCount = Object.keys(records).length
 
-    let checkInDescription = `${totalCount}个导览点已整理完成\n开始记录你的九眼楼旅程`
-    let checkInAction = '立即打卡'
+    let checkInDescription = `${totalCount}枚暗号等待收集\n到指定景点扫码后解锁研学报告`
+    let checkInAction = '去收集'
 
     if (completedCount > 0 && completedCount < totalCount) {
-      checkInDescription = `已完成 ${completedCount}/${totalCount} 个导览点\n继续点亮剩余打卡点`
-      checkInAction = '继续打卡'
+      checkInDescription = `已收集 ${completedCount}/${totalCount} 枚暗号\n继续前往景点扫码解锁剩余图案`
+      checkInAction = '继续收集'
     } else if (completedCount >= totalCount) {
-      checkInDescription = `${totalCount}个导览点已全部点亮\n回看你的完整游览记录`
-      checkInAction = '查看记录'
+      checkInDescription = `${totalCount}枚暗号已全部收齐\n研学报告已进入可解锁状态`
+      checkInAction = '查看档案'
     }
 
     this.setData({

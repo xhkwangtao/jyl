@@ -44,7 +44,7 @@
         </view>
 
         <view class="check-in-progress">
-          <text class="check-in-progress-label">已完成</text>
+          <text class="check-in-progress-label">已收集</text>
           <text class="check-in-progress-value">{{checkInCompletedCount}}/{{checkInTotalCount}}</text>
         </view>
       </view>

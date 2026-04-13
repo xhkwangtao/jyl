@@ -1,6 +1,6 @@
 <page-meta page-style="{{pageStyle}}"></page-meta>
 
-<view class="my-page {{isCardCollapsed ? 'compact-mode' : ''}}" wx:if="{{pageReady}}" style="{{navBarHeightStyle}}">
+<view class="my-page" wx:if="{{pageReady}}" style="{{navBarHeightStyle}}">
   <view class="background-layer">
     <image class="background-svg" src="/images/ai-chat-bg.svg" mode="aspectFill" />
   </view>
@@ -10,7 +10,7 @@
       title="我的"
       show-back="{{true}}"
       showHomeButton="{{true}}"
-      background-color="rgba(255, 255, 255, 0.1)"
+      background-color="rgba(255, 255, 255, 0.12)"
       title-color="#333333"
       showUserAvatar="{{false}}"
       useCapsuleStyle="{{false}}"
@@ -20,151 +20,167 @@
   </view>
 
   <view class="content-layer">
-    <view class="main-content" data-tab="{{currentTab}}">
+    <view class="hero-card">
+      <text class="hero-kicker">RESEARCH QUEST</text>
+      <text class="hero-title">{{heroTitle}}</text>
+      <text class="hero-desc">{{heroDesc}}</text>
+
+      <view class="hero-progress-row">
+        <view class="hero-progress-copy">
+          <text class="hero-progress-label">{{userNickname}} 的暗号收集进度</text>
+          <text class="hero-progress-value">{{collectedCount}} / {{totalCount}}</text>
+        </view>
+        <text class="hero-progress-percent">{{progressPercentText}}</text>
+      </view>
+
+      <view class="progress-track">
+        <view class="progress-fill" style="width: {{progressPercent}}%;"></view>
+      </view>
+
+      <view class="stats-grid">
+        <view class="stat-card">
+          <text class="stat-label">全部暗号</text>
+          <text class="stat-value">{{totalCount}}</text>
+        </view>
+        <view class="stat-card stat-card-checked">
+          <text class="stat-label">已收集</text>
+          <text class="stat-value">{{collectedCount}}</text>
+        </view>
+        <view class="stat-card">
+          <text class="stat-label">未收集</text>
+          <text class="stat-value">{{pendingCount}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="report-card {{reportUnlocked ? 'report-card-ready' : 'report-card-pending'}}">
+      <view class="report-chip {{reportUnlocked ? 'report-chip-ready' : 'report-chip-pending'}}">
+        <text class="report-chip-text">{{reportStatusText}}</text>
+      </view>
+      <text class="report-title">{{reportTitle}}</text>
+      <text class="report-desc">{{reportDesc}}</text>
+
+      <view class="report-actions">
+        <view class="report-action report-action-primary" bindtap="onReportTap">
+          <text class="report-action-text report-action-text-primary">{{reportActionText}}</text>
+        </view>
+        <view class="report-action report-action-secondary" bindtap="onOpenCollectionPage">
+          <text class="report-action-text report-action-text-secondary">查看收集点</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="rules-card">
+      <view class="section-head section-head-static">
+        <view>
+          <text class="section-title">研学流程</text>
+          <text class="section-caption">现在这页会明确展示已经拿到的暗号图案和剩余待收集的图案。</text>
+        </view>
+      </view>
+
+      <view class="rule-list">
+        <view class="rule-item" wx:for="{{ruleList}}" wx:key="indexText">
+          <view class="rule-index-shell">
+            <text class="rule-index">{{item.indexText}}</text>
+          </view>
+          <view class="rule-copy">
+            <text class="rule-title">{{item.title}}</text>
+            <text class="rule-desc">{{item.desc}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-head">
+      <view>
+        <text class="section-title">已收集暗号</text>
+        <text class="section-caption">已经通过景点二维码收下来的暗号图案会显示在这里。</text>
+      </view>
+      <text class="section-right">{{collectedCount}} 枚</text>
+    </view>
+
+    <view class="secret-list" wx:if="{{collectedSecretList.length}}">
       <view
-        class="tab-content-container {{isCardCollapsed ? 'collapsed-mode' : 'expanded-mode'}} {{isDragging ? 'dragging' : ''}}"
-        style="transform: {{tabTransform}}; transition: {{tabTransition}};"
-        bindtouchstart="onTouchStart"
-        bindtouchmove="onTouchMove"
-        bindtouchend="onTouchEnd"
+        class="secret-card secret-card-collected"
+        wx:for="{{collectedSecretList}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onSecretTap"
       >
-        <view class="tab-container">
-          <tab-switch current-tab="{{currentTab}}" bind:tabChange="onTabChange" />
+        <view class="secret-code-shell">
+          <text class="secret-code">{{item.secretIndexText}}</text>
+          <text class="secret-code-label">已解锁</text>
         </view>
 
-        <view class="content-container">
-          <view class="badge-container" wx:if="{{currentTab === 'badge'}}">
-            <badge-grid badges="{{userBadges}}" bind:badgeTap="onBadgeTap" />
-          </view>
-
-          <view class="ranking-container" wx:if="{{currentTab === 'ranking'}}">
-            <view class="top-ranking-list">
-              <view class="list-header">
-                <text class="list-title">排行榜 TOP 10</text>
-              </view>
-
-              <view class="top-three-simple">
-                <view class="simple-podium-item {{topRankingList[1] && topRankingList[1].isSelf ? 'self-item' : ''}}" wx:if="{{topRankingList[1]}}">
-                  <view class="avatar-container">
-                    <image class="simple-avatar" src="{{topRankingList[1].avatar}}" mode="aspectFit" />
-                    <view class="simple-rank-badge">2</view>
-                  </view>
-                  <view class="simple-username">{{topRankingList[1].nickname}}</view>
-                  <view class="simple-score-container">
-                    <text class="simple-score-number">{{topRankingList[1].score}}</text>
-                    <text class="simple-score-label">积分</text>
-                  </view>
-                </view>
-
-                <view class="simple-podium-item first-place {{topRankingList[0] && topRankingList[0].isSelf ? 'self-item' : ''}}" wx:if="{{topRankingList[0]}}">
-                  <view class="avatar-container">
-                    <image class="simple-avatar" src="{{topRankingList[0].avatar}}" mode="aspectFit" />
-                    <view class="simple-rank-badge">1</view>
-                  </view>
-                  <view class="simple-username">{{topRankingList[0].nickname}}</view>
-                  <view class="simple-score-container">
-                    <text class="simple-score-number">{{topRankingList[0].score}}</text>
-                    <text class="simple-score-label">积分</text>
-                  </view>
-                </view>
-
-                <view class="simple-podium-item {{topRankingList[2] && topRankingList[2].isSelf ? 'self-item' : ''}}" wx:if="{{topRankingList[2]}}">
-                  <view class="avatar-container">
-                    <image class="simple-avatar" src="{{topRankingList[2].avatar}}" mode="aspectFit" />
-                    <view class="simple-rank-badge">3</view>
-                  </view>
-                  <view class="simple-username">{{topRankingList[2].nickname}}</view>
-                  <view class="simple-score-container">
-                    <text class="simple-score-number">{{topRankingList[2].score}}</text>
-                    <text class="simple-score-label">积分</text>
-                  </view>
-                </view>
-              </view>
-
-              <view class="ranking-items">
-                <block wx:for="{{topRankingList}}" wx:for-index="idx" wx:key="id">
-                  <view class="ranking-item {{item.isSelf ? 'self-item' : ''}}" wx:if="{{idx >= 3}}">
-                    <view class="rank-number-badge">
-                      <text class="rank-number">{{item.rank}}</text>
-                    </view>
-                    <image class="user-avatar" src="{{item.avatar}}" mode="aspectFit" />
-                    <view class="user-info">
-                      <text class="user-nickname">{{item.nickname}}</text>
-                      <text class="user-title">{{item.title}}</text>
-                    </view>
-                    <view class="score-display">
-                      <text class="score-number">{{item.score}}</text>
-                      <text class="score-label">分</text>
-                    </view>
-                  </view>
-                </block>
-              </view>
+        <view class="secret-copy">
+          <view class="secret-meta-row">
+            <text class="secret-tag secret-tag-{{item.themeTone}}">{{item.patternLabel}}</text>
+            <view class="secret-status-chip secret-status-chip-collected">
+              <text class="secret-status-text">已收集</text>
             </view>
           </view>
+
+          <text class="secret-title">{{item.name}}</text>
+          <text class="secret-hint">{{item.sequenceText}} · {{item.themeTag}}</text>
+          <text class="secret-desc">{{item.collectionHint}}</text>
+          <text class="secret-time">{{item.timeText}}</text>
         </view>
       </view>
     </view>
-  </view>
 
-  <view class="quick-links-section bottom-fixed" wx:if="{{currentTab === 'badge'}}">
-    <button class="action-button primary" bindtap="openOrderCenter">
-      <text class="button-icon">📦</text>
-      <text>查看订单</text>
-    </button>
-    <button class="action-button secondary" bindtap="handleContact">
-      <text class="button-icon">💬</text>
-      <text>联系客服</text>
-    </button>
-  </view>
+    <view class="empty-state" wx:else>
+      <text class="empty-title">还没有收集到暗号图案</text>
+      <text class="empty-desc">到达指定景点后扫描二维码，第一枚暗号会显示在这里。</text>
+    </view>
 
-  <view class="my-rank-card-container-fixed" wx:if="{{currentTab === 'ranking'}}">
-    <image class="rank-avatar" src="/images/xiaoying.png" mode="aspectFill"></image>
+    <view class="section-head">
+      <view>
+        <text class="section-title">待收集暗号</text>
+        <text class="section-caption">这些暗号图案还未解锁，继续按路线前往景点扫码即可。</text>
+      </view>
+      <text class="section-right">{{pendingCount}} 枚</text>
+    </view>
 
-    <view class="my-rank-card">
-      <view class="progress-dot"></view>
+    <view class="secret-list" wx:if="{{pendingSecretList.length}}">
+      <view
+        class="secret-card secret-card-pending"
+        wx:for="{{pendingSecretList}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onSecretTap"
+      >
+        <view class="secret-code-shell">
+          <text class="secret-code">{{item.secretIndexText}}</text>
+          <text class="secret-code-label">待解锁</text>
+        </view>
 
-      <view class="rank-content-new">
-        <text class="rank-title-new">我的排名</text>
-        <text class="my-name">{{userNickname || '游客'}}</text>
-        <text class="my-rank1">第</text>
-        <text class="my-rank">{{currentRank}}</text>
-        <text class="my-rank2">名</text>
-        <text class="score-count">{{currentPoints}}</text>
-        <text class="score-label">积分</text>
-        <text class="progress-text">{{percentileText}}</text>
+        <view class="secret-copy">
+          <view class="secret-meta-row">
+            <text class="secret-tag secret-tag-{{item.themeTone}}">{{item.patternLabel}}</text>
+            <view class="secret-status-chip secret-status-chip-pending">
+              <text class="secret-status-text">未收集</text>
+            </view>
+          </view>
 
-        <view class="challenge-btn" bindtap="goToQuiz">
-          <text class="challenge-btn-text">去挑战</text>
-          <view class="challenge-arrow"></view>
+          <text class="secret-title">{{item.name}}</text>
+          <text class="secret-hint">{{item.sequenceText}} · {{item.themeTag}}</text>
+          <text class="secret-desc">{{item.collectionHint}}</text>
+          <text class="secret-time">{{item.timeText}}</text>
         </view>
       </view>
     </view>
-  </view>
 
-  <view class="qrcode-modal" wx:if="{{showQrcodeModal}}">
-    <view class="qrcode-overlay" bindtap="hideQrcodeModal"></view>
-    <view class="qrcode-container">
-      <view class="qrcode-card">
-        <view class="qrcode-close" bindtap="hideQrcodeModal">
-          <text class="qrcode-close-icon">×</text>
-        </view>
+    <view class="empty-state" wx:else>
+      <text class="empty-title">全部暗号都已解锁</text>
+      <text class="empty-desc">当前设备上的研学暗号收集任务已经完成，可以继续查看报告状态。</text>
+    </view>
 
-        <view class="qrcode-title">扫码添加客服微信</view>
-
-        <image
-          class="qrcode-image"
-          src="{{qrcodeImageUrl}}"
-          mode="aspectFit"
-          show-menu-by-longpress="true"
-          bindtap="previewQrcode"
-        />
-
-        <view class="qrcode-tips">
-          <text class="qrcode-tip-text">当前仅复刻 UI 展示效果</text>
-          <text class="qrcode-tip-text">保存与扫码能力暂未接入</text>
-        </view>
-
-        <button class="qrcode-save-btn" bindtap="saveQrcodeToAlbum">保存到相册</button>
+    <view class="bottom-actions">
+      <view class="bottom-action bottom-action-primary" bindtap="onOpenCollectionPage">
+        <text class="bottom-action-text bottom-action-text-primary">{{reportUnlocked ? '回看收集点' : '去收集暗号'}}</text>
+      </view>
+      <view class="bottom-action bottom-action-secondary" bindtap="onOpenMapPage">
+        <text class="bottom-action-text bottom-action-text-secondary">打开地图</text>
       </view>
     </view>
   </view>

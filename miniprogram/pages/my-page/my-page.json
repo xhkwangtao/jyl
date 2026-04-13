@@ -4,8 +4,6 @@
   "backgroundTextStyle": "dark",
   "enablePullDownRefresh": false,
   "usingComponents": {
-    "universal-navigation": "/components/universal-navigation/universal-navigation",
-    "tab-switch": "/components/tab-switch/tab-switch",
-    "badge-grid": "/components/badge-grid/badge-grid"
+    "universal-navigation": "/components/universal-navigation/universal-navigation"
   }
 }
