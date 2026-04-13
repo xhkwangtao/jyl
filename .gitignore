@@ -1,4 +1,6 @@
 .DS_Store
+__pycache__/
+*.py[cod]
 editor/.env.local
 editor/node_modules
 editor/dist
