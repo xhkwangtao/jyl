@@ -1,0 +1,806 @@
+/* components/audio-player-guide/audio-player-guide.wxss */
+
+/* ======================
+   音频播放器组件颜色变量定义
+   ====================== */
+/*
+  主题色彩概览：
+  - UI主题：#2CEDB8 (数字人AI的绿色主题色) - 用于按钮、交互元素
+  - 波形主题：酷黑色系 (#1a1a1a 到 #535353) - 专用于音频波形动画
+  - 渐变层次：从深黑到浅灰的渐变变化，营造酷炫科技感
+  - 透明度层次：提供10%-100%的透明度变化
+  - 用途分类：波形动画(黑色)、交互状态(绿色)、背景装饰
+*/
+page {
+  /* 主题色系 - 基于 #2CEDB8 的色彩变化 */
+  --primary-color: #2CEDB8;              /* 主绿色 - 按钮、指示器等主要元素 */
+  --primary-light: #4EFCD1;              /* 亮绿色 - 高亮效果 */
+  --primary-lighter: #6AF5D5;            /* 更亮绿色 - 中等高亮 */
+  --primary-lightest: #88F7E2;           /* 最亮绿色 - 轻微高亮 */
+  
+  /* 波形颜色系统 - 专用于音频波形动画 (酷黑主题) */
+  --wave-primary: #1a1a1a;               /* 基础波形颜色 - 深黑色 */
+  --wave-highlight-1: #2d2d2d;           /* 高亮波形颜色1 - 炭黑色 */
+  --wave-highlight-2: #404040;           /* 高亮波形颜色2 - 石墨灰 */
+  --wave-highlight-3: #535353;           /* 高亮波形颜色3 - 钢铁灰 */
+  
+  /* 波形渐变色 - 创建立体感 */
+  --wave-gradient-1: linear-gradient(to top, var(--wave-primary), var(--wave-highlight-1));
+  --wave-gradient-2: linear-gradient(to top, var(--wave-primary), var(--wave-highlight-2));
+  --wave-gradient-3: linear-gradient(to top, var(--wave-primary), var(--wave-highlight-3));
+  
+  /* 透明度层次 - 用于波形动画的层次感 */
+  --wave-opacity-primary: 1.0;           /* 主要波形透明度 */
+  --wave-opacity-secondary: 0.8;         /* 次要波形透明度 */
+  --wave-opacity-tertiary: 0.6;          /* 第三级波形透明度 */
+  
+  /* 状态颜色 */
+  --wave-paused-opacity: 0.5;            /* 暂停时整体透明度 - 酷黑主题下降低 */
+  --pause-indicator-color: rgba(26, 26, 26, 0.8);    /* 暂停指示器颜色 - 深黑色 */
+  
+  /* 透明度变化的主题色 - 用于交互反馈 (保持绿色) */
+  --primary-alpha-10: rgba(44, 237, 184, 0.1);    /* 轻微背景色 */
+  --primary-alpha-20: rgba(44, 237, 184, 0.2);    /* 按下状态 */
+  --primary-alpha-30: rgba(44, 237, 184, 0.3);    /* 边框颜色 */
+  --primary-alpha-40: rgba(44, 237, 184, 0.4);    /* 阴影效果 */
+  --primary-alpha-50: rgba(44, 237, 184, 0.5);    /* 高亮阴影 */
+  --primary-alpha-60: rgba(44, 237, 184, 0.6);    /* 强调边框 */
+  --primary-alpha-100: rgba(44, 237, 184, 1.0);   /* 完全不透明 */
+  
+  /* 波形专用透明度色系 - 酷黑主题 */
+  --wave-alpha-10: rgba(26, 26, 26, 0.1);         /* 波形轻微透明 */
+  --wave-alpha-20: rgba(26, 26, 26, 0.2);         /* 波形浅透明 */
+  --wave-alpha-30: rgba(26, 26, 26, 0.3);         /* 波形中透明 */
+  --wave-alpha-40: rgba(26, 26, 26, 0.4);         /* 波形较透明 */
+  --wave-alpha-50: rgba(26, 26, 26, 0.5);         /* 波形半透明 */
+  --wave-alpha-60: rgba(26, 26, 26, 0.6);         /* 波形深透明 */
+  --wave-alpha-80: rgba(26, 26, 26, 0.8);         /* 波形很深 */
+  --wave-alpha-100: rgba(26, 26, 26, 1.0);        /* 波形完全不透明 */
+  
+  /* 其他UI颜色 */
+  --text-color-white: white;             /* 白色文字 */
+  --text-color-black: black;             /* 黑色文字 */
+  --background-dark: #212121;            /* 深色背景 */
+  --border-color: #6786D5;               /* 蓝色边框 */
+  --shadow-primary: rgba(58, 24, 127, 0.30);  /* 主要阴影 */
+}
+
+/* 主容器 */
+.audio-player-guide {
+  position: fixed;
+  top: 80rpx; /* 在状态栏下方 */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  transition: all 0.3s ease;
+}
+
+.audio-player-guide.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.audio-player-guide.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-100%);
+  pointer-events: none;
+}
+
+/* 播放器容器 - 对应设计稿尺寸 */
+.player-container {
+  width: 678rpx; /* 339px * 2 */
+  height: 232rpx; /* 116px * 2 */
+  position: relative;
+}
+
+/* 白色背景边框 */
+.background-border {
+  width: 678rpx;
+  height: 232rpx;
+  position: absolute;
+  left: 0;
+  top: 100rpx;
+  background: white;
+  box-shadow: 0 0 40rpx rgba(58, 24, 127, 0.30);
+  border-radius: 28rpx;
+  border: 2rpx solid #6786D5;
+}
+
+/* 黑色背景主体 */
+.main-background {
+  width: 678rpx;
+  height: 174rpx; /* 87px * 2 */
+  position: absolute;
+  left: 0;
+  top: 100rpx;
+  background: #212121;
+  border-radius: 28rpx;
+}
+
+/* 数字人导游头像容器 */
+.avatar-container {
+  width: 214rpx;
+  height: 278rpx;
+  position: absolute;
+  left: 16rpx;
+  top: -8rpx;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.guide-avatar {
+  width: 100%;
+  height: 100%;
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 12rpx 24rpx rgba(0, 0, 0, 0.28));
+}
+
+.guide-avatar.playing {
+  /* 播放时的动画效果 */
+  animation: avatarPulse 2s ease-in-out infinite;
+}
+
+.guide-avatar.paused {
+  /* 暂停时的静态效果 */
+  animation: none;
+  opacity: 0.9;
+  filter: grayscale(10%);
+}
+
+/* 数字人头像动画状态 */
+.guide-avatar.talking {
+  /* 说话时的动画效果 */
+  /*animation: talkingAnimation 0.6s ease-in-out infinite alternate;*/
+}
+
+.guide-avatar.breathing {
+  /* 呼吸动画效果 */
+  animation: breathingAnimation 3s ease-in-out infinite;
+}
+
+.guide-avatar.idle {
+  /* 静态状态 */
+  animation: none;
+  transform: scale(1);
+}
+
+/* 暂停状态指示器 */
+.pause-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: all 0.3s ease;
+}
+
+.pause-indicator.visible {
+  opacity: 1;
+}
+
+.pause-indicator.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.breathing-circle {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid var(--pause-indicator-color);
+  border-radius: 50%;
+  animation: breathingPulse 3s ease-in-out infinite;
+}
+
+/* 播放时的脉冲动画 */
+@keyframes avatarPulse {
+  0%, 100% { 
+    transform: scale(1); 
+    box-shadow: 0 0 0 0 var(--primary-alpha-40);
+  }
+  50% { 
+    transform: scale(1.05); 
+    box-shadow: 0 0 0 10rpx transparent;
+  }
+}
+
+/* 暂停时的呼吸动画 */
+@keyframes breathingPulse {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 0.6;
+    border-color: var(--primary-alpha-60);
+  }
+  50% { 
+    transform: scale(1.2);
+    opacity: 1;
+    border-color: var(--primary-alpha-100);
+  }
+}
+
+/* 播放状态文字区域 */
+.status-text-area {
+  width: 210rpx; /* 105px * 2 */
+  height: 68rpx; /* 34px * 2 */
+  position: absolute;
+  left: 216rpx; /* 108px * 2 */
+  top: 114rpx; /* 57px * 2 */
+  background: linear-gradient(180deg, rgba(153, 153, 153, 0.30) 0%, rgba(232.20, 232.20, 232.20, 0) 100%);
+  border-radius: 200rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-text {
+  color: white;
+  font-size: 20rpx; /* 10px * 2 */
+  font-family: 'Asap Condensed', sans-serif;
+  font-weight: 400;
+  line-height: 20rpx;
+  text-align: center;
+}
+
+/* 积分区域 */
+.score-area {
+  position: absolute;
+  left: 442rpx; /* 221px * 2 */
+  top: 114rpx; /* 57px * 2 */
+  width: 222rpx; /* 111px * 2 */
+  height: 146rpx; /* 73px * 2 */
+}
+
+.score-background {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(0deg, var(--text-color-white) 0%, var(--primary-color) 100%);
+  border-radius: 30rpx;
+}
+
+.score-label {
+  position: absolute;
+  left: 92rpx; /* 从54rpx调整到92rpx，为avatar留出空间 */
+  top: 8rpx; /* 从4rpx调整到8rpx，微调垂直位置 */
+  color: black;
+  font-size: 24rpx; /* 12px * 2 */
+  font-family: 'Alibaba PuHuiTi', sans-serif;
+  font-weight: 500;
+  line-height: 24rpx;
+}
+
+.score-value {
+  position: absolute;
+  left: 92rpx; /* 从54rpx调整到92rpx，与score-label左对齐 */
+  top: 40rpx; /* 从52rpx调整到40rpx，适当缩小间距 */
+  color: black;
+  font-size: 44rpx; /* 22px * 2 */
+  font-family: 'DIN', sans-serif;
+  font-weight: 700;
+  line-height: 38rpx;
+}
+
+.rank-text {
+  position: absolute;
+  left: 2rpx; /* 1px * 2 */
+  top: 104rpx; /* 52px * 2 */
+  color: #919191;
+  font-size: 20rpx; /* 10px * 2 */
+  font-family: 'Alibaba-PuHuiTi-Regular', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-weight: 400;
+  line-height: 19rpx;
+  text-align: center;
+  width: 100%;
+}
+
+/* 积分区域表情头像 */
+.score-avatar {
+  position: absolute;
+  left: 8rpx; /* 从2rpx调整到8rpx，增加左边距 */
+  top: 20rpx; /* 从24rpx调整到20rpx，微调垂直位置 */
+  width: 72rpx; /* 从60rpx调整到72rpx，适应80rpx图标 */
+  height: 72rpx; /* 从60rpx调整到72rpx，适应80rpx图标 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emoji-avatar {
+  width: 68rpx; /* 从80rpx调整到68rpx，适应容器 */
+  height: 68rpx; /* 从80rpx调整到68rpx，适应容器 */
+  transition: all 0.3s ease;
+}
+
+/* 积分区域头像的悬停效果（可选） */
+.score-avatar:active .emoji-avatar {
+  transform: scale(0.95);
+}
+
+/* 根据播放状态添加动态效果 */
+.audio-player-guide .score-avatar {
+  transition: all 0.3s ease;
+}
+
+/* 播放时给积分区域头像添加轻微动画 */
+.audio-player-guide .score-avatar {
+  animation: scoreAvatarPulse 3s ease-in-out infinite;
+}
+
+@keyframes scoreAvatarPulse {
+  0%, 100% { 
+    box-shadow: 0 4rpx 8rpx rgba(44, 237, 184, 0.3);
+  }
+  50% { 
+    box-shadow: 0 6rpx 12rpx rgba(44, 237, 184, 0.5);
+  }
+}
+
+/* 播放控制区域 */
+.control-area {
+  position: absolute;
+  left: 216rpx; /* 108px * 2 */
+  top: 192rpx; /* 96px * 2 */
+  width: 210rpx; /* 105px * 2 */
+  height: 68rpx; /* 34px * 2 */
+}
+
+.control-background {
+  width: 100%;
+  height: 100%;
+  background: #A1A1A1;
+  border-radius: 200rpx;
+}
+
+.play-button {
+  position: absolute;
+  left: 6rpx; /* 3px * 2 */
+  top: 6rpx; /* 3px * 2 */
+  width: 56rpx; /* 28px * 2 */
+  height: 56rpx; /* 28px * 2 */
+  background: var(--primary-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.play-button:active {
+  transform: scale(0.95);
+}
+
+/* 播放图标 */
+.play-triangle {
+  width: 0;
+  height: 0;
+  border-left: 24rpx solid black;
+  border-top: 16rpx solid transparent;
+  border-bottom: 16rpx solid transparent;
+  margin-left: 8rpx;
+}
+
+/* 暂停图标 */
+.pause-bar {
+  width: 10rpx; /* 3.5px * 2 */
+  height: 30rpx; /* 10px * 2 */
+  background: black;
+  border-radius: 2rpx;
+}
+
+.pause-icon {
+  display: flex;
+  gap: 6rpx;
+}
+
+/* 音频波形装饰 */
+.audio-waves {
+  position: absolute;
+  left: 72rpx; /* 播放按钮右侧开始 */
+  right: 10rpx; /* 右侧留10rpx边距 */
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: opacity 0.3s ease;
+}
+
+/* 播放状态：正常显示和动画 */
+.audio-waves.playing {
+  opacity: 1;
+  filter: none;
+  animation: none;
+}
+
+.audio-waves.playing .wave {
+  animation-play-state: running;
+}
+
+/* 暂停状态：保持显示但停止动画，酷黑主题下的暂停效果 */
+.audio-waves.paused {
+  opacity: var(--wave-paused-opacity);
+  filter: brightness(0.7) contrast(1.2);
+  animation: pausedPulse 2s ease-in-out infinite;
+}
+
+.audio-waves.paused .wave {
+  animation-play-state: paused;
+}
+
+/* 暂停时的整体脉冲效果 - 酷黑主题 */
+@keyframes pausedPulse {
+  0%, 100% { 
+    opacity: var(--wave-paused-opacity);
+    filter: brightness(0.7) contrast(1.2);
+  }
+  50% { 
+    opacity: 0.8;
+    filter: brightness(0.9) contrast(1.4);
+  }
+}
+
+/* ======================
+   波形样式定义
+   ====================== */
+.wave {
+  width: 4rpx;
+  background: var(--wave-primary);
+  border-radius: 4rpx;
+  animation: waveAnimation 1.5s ease-in-out infinite;
+  transform-origin: bottom;
+  opacity: var(--wave-opacity-primary);
+}
+
+/* 高亮波形组：较宽，使用渐变1 */
+.wave-4, .wave-8, .wave-12 {
+  width: 5rpx;
+  background: var(--wave-gradient-1);
+}
+
+/* 细波形组：较窄，使用渐变3 */
+.wave-2, .wave-6, .wave-10 {
+  width: 3rpx;
+  background: var(--wave-gradient-3);
+}
+
+/* 次要波形组：基础颜色，降低透明度 */
+.wave-1, .wave-5, .wave-9 {
+  background: var(--wave-primary);
+  opacity: var(--wave-opacity-secondary);
+}
+
+/* 中等波形组：使用渐变2 */
+.wave-3, .wave-7, .wave-11 {
+  background: var(--wave-gradient-2);
+}
+
+/* 12个波形条的高度、延迟和动画时长设置 - 创建自然的音频波形 */
+.wave-1 {
+  height: 12rpx;
+  animation-delay: 0s;
+  animation-duration: 1.3s;
+}
+
+.wave-2 {
+  height: 24rpx;
+  animation-delay: 0.1s;
+  animation-duration: 1.7s;
+}
+
+.wave-3 {
+  height: 18rpx;
+  animation-delay: 0.2s;
+  animation-duration: 1.4s;
+}
+
+.wave-4 {
+  height: 32rpx;
+  animation-delay: 0.3s;
+  animation-duration: 1.8s;
+}
+
+.wave-5 {
+  height: 14rpx;
+  animation-delay: 0.4s;
+  animation-duration: 1.2s;
+}
+
+.wave-6 {
+  height: 28rpx;
+  animation-delay: 0.5s;
+  animation-duration: 1.6s;
+}
+
+.wave-7 {
+  height: 20rpx;
+  animation-delay: 0.6s;
+  animation-duration: 1.5s;
+}
+
+.wave-8 {
+  height: 36rpx;
+  animation-delay: 0.7s;
+  animation-duration: 1.9s;
+}
+
+.wave-9 {
+  height: 16rpx;
+  animation-delay: 0.8s;
+  animation-duration: 1.3s;
+}
+
+.wave-10 {
+  height: 26rpx;
+  animation-delay: 0.9s;
+  animation-duration: 1.7s;
+}
+
+.wave-11 {
+  height: 22rpx;
+  animation-delay: 1.0s;
+  animation-duration: 1.4s;
+}
+
+.wave-12 {
+  height: 30rpx;
+  animation-delay: 1.1s;
+  animation-duration: 1.6s;
+}
+
+/* 酷黑波形动画 - 增强对比度和动态效果 */
+@keyframes waveAnimation {
+  0%, 100% { 
+    transform: scaleY(0.3); 
+    opacity: 0.7;
+    filter: brightness(0.8);
+  }
+  50% { 
+    transform: scaleY(1.4); 
+    opacity: 1;
+    filter: brightness(1.2) contrast(1.3);
+  }
+}
+
+/* AI聊天入口 */
+.chat-entry {
+  position: absolute;
+  left: 232rpx; /* 116px * 2 */
+  top: 282rpx; /* 141px * 2 */
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  padding: 1rpx 10rpx; 
+  border-radius: 10rpx;
+  transition: all 0.2s ease;
+}
+
+.chat-entry:active {
+  background: var(--primary-alpha-10);
+}
+
+.chat-text {
+  color: black;
+  font-size: 24rpx; /* 12px * 2 */
+  font-family: 'Alibaba-PuHuiTi-Medium', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-weight: 500;
+  line-height: 40rpx;
+}
+
+.chat-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32rpx;
+  height: 32rpx;
+  background: var(--primary-alpha-10);
+  border-radius: 50%;
+  border: 2rpx solid var(--primary-alpha-30);
+  transition: all 0.2s ease;
+}
+
+.arrow-icon {
+  width: 36rpx;
+  height: 36rpx;
+  transition: all 0.2s ease;
+}
+
+/* 点击时的整体动画效果 */
+.chat-entry:active .chat-icon {
+  background: var(--primary-alpha-20);
+  border-color: var(--primary-alpha-60);
+  transform: scale(0.95);
+}
+
+.chat-entry:active .arrow-icon {
+  transform: translateX(4rpx);
+  filter: brightness(0.2) contrast(1.2);
+}
+
+/* 关闭按钮 */
+.close-button {
+  position: absolute;
+  right: 10rpx;
+  top: 10rpx;
+  width: 40rpx;
+  height: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.close-button:active {
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(0.95);
+}
+
+.close-icon {
+  width: 20rpx;
+  height: 20rpx;
+  position: relative;
+}
+
+.close-icon::before,
+.close-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16rpx;
+  height: 2rpx;
+  background: white;
+  border-radius: 2rpx;
+}
+
+.close-icon::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.close-icon::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+/* 进度条（可选功能） - 内嵌在播放器内部 */
+.progress-bar {
+    display: none;
+  position: absolute;
+  bottom: 15rpx; /* 从播放器底部向上15rpx */
+  left: 30rpx;   /* 左边距30rpx */
+  right: 30rpx;  /* 右边距30rpx，自动计算宽度 */
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12rpx;
+  padding: 12rpx 16rpx;
+  backdrop-filter: blur(10rpx); /* 添加背景模糊效果 */
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.15);
+}
+
+.progress-track {
+  width: 100%;
+  height: 6rpx;
+  background: #E0E0E0;
+  border-radius: 6rpx;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color) 0%, var(--border-color) 100%);
+  border-radius: 6rpx;
+  transition: width 0.3s ease;
+}
+
+.time-display {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8rpx;
+}
+
+.current-time,
+.total-time {
+  font-size: 20rpx; /* 稍微缩小字体 */
+  color: #555;      /* 加深颜色增加可读性 */
+  font-family: 'DIN', sans-serif;
+  font-weight: 500;
+}
+
+/* 响应式适配 */
+@media (max-width: 750rpx) {
+  .player-container {
+    width: 90vw;
+    max-width: 678rpx;
+  }
+  
+  .background-border,
+  .main-background {
+    width: 100%;
+  }
+}
+
+/* 说话动画 - 轻微的缩放和倾斜 */
+@keyframes talkingAnimation {
+  0% { 
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+  25% { 
+    transform: scale(1.02) rotate(0.5deg);
+    filter: brightness(1.05);
+  }
+  50% { 
+    transform: scale(1.04) rotate(0deg);
+    filter: brightness(1.1);
+  }
+  75% { 
+    transform: scale(1.02) rotate(-0.5deg);
+    filter: brightness(1.05);
+  }
+  100% { 
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+}
+
+/* 呼吸动画 - 缓慢的缩放 */
+@keyframes breathingAnimation {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% { 
+    transform: scale(1.015);
+    opacity: 1;
+  }
+}
+
+/* 动画状态指示器 */
+.animation-indicator {
+  position: absolute;
+  bottom: 34rpx;
+  right: 26rpx;
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.animation-indicator.talking {
+  background: var(--primary-color);
+  animation: indicatorPulse 0.6s ease-in-out infinite;
+}
+
+.animation-indicator.breathing {
+  background: #4686ff;
+  animation: indicatorSlow 3s ease-in-out infinite;
+}
+
+.state-indicator-dot {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: inherit;
+}
+
+@keyframes indicatorPulse {
+  0%, 100% { 
+    transform: scale(0.8);
+    opacity: 0.7;
+  }
+  50% { 
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+@keyframes indicatorSlow {
+  0%, 100% { 
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  50% { 
+    transform: scale(1.1);
+    opacity: 0.9;
+  }
+} 

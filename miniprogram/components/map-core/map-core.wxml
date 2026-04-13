@@ -1,0 +1,36 @@
+<!-- components/map-core/map-core.wxml -->
+<!-- 地图核心组件模板 -->
+
+<view class="map-core-container">
+  <!-- 地图组件 -->
+  <map 
+    id="map-core" 
+    class="map-core"
+    longitude="{{longitude}}" 
+    latitude="{{latitude}}"
+    scale="{{scale}}"
+    min-scale="{{minScale}}"
+    max-scale="{{maxScale}}"
+    markers="{{markers}}"
+    polyline="{{polyline}}"
+    show-location="{{showLocation}}"
+    show-scale="true"
+    show-compass="true"
+    enable-zoom="true"
+    enable-scroll="true"
+    enable-rotate="false"
+    enable-overlooking="false"
+    enable-poi="{{enablePOI}}"
+    bindregionchange="onRegionChange"
+    bindmarkertap="onMarkerTap"
+    bindcallouttap="onCalloutTap"
+    bindtap="onMapTap"
+    bindpoitap="onPOITap"
+  >
+    <!-- 地图加载状态 -->
+    <cover-view class="map-loading" wx:if="{{loading}}">
+      <cover-view class="loading-spinner"></cover-view>
+      <cover-text class="loading-text">{{loadingText}}</cover-text>
+    </cover-view>
+  </map>
+</view> 

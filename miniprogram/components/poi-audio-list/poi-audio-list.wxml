@@ -1,0 +1,55 @@
+<view wx:if="{{visible}}" class="audio-list-overlay">
+  <view class="audio-list-mask" bind:tap="handleClose"></view>
+  <view class="audio-list-drawer">
+    <view class="figma-container">
+      <view class="background-base"></view>
+      <view class="bg-decoration bg-decoration-1"></view>
+      <view class="bg-decoration bg-decoration-2"></view>
+      <view class="bg-decoration bg-decoration-3"></view>
+      <view class="bg-decoration bg-decoration-4"></view>
+      <view class="bg-decoration bg-decoration-5"></view>
+      <view class="bg-decoration bg-decoration-1 bottom"></view>
+      <view class="bg-decoration bg-decoration-2 bottom"></view>
+      <view class="bg-decoration bg-decoration-3 bottom"></view>
+      <view class="bg-decoration bg-decoration-4 bottom"></view>
+      <view class="bg-decoration bg-decoration-5 bottom"></view>
+    </view>
+    <view class="drawer-header">
+      <text class="drawer-title">音频列表</text>
+      <view class="drawer-close" bind:tap="handleClose">
+        <text class="drawer-close-icon">×</text>
+      </view>
+    </view>
+    <scroll-view class="drawer-body" scroll-y="true">
+      <block wx:if="{{!preparedPoiList.length}}">
+        <view class="empty-placeholder">
+          <text>暂无可播放的音频</text>
+        </view>
+      </block>
+      <block wx:for="{{preparedPoiList}}" wx:key="id">
+        <view
+          class="audio-item {{item.id === currentPoiId ? 'active' : ''}}"
+          bind:tap="handleSelect"
+          data-index="{{index}}"
+        >
+          <view class="audio-item-cover">
+            <image class="cover-img" src="{{item.coverImage}}" mode="aspectFill"></image>
+            <view class="cover-overlay"></view>
+            <view class="play-audio-button">
+              <view class="pause-icon-bars" wx:if="{{item.id === currentPoiId}}"></view>
+              <view class="play-icon-triangle" wx:else></view>
+            </view>
+          </view>
+          <view class="audio-item-info">
+            <text class="audio-item-title">{{item.displayName}}</text>
+            <text class="audio-item-subtitle">{{item.subtitle}}</text>
+          </view>
+          <view class="audio-item-status" wx:if="{{item.id === currentPoiId}}">
+            <view class="status-indicator"></view>
+            <text class="status-text">播放中</text>
+          </view>
+        </view>
+      </block>
+    </scroll-view>
+  </view>
+</view>

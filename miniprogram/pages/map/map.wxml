@@ -1,122 +1,97 @@
-<view class="map-page">
+<view class="map-page {{navigationActive ? 'navigation-mode' : ''}}">
   <universal-navigation
     title=""
-    backgroundColor="transparent"
+    backgroundColor="rgba(0, 0, 0, 0.0)"
     showHomeButton="{{false}}"
     showUserAvatar="{{false}}"
     useCapsuleStyle="{{true}}"
     theme="light"
     useDefaultBack="{{true}}"
+    bind:back="onStatusBarBack"
+    bind:user="goToUserPage"
   />
 
-  <view class="page-body" style="padding-top: {{navigationBarTotalHeight}}px; padding-bottom: {{safeAreaBottom}}px;">
-    <view class="map-stage">
-      <map
-        wx:if="{{mapMounted}}"
-        id="jyl-map"
-        class="jyl-map"
-        longitude="{{longitude}}"
-        latitude="{{latitude}}"
-        scale="{{scale}}"
-        polyline="{{routePolylines}}"
-        markers="{{markers}}"
-        show-location="{{showLocation}}"
-        show-scale="{{true}}"
-        show-compass="{{true}}"
-        enable-overlooking="{{false}}"
-        enable-zoom="{{true}}"
-        enable-scroll="{{true}}"
-        enable-rotate="{{false}}"
-        bindmarkertap="onMarkerTap"
+  <view class="map-container" style="padding-top: {{navigationBarTotalHeight}}px;">
+    <view class="gradient-background-container">
+      <view class="gradient-bg-main"></view>
+      <view class="gradient-bg-blur1"></view>
+      <view class="gradient-bg-blur2"></view>
+      <view class="gradient-bg-blur3"></view>
+      <view class="gradient-bg-blur4"></view>
+      <view class="gradient-bg-blur5"></view>
+    </view>
+
+    <audio-player-guide
+      id="audioPlayerGuide"
+      visible="{{showAudioPlayer && (!navigationActive || navigationAudioMode === 'full')}}"
+      current-poi="{{currentAudioPoi}}"
+      user-score="{{userScore}}"
+      user-rank-percent="{{userRankPercent}}"
+      show-progress="{{showAudioProgress}}"
+      bind:audioPlay="onAudioPlay"
+      bind:audioPause="onAudioPause"
+      bind:audioStop="onAudioStop"
+      bind:audioEnded="onAudioEnded"
+      bind:audioTimeUpdate="onAudioTimeUpdate"
+      bind:close="onCloseAudioPlayer"
+    />
+
+    <view class="top-toolbar-container {{!showAudioPlayer ? 'no-audio-player' : ''}}" wx:if="{{!navigationActive}}">
+      <poi-filter
+        id="poiFilter"
+        visible="{{showPoiFilter}}"
+        default-filter="{{currentPoiFilter}}"
+        bind:filterChange="onPoiFilterChange"
       />
-      <view wx:else class="map-placeholder">
-        <text class="map-placeholder-text">地图加载中...</text>
-      </view>
     </view>
 
-    <view class="quick-panel">
-      <view class="quick-panel-copy">
-        <text class="quick-panel-label">当前导览点</text>
-        <text class="quick-panel-title">{{focusSummary.title}}</text>
-        <text class="quick-panel-meta">{{focusSummary.subtitle}}</text>
-      </view>
-      <view class="quick-panel-actions">
-        <view class="quick-action" bindtap="onFocusEntry">
-          <text class="quick-action-text">入口位置</text>
-        </view>
-        <view class="quick-action" bindtap="onShowOverview">
-          <text class="quick-action-text">景区全览</text>
-        </view>
-        <view class="quick-action quick-action-strong" bindtap="onLocateMe">
-          <text class="quick-action-text quick-action-text-strong">我的位置</text>
-        </view>
-      </view>
+    <map-core
+      longitude="{{longitude}}"
+      latitude="{{latitude}}"
+      scale="{{scale}}"
+      show-location="{{showLocation}}"
+      enable-p-o-i="{{enablePOI}}"
+      markers="{{allMarkers}}"
+      polyline="{{polylineData}}"
+      boundary-limit="{{mapBoundaryLimit}}"
+      allowed-zooms="{{allowedZooms}}"
+      bind:mapReady="onMapReady"
+      bind:regionChange="onRegionChange"
+      bind:scaleUpdate="onScaleUpdate"
+      bind:mapTap="onMapTap"
+      bind:markerTap="onMarkerTap"
+      bind:poiTap="onPOITap"
+    />
+
+    <view class="intelligent-route-button-wrapper" wx:if="{{!navigationActive}}">
+      <gradient-button bind:tap="onIntelligentRoutePlanning">
+        <image class="button-icon" src="/images/icons/intelligent-route.svg" mode="aspectFit"></image>
+        <text>{{intelligentRoutePlanningText}}</text>
+      </gradient-button>
     </view>
 
-    <view class="spot-panel">
-      <view class="section-header">
-        <text class="section-title">导览点切换</text>
-        <text class="section-caption">{{visibleMarkerCount}} 个地图点位 · {{cardCount}} 个打卡点</text>
-      </view>
-
-      <scroll-view
-        class="spot-scroll"
-        scroll-x="{{true}}"
-        enhanced="{{true}}"
-        show-scrollbar="{{false}}"
-      >
-        <view class="spot-list">
-          <view
-            class="spot-card {{item.isActive ? 'spot-card-active' : ''}}"
-            wx:for="{{pointCards}}"
-            wx:key="id"
-            data-id="{{item.id}}"
-            bindtap="onPointCardTap"
-          >
-            <view class="spot-card-index">
-              <text class="spot-card-index-text">{{item.orderText}}</text>
-            </view>
-            <view class="spot-card-copy">
-              <text class="spot-card-tag spot-card-tag-{{item.themeTone}}">{{item.themeTag}}</text>
-              <text class="spot-card-name">{{item.name}}</text>
-            </view>
-          </view>
-        </view>
-      </scroll-view>
+    <view
+      class="audio-list-floating-button"
+      wx:if="{{audioPoiList.length > 0}}"
+      bindtap="onToggleAudioListDrawer"
+    >
+      <image class="audio-list-icon" src="/images/icons/voice-static.svg" mode="aspectFit"></image>
     </view>
 
-    <view id="detail-card" class="detail-card {{detailCardPulseClass}}" wx:if="{{selectedPoint}}">
-      <view class="detail-top">
-        <view class="detail-copy">
-          <text class="detail-kicker">{{selectedPoint.sequenceText}} · {{selectedPoint.themeTag}}</text>
-          <text class="detail-title">{{selectedPoint.name}}</text>
-        </view>
-        <view class="detail-tag">
-          <text class="detail-tag-text">当前导览点</text>
-        </view>
-      </view>
+    <intelligent-route-planner
+      visible="{{showIntelligentPlanner}}"
+      routes="{{plannerRoutes}}"
+      selected-route-id="{{selectedIntelligentRouteId}}"
+      bind:routeSelected="onIntelligentRouteSelected"
+      bind:close="onCloseIntelligentPlanner"
+    />
 
-      <text class="point-description">{{selectedPoint.description}}</text>
-      <text class="detail-scene-line">{{selectedPoint.sceneLine}}</text>
-
-      <view class="meta-grid">
-        <view class="meta-card">
-          <text class="meta-label">建议停留</text>
-          <text class="meta-value">{{selectedPoint.stayText}}</text>
-        </view>
-        <view class="meta-card">
-          <text class="meta-label">离我距离</text>
-          <text class="meta-value">{{selectedPoint.distanceText}}</text>
-        </view>
-      </view>
-
-      <view class="action-row">
-        <view class="primary-action" bindtap="onNavigateToSelectedPoint">
-          <text class="primary-action-text">导航到这里</text>
-        </view>
-      </view>
-
-      <text class="detail-tip">{{selectedPoint.guideTip}}</text>
-    </view>
+    <poi-audio-list
+      visible="{{showAudioListDrawer}}"
+      poi-list="{{audioPoiList}}"
+      current-poi="{{currentAudioPoi}}"
+      bind:close="onCloseAudioListDrawer"
+      bind:select="onSelectAudioFromList"
+    />
   </view>
 </view>

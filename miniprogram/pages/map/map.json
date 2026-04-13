@@ -3,6 +3,12 @@
   "navigationStyle": "custom",
   "enablePullDownRefresh": false,
   "usingComponents": {
-    "universal-navigation": "/components/universal-navigation/universal-navigation"
+    "universal-navigation": "/components/universal-navigation/universal-navigation",
+    "audio-player-guide": "/components/audio-player-guide/audio-player-guide",
+    "map-core": "/components/map-core/map-core",
+    "gradient-button": "/components/gradient-button/gradient-button",
+    "poi-filter": "/components/poi-filter/poi-filter",
+    "poi-audio-list": "/components/poi-audio-list/poi-audio-list",
+    "intelligent-route-planner": "/components/intelligent-route-planner/intelligent-route-planner"
   }
 }

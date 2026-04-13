@@ -1,0 +1,50 @@
+/* components/gradient-button/gradient-button.wxss */
+.gradient-button-container {
+  /* 局部CSS变量：定义该组件特有的设计规范 */
+  --button-width: 554rpx;
+  --button-height: 76rpx;
+  --button-gradient: linear-gradient(90deg, #4387FF 0%, #20D8FA 58%, #78F8E1 100%);
+  --button-shadow: 0rpx 8rpx 40rpx rgba(58, 24, 127, 0.30);
+  --button-shadow-hover: 0rpx 4rpx 20rpx rgba(58, 24, 127, 0.45);
+  --button-font-size: 32rpx;
+  --button-font-weight: 600;
+
+  /* 使用变量 */
+  width: var(--button-width);
+  height: var(--button-height);
+  position: relative;
+  border-radius: 999rpx; /* 使用一个很大的值来实现胶囊形状 */
+  box-shadow: var(--button-shadow);
+  transition: all 0.2s ease-in-out;
+}
+
+.gradient-bg {
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  position: absolute;
+  background: var(--button-gradient);
+  border-radius: inherit; /* 继承父容器的圆角 */
+  z-index: 1;
+}
+
+.button-content {
+  position: relative;
+  z-index: 2; /* 确保内容在渐变层之上 */
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 应用全局颜色变量 */
+  color: var(--color-white, white); /* 提供一个降级，以防全局变量未定义 */
+  font-size: var(--button-font-size);
+  font-weight: var(--button-font-weight);
+}
+
+/* 按钮的点击交互效果 */
+.button-hover {
+  transform: scale(0.98);
+  box-shadow: var(--button-shadow-hover);
+} 

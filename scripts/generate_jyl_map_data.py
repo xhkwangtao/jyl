@@ -22,6 +22,7 @@ KML_NS = {
 }
 
 SIMPLIFY_TOLERANCE_METERS = 0.0
+MIN_DISPLAY_TRACK_SEGMENT_METERS = 0.0
 
 
 @dataclass(frozen=True)
@@ -267,22 +268,33 @@ def parse_coordinate_text(value: str | None) -> list[tuple[float, float]]:
     return coordinates
 
 
-def extract_track(root: ET.Element) -> list[tuple[float, float]]:
-    coords: list[tuple[float, float]] = []
-    for coord in root.findall('.//gx:Track/gx:coord', KML_NS):
-        raw_parts = coord.text.split() if coord.text else []
-        if len(raw_parts) >= 2:
-            lon = float(raw_parts[0])
-            lat = float(raw_parts[1])
-            coords.append((lon, lat))
-    if coords:
-        return coords
+def extract_track_segments(root: ET.Element) -> list[list[tuple[float, float]]]:
+    track_candidates: list[list[tuple[float, float]]] = []
+    for track_node in root.findall('.//gx:Track', KML_NS):
+        coords: list[tuple[float, float]] = []
+        for coord in track_node.findall('gx:coord', KML_NS):
+            raw_parts = coord.text.split() if coord.text else []
+            if len(raw_parts) >= 2:
+                lon = float(raw_parts[0])
+                lat = float(raw_parts[1])
+                coords.append((lon, lat))
+        if len(coords) >= 2:
+            track_candidates.append(coords)
+    if track_candidates:
+        return track_candidates
 
+    line_candidates: list[list[tuple[float, float]]] = []
     for line in root.findall('.//k:LineString/k:coordinates', KML_NS):
-        coords.extend(parse_coordinate_text(''.join(line.itertext())))
-    if not coords:
+        coords = parse_coordinate_text(''.join(line.itertext()))
+        if len(coords) >= 2:
+            line_candidates.append(coords)
+    if not line_candidates:
         raise ValueError('No track coordinates found in KMZ file.')
-    return coords
+    return line_candidates
+
+
+def extract_track(root: ET.Element) -> list[tuple[float, float]]:
+    return select_primary_track(extract_track_segments(root))
 
 
 def extract_named_points(root: ET.Element) -> dict[str, tuple[float, float]]:
@@ -328,6 +340,47 @@ def total_distance_meters(points: Iterable[tuple[float, float]]) -> float:
         haversine_meters(points_list[index - 1], points_list[index])
         for index in range(1, len(points_list))
     )
+
+
+def select_primary_track(track_candidates: list[list[tuple[float, float]]]) -> list[tuple[float, float]]:
+    if not track_candidates:
+        return []
+
+    if len(track_candidates) == 1:
+        return track_candidates[0]
+
+    return max(
+        track_candidates,
+        key=lambda coords: (total_distance_meters(coords), len(coords)),
+    )
+
+
+def select_display_track_segments(
+    track_candidates: list[list[tuple[float, float]]],
+    min_distance_meters: float = MIN_DISPLAY_TRACK_SEGMENT_METERS,
+) -> list[list[tuple[float, float]]]:
+    if not track_candidates:
+        return []
+
+    primary_track = select_primary_track(track_candidates)
+    selected_segments: list[list[tuple[float, float]]] = []
+
+    for candidate in track_candidates:
+        distance = total_distance_meters(candidate)
+        if candidate == primary_track or distance >= min_distance_meters:
+            selected_segments.append(candidate)
+
+    if not selected_segments:
+        return [primary_track]
+
+    selected_segments.sort(
+        key=lambda coords: (
+            0 if coords == primary_track else 1,
+            -total_distance_meters(coords),
+            -len(coords),
+        )
+    )
+    return selected_segments
 
 
 def project_to_local_meters(point: tuple[float, float], origin: tuple[float, float]) -> tuple[float, float]:
@@ -479,6 +532,32 @@ def infer_generic_poi_type(name: str, order_index: int) -> str:
     return 'scenic'
 
 
+def choose_generic_start_source_name(ordered_points: list[dict]) -> str | None:
+    if not ordered_points:
+        return None
+
+    def build_priority(point: dict) -> tuple[int, int, str]:
+        source_name = point['sourceName']
+        if '检票口' in source_name or '检票' in source_name:
+            priority = 0
+        elif '入口' in source_name or '游客中心' in source_name:
+            priority = 1
+        elif '起点' in source_name:
+            priority = 2
+        elif '大门' in source_name:
+            priority = 3
+        else:
+            priority = 9
+
+        return (priority, point['routeIndex'], source_name)
+
+    prioritized_points = sorted(ordered_points, key=build_priority)
+    if build_priority(prioritized_points[0])[0] < 9:
+        return prioritized_points[0]['sourceName']
+
+    return ordered_points[0]['sourceName']
+
+
 def infer_generic_theme(name: str, point_type: str) -> tuple[str, str]:
     if point_type == 'start':
         return '起点', 'forest'
@@ -502,7 +581,7 @@ def infer_generic_visibility(name: str, point_type: str) -> tuple[bool, bool, bo
     if point_type == 'start':
         return True, False, False
     if point_type == 'guide':
-        return False, False, False
+        return True, False, False
     if point_type == 'junction':
         return True, False, False
     if point_type == 'service':
@@ -624,6 +703,7 @@ def build_curated_pois(
                 'guideTip': spec.guide_tip,
                 'triggerRadiusM': spec.trigger_radius_m,
                 'routeIndex': route_index,
+                'locationRaw': round_coordinate_pair(source_point),
                 'locationGcj02': round_coordinate_pair(gcj02_point),
                 'locationWgs84': round_coordinate_pair(source_point),
             }
@@ -648,8 +728,9 @@ def build_generic_pois(
     )
 
     pois: list[dict] = []
+    start_source_name = choose_generic_start_source_name(ordered_points)
     for order_index, point in enumerate(ordered_points):
-        point_type = infer_generic_poi_type(point['sourceName'], order_index)
+        point_type = 'start' if point['sourceName'] == start_source_name else infer_generic_poi_type(point['sourceName'], order_index + 1)
         display_name = prettify_name(point['sourceName'])
         meta = build_generic_meta(display_name, point_type)
         visible, card_visible, checkin_visible = infer_generic_visibility(display_name, point_type)
@@ -673,6 +754,7 @@ def build_generic_pois(
                 'guideTip': meta['guideTip'],
                 'triggerRadiusM': meta['triggerRadiusM'],
                 'routeIndex': point['routeIndex'],
+                'locationRaw': round_coordinate_pair(point['locationWgs84']),
                 'locationGcj02': round_coordinate_pair(gcj02_point),
                 'locationWgs84': round_coordinate_pair(point['locationWgs84']),
             }
@@ -705,13 +787,19 @@ def finalize_pois(pois: list[dict]) -> list[dict]:
 def build_output(track_kmz_path: Path, points_kmz_path: Path, simplify_tolerance_meters: float) -> dict:
     track_root = read_kmz_root(track_kmz_path)
     points_root = read_kmz_root(points_kmz_path)
-    track_wgs84 = extract_track(track_root)
+    track_candidates_wgs84 = extract_track_segments(track_root)
+    track_wgs84 = select_primary_track(track_candidates_wgs84)
+    display_track_segments_wgs84 = select_display_track_segments(track_candidates_wgs84)
     named_points_wgs84 = extract_named_points(points_root)
     if not named_points_wgs84:
         raise ValueError('No named points found in KMZ file.')
 
     simplified_track_wgs84 = simplify_track(track_wgs84, simplify_tolerance_meters)
     simplified_track_gcj02 = [wgs84_to_gcj02(lon, lat) for lon, lat in simplified_track_wgs84]
+    simplified_display_segments_gcj02 = [
+        [wgs84_to_gcj02(lon, lat) for lon, lat in simplify_track(segment, simplify_tolerance_meters)]
+        for segment in display_track_segments_wgs84
+    ]
 
     has_curated_names = all(spec.source_name in named_points_wgs84 for spec in POI_SPECS)
     pois = build_curated_pois(named_points_wgs84, track_wgs84) if has_curated_names else build_generic_pois(named_points_wgs84, track_wgs84)
@@ -737,7 +825,17 @@ def build_output(track_kmz_path: Path, points_kmz_path: Path, simplify_tolerance
             'simplifyToleranceMeters': simplify_tolerance_meters,
             'sourcePointCount': len(track_wgs84),
             'simplifiedPointCount': len(simplified_track_gcj02),
+            'displaySegmentCount': len(simplified_display_segments_gcj02),
+            'pathRaw': [round_coordinate_pair(point) for point in simplified_track_wgs84],
             'pathGcj02': [round_coordinate_pair(point) for point in simplified_track_gcj02],
+            'pathSegmentsRaw': [
+                [round_coordinate_pair(point) for point in simplify_track(segment, simplify_tolerance_meters)]
+                for segment in display_track_segments_wgs84
+            ],
+            'pathSegmentsGcj02': [
+                [round_coordinate_pair(point) for point in segment]
+                for segment in simplified_display_segments_gcj02
+            ],
         },
         'poiSummary': {
             'visibleCount': visible_count,
@@ -805,6 +903,26 @@ def resolve_input_paths(args: argparse.Namespace) -> tuple[Path, Path]:
 
     if DEFAULT_TRACK_KMZ_PATH.exists() and DEFAULT_POINTS_KMZ_PATH.exists():
         return DEFAULT_TRACK_KMZ_PATH.resolve(), DEFAULT_POINTS_KMZ_PATH.resolve()
+
+    docs_track_dir = ROOT_DIR / 'docs/tracks'
+    if docs_track_dir.exists():
+        kmz_paths = [path for path in docs_track_dir.iterdir() if path.suffix.lower() == '.kmz']
+        track_keywords = ('track', 'tracks', 'route', 'line', '轨迹', '线路')
+        point_keywords = ('point', 'points', 'poi', 'marker', 'markers', '点位')
+
+        track_candidates = [
+            path for path in kmz_paths
+            if any(keyword in path.stem.lower() for keyword in track_keywords)
+        ]
+        point_candidates = [
+            path for path in kmz_paths
+            if any(keyword in path.stem.lower() for keyword in point_keywords)
+        ]
+
+        if track_candidates and point_candidates:
+            track_path = max(track_candidates, key=lambda path: (path.stat().st_mtime, path.name))
+            points_path = max(point_candidates, key=lambda path: (path.stat().st_mtime, path.name))
+            return track_path.resolve(), points_path.resolve()
 
     return DEFAULT_KMZ_PATH.resolve(), DEFAULT_KMZ_PATH.resolve()
 

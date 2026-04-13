@@ -1,0 +1,8 @@
+<!--components/gradient-button/gradient-button.wxml-->
+<view class="gradient-button-container" hover-class="button-hover" bindtap="handleTap">
+  <view class="gradient-bg"></view>
+  <view class="button-content">
+    <!-- 使用 slot 允许父组件自定义按钮的文本或图标 -->
+    <slot></slot>
+  </view>
+</view> 

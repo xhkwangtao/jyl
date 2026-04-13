@@ -1,0 +1,80 @@
+/* POI筛选器组件样式 */
+
+.poi-filter-container {
+  height: 58rpx; /* 34px转换为rpx */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* 两端对齐，平均分散 */
+  padding: 0; /* 移除左右内边距，两端不留白 */
+  box-sizing: border-box;
+  width: 100%; /* 确保容器占满父元素宽度 */
+  gap:10rpx;
+  /* 调试样式 - 临时添加 */
+  /* background: rgba(0, 255, 0, 0.3);
+  border: 2rpx solid green; */
+}
+
+.filter-item {
+  flex: 1; /* 每个item平均占用可用空间 */
+  height: 58rpx; /* 34px转换为rpx */
+  min-height: 58rpx; /* 确保最小高度 */
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0; /* 移除间距 */
+  cursor: pointer;
+  flex-shrink: 0; /* 防止被压缩 */
+}
+
+.filter-item:last-child {
+  margin-right: 0;
+}
+
+.filter-background {
+  width: 100%;
+  height: 100%;
+  background: white;
+  border-radius: 100.74rpx; /* 50.37px转换为rpx */
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: all 0.3s ease;
+}
+
+.filter-item.active .filter-background {
+  background: #212121;
+}
+
+.filter-text {
+  color: black;
+  font-size: 26rpx; /* 13px转换为rpx */
+  font-family: 'Alibaba PuHuiTi', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 700;
+  line-height: 30rpx; /* 15px转换为rpx */
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  transition: color 0.3s ease;
+}
+
+.filter-item.active .filter-text {
+  color: white;
+}
+
+/* 响应式布局优化 */
+@media screen and (max-width: 375px) {
+  .filter-text {
+    font-size: 24rpx;
+  }
+}
+
+/* 大屏幕(414px及以上)保持默认设置 */
+
+/* 超小屏幕适配 */
+@media screen and (max-width: 320px) {
+  .filter-text {
+    font-size: 22rpx;
+  }
+}

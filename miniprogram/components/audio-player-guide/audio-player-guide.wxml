@@ -1,0 +1,103 @@
+<!--components/audio-player-guide/audio-player-guide.wxml-->
+<view class="audio-player-guide {{visible ? 'visible' : 'hidden'}}"  wx:if="{{visible}}">
+  <!-- 主容器 -->
+  <view class="player-container">
+    
+    <!-- 黑色背景主体 -->
+    <view class="main-background"></view>
+    
+    <!-- 数字人导游头像 -->
+    <view class="avatar-container">
+      <image 
+        class="guide-avatar {{animationState}}" 
+        src="{{avatarImages.currentFrame}}" 
+        mode="aspectFit"
+      />
+      <!-- 动画状态指示器 -->
+      <view class="animation-indicator {{animationState}}" wx:if="{{animationState !== 'idle'}}">
+        <view class="state-indicator-dot"></view>
+      </view>
+    </view>
+    
+    <!-- 播放状态文字区域 -->
+    <view class="status-text-area">
+      <text class="status-text">{{statusText}}</text>
+    </view>
+    
+    <!-- 积分区域 -->
+    <view class="score-area">
+      <!-- 积分背景 -->
+      <view class="score-background"></view>
+      
+      <!-- 积分标题 -->
+      <text class="score-label">{{scoreLabel}}</text>
+      
+      <!-- 积分数值 -->
+      <text class="score-value">{{userScore}}</text>
+      
+      <!-- 排名文字 -->
+      <text class="rank-text">{{rankTextPrefix}}{{userRankPercent}}{{rankTextSuffix}}</text>
+      
+      <!-- 表情头像（积分区域） -->
+      <view class="score-avatar">
+        <image
+          class="emoji-avatar"
+          src="/images/icons/question-start.svg"
+          mode="aspectFit"
+        />
+      </view>
+    </view>
+    
+    <!-- 播放控制区域 -->
+    <view class="control-area">
+      <!-- 控制背景 -->
+      <view class="control-background"></view>
+      
+      <!-- 播放/暂停按钮 -->
+      <view class="play-button {{isPlaying ? 'playing' : 'paused'}}" bind:tap="togglePlay">
+        <!-- 播放图标 -->
+        <view class="play-icon" wx:if="{{!isPlaying}}">
+          <view class="play-triangle"></view>
+        </view>
+        <!-- 暂停图标 -->
+        <view class="pause-icon" wx:if="{{isPlaying}}">
+          <view class="pause-bar left-bar"></view>
+          <view class="pause-bar right-bar"></view>
+        </view>
+      </view>
+      
+      <!-- 音频波形装饰 -->
+      <view class="audio-waves {{isPlaying ? 'playing' : 'paused'}}">
+        <view class="wave wave-1"></view>
+        <view class="wave wave-2"></view>
+        <view class="wave wave-3"></view>
+        <view class="wave wave-4"></view>
+        <view class="wave wave-5"></view>
+        <view class="wave wave-6"></view>
+        <view class="wave wave-7"></view>
+        <view class="wave wave-8"></view>
+        <view class="wave wave-9"></view>
+        <view class="wave wave-10"></view>
+        <view class="wave wave-11"></view>
+        <view class="wave wave-12"></view>
+      </view>
+    </view>
+    
+    
+    <!-- 关闭按钮 -->
+    <view class="close-button" bind:tap="closePlayer">
+      <view class="close-icon"></view>
+    </view>
+  </view>
+  
+  <!-- 进度条（可选） -->
+  <view class="progress-bar" wx:if="{{showProgress}}">
+    <view class="progress-track">
+      <view class="progress-fill" style="width: {{audioProgress}}%"></view>
+    </view>
+    <view class="time-display">
+      <text class="current-time">{{formatTime(currentTime)}}</text>
+      <text class="total-time">{{formatTime(totalTime)}}</text>
+    </view>
+  </view>
+</view> 

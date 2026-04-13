@@ -1,4 +1,5 @@
 const rawData = require('./jyl-map-data.generated.js')
+const USE_RAW_SOURCE_COORDINATES = false
 
 const ICON_PATHS = {
   start: '/images/poi/icons/entrance.png',
@@ -26,7 +27,10 @@ function buildIconPath(pointType) {
 }
 
 function buildPoi(point, index) {
-  const [longitude, latitude] = point.locationGcj02
+  const location = USE_RAW_SOURCE_COORDINATES
+    ? (point.locationRaw || point.locationWgs84 || point.locationGcj02)
+    : (point.locationGcj02 || point.locationRaw || point.locationWgs84)
+  const [longitude, latitude] = location
 
   return {
     id: point.id,
@@ -63,7 +67,18 @@ function buildRoutePoints(path) {
   }))
 }
 
+function buildRouteSegments(segmentPaths) {
+  return segmentPaths.map((segmentPath) => buildRoutePoints(segmentPath))
+}
+
 const JYL_SOURCE_FILE = rawData.sourceFile
+const routePath = USE_RAW_SOURCE_COORDINATES
+  ? (rawData.route.pathRaw || rawData.route.pathGcj02)
+  : (rawData.route.pathGcj02 || rawData.route.pathRaw)
+const routeSegmentPaths = USE_RAW_SOURCE_COORDINATES
+  ? (rawData.route.pathSegmentsRaw || rawData.route.pathSegmentsGcj02 || [routePath])
+  : (rawData.route.pathSegmentsGcj02 || rawData.route.pathSegmentsRaw || [routePath])
+const JYL_ROUTE_SEGMENTS = buildRouteSegments(routeSegmentPaths)
 const JYL_ROUTE = {
   id: rawData.route.id,
   name: rawData.route.name,
@@ -71,8 +86,12 @@ const JYL_ROUTE = {
   distanceText: formatDistanceText(rawData.route.distanceMeters),
   sourcePointCount: rawData.route.sourcePointCount,
   simplifiedPointCount: rawData.route.simplifiedPointCount,
-  coordinateSystem: rawData.outputCoordinateSystem,
-  pathPoints: buildRoutePoints(rawData.route.pathGcj02)
+  displaySegmentCount: rawData.route.displaySegmentCount || JYL_ROUTE_SEGMENTS.length,
+  coordinateSystem: USE_RAW_SOURCE_COORDINATES
+    ? (rawData.sourceCoordinateSystem || 'RAW')
+    : rawData.outputCoordinateSystem,
+  pathPoints: buildRoutePoints(routePath),
+  segmentPaths: JYL_ROUTE_SEGMENTS
 }
 
 const JYL_ALL_POI_POINTS = rawData.pois.map(buildPoi)
@@ -86,23 +105,26 @@ const JYL_POI_SUMMARY = rawData.poiSummary || {
   totalCount: JYL_ALL_POI_POINTS.length
 }
 
-const JYL_ROUTE_POLYLINES = [
-  {
-    points: JYL_ROUTE.pathPoints,
-    color: '#245F6D',
-    width: 6
-  }
-]
+const ROUTE_POLYLINE_COLOR = '#245F6D'
+
+const JYL_ROUTE_POLYLINES = JYL_ROUTE.segmentPaths.map((points, index) => ({
+  points,
+  color: ROUTE_POLYLINE_COLOR,
+  width: index === 0 ? 6 : 4
+}))
 
 const JYL_MAP_META = {
   sourceFile: JYL_SOURCE_FILE,
-  coordinateSystem: rawData.outputCoordinateSystem,
+  coordinateSystem: JYL_ROUTE.coordinateSystem,
+  coordinateMode: USE_RAW_SOURCE_COORDINATES ? 'raw' : 'gcj02',
   markerCount: JYL_POI_SUMMARY.visibleCount,
   cardCount: JYL_POI_SUMMARY.cardCount,
   routeDistanceText: JYL_ROUTE.distanceText,
   navigationText: '步行导览',
   routePreviewText: `主路线约 ${JYL_ROUTE.distanceText}`,
-  note: '路线和导览点已统一整理为 GCJ-02，可直接用于微信小程序地图组件。',
+  note: USE_RAW_SOURCE_COORDINATES
+    ? '当前地图直接使用导入源坐标，便于核对是否存在坐标系偏移。'
+    : '路线和导览点已统一整理为 GCJ-02，可直接用于微信小程序地图组件。',
   summaryCopy: `主路线已整理完成，公开显示 ${JYL_POI_SUMMARY.cardCount} 个导览点，并保留 ${JYL_POI_SUMMARY.hiddenTriggerCount} 个隐藏触发点。`
 }
 

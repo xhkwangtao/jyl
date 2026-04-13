@@ -1,0 +1,22 @@
+<!-- POI筛选器组件 - 简化为三类 -->
+<view class="poi-filter-container" wx:if="{{visible}}">
+  <view class="filter-item {{selectedFilter === 'all' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="all">
+    <view class="filter-background"></view>
+    <text class="filter-text">{{allSpotsText}}</text>
+  </view>
+  
+  <view class="filter-item {{selectedFilter === 'photo_spot' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="photo_spot">
+    <view class="filter-background"></view>
+    <text class="filter-text">{{photoSpotText}}</text>
+  </view>
+  
+  <view class="filter-item {{selectedFilter === 'exploration' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="exploration">
+    <view class="filter-background"></view>
+    <text class="filter-text">{{explorationText}}</text>
+  </view>
+  
+  <view class="filter-item {{selectedFilter === 'facility' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="facility">
+    <view class="filter-background"></view>
+    <text class="filter-text">{{facilityText}}</text>
+  </view>
+</view>

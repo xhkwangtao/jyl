@@ -1,0 +1,72 @@
+<view class="route-planner-container" wx:if="{{visible}}">
+  <view class="route-planner-mask" bindtap="onClose"></view>
+
+  <view class="route-planner-panel" catchtap="noop">
+    <view class="close-button" bindtap="onClose">
+      <text class="close-icon-text">×</text>
+    </view>
+
+    <view class="route-title-section">
+      <text class="route-main-title">游览路线</text>
+      <text class="route-sub-title">AI规划游览线路</text>
+    </view>
+
+    <view class="route-cards-container">
+      <view
+        wx:for="{{routes}}"
+        wx:key="id"
+        wx:for-item="route"
+        class="route-card {{route.themeClass}} {{internalSelectedRouteId === route.id ? 'selected' : ''}} {{isPlanning && internalSelectedRouteId === route.id ? 'planning' : ''}}"
+        bindtap="onRouteCardTap"
+        data-route-id="{{route.id}}"
+      >
+        <view class="selection-indicator" wx:if="{{internalSelectedRouteId === route.id}}">
+          <text class="check-icon">✓</text>
+        </view>
+
+        <view class="planning-progress" wx:if="{{isPlanning && internalSelectedRouteId === route.id}}">
+          <view class="progress-bar">
+            <view class="progress-fill" style="width: {{planningProgress}}%"></view>
+          </view>
+          <text class="progress-text">规划中 {{planningProgress}}%</text>
+        </view>
+
+        <view class="route-stats">
+          <view class="stat-item duration">
+            <view class="stat-value-row">
+              <text class="stat-number">{{route.durationValue}}</text>
+              <text class="stat-unit">{{route.durationUnit}}</text>
+            </view>
+            <text class="stat-label">预计游览时长</text>
+          </view>
+
+          <view class="stat-item distance">
+            <view class="stat-value-row">
+              <text class="stat-number">{{route.distanceValue}}</text>
+              <text class="stat-unit">{{route.distanceUnit}}</text>
+            </view>
+            <text class="stat-label">路程距离</text>
+          </view>
+
+          <view class="stat-item attractions">
+            <view class="stat-value-row">
+              <text class="stat-number">{{route.pointCount}}</text>
+              <text class="stat-unit">个</text>
+            </view>
+            <text class="stat-label">途经点位</text>
+          </view>
+
+          <view class="route-button-area">
+            <view
+              class="route-button {{isPlanning && internalSelectedRouteId === route.id ? 'disabled' : ''}}"
+              catchtap="onRouteButtonTap"
+              data-route-id="{{route.id}}"
+            >
+              <text>{{isPlanning && internalSelectedRouteId === route.id ? '规划中...' : route.name}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
