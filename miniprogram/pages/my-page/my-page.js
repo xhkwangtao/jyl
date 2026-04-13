@@ -1,6 +1,9 @@
 const {
   buildSecretCollectionState
 } = require('../../utils/secret-collection')
+const {
+  buildAiOfficerState
+} = require('../../utils/ai-officer')
 
 const PAGE_STYLE = 'background: #f6f1e8;'
 const RULE_LIST = [
@@ -78,6 +81,20 @@ Page({
     userNickname: '游客',
     heroTitle: '',
     heroDesc: '',
+    aiAvatarSrc: '',
+    aiOfficerTitle: '',
+    aiOfficerShortTitle: '',
+    aiOfficerRewardText: '',
+    aiOfficerDesc: '',
+    aiOfficerNextHint: '',
+    aiOfficerScore: 0,
+    aiOfficerScoreText: '0 军功',
+    aiOfficerProgressPercent: 0,
+    aiOfficerProgressPercentText: '0%',
+    aiOfficerNextTitle: '',
+    aiOfficerRankList: [],
+    aiOfficerStageText: '',
+    aiOfficerScoreRuleText: '',
     totalCount: 0,
     collectedCount: 0,
     pendingCount: 0,
@@ -88,6 +105,8 @@ Page({
     reportTitle: '',
     reportDesc: '',
     reportActionText: '去收集暗号',
+    themeSummaryList: [],
+    secretList: [],
     collectedSecretList: [],
     pendingSecretList: [],
     ruleList: RULE_LIST
@@ -109,9 +128,12 @@ Page({
   },
 
   refreshSecretState() {
+    const collectionState = buildSecretCollectionState()
+
     this.setData({
       userNickname: getUserNickname(),
-      ...buildSecretCollectionState()
+      ...collectionState,
+      ...buildAiOfficerState(collectionState.secretList)
     })
   },
 
@@ -147,24 +169,29 @@ Page({
 
   onReportTap() {
     if (!this.data.reportUnlocked) {
-      this.onOpenCollectionPage()
+      wx.showToast({
+        title: '集齐全部暗号后解锁研学报告',
+        icon: 'none',
+        duration: 1800
+      })
       return
     }
 
-    wx.showToast({
-      title: '研学报告页面待接入',
-      icon: 'none',
-      duration: 1800
-    })
+    navigateToPage('/pages/study-report/study-report')
   },
 
   onSecretTap(event) {
-    const pointId = event.currentTarget?.dataset?.id
+    const mapPointId = event.currentTarget?.dataset?.mapId
 
-    if (!pointId) {
+    if (!mapPointId) {
+      wx.showToast({
+        title: '该暗号点暂未接入地图定位',
+        icon: 'none',
+        duration: 1600
+      })
       return
     }
 
-    navigateToPage(`/pages/map/map?pointId=${pointId}`)
+    navigateToPage(`/pages/map/map?pointId=${mapPointId}`)
   }
 })

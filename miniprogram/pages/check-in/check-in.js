@@ -2,6 +2,9 @@ const {
   updatePointCheckin
 } = require('../../utils/checkin')
 const {
+  ENABLE_MANUAL_SECRET_COLLECTION_FOR_TESTING
+} = require('../../config/feature-flags')
+const {
   SECRET_FILTER_OPTIONS,
   buildSecretCollectionState,
   filterSecretList,
@@ -17,7 +20,7 @@ function buildSectionCaption(currentFilter, collectedCount, pendingCount) {
     return `当前展示 ${pendingCount} 枚待收集的暗号图案`
   }
 
-  return '当前先按可打卡景点整理为暗号收集点，后续可替换为真实二维码名单。'
+  return '当前已经按景区真实暗号点整理，共 19 枚暗号图案。'
 }
 
 function navigateToPage(url) {
@@ -50,7 +53,11 @@ Page({
     visibleCount: 0,
     secretList: [],
     visibleSecretList: [],
-    scanTip: '支持识别二维码中携带的点位 id、key 或景点名称。'
+    scanTip: '支持识别二维码中携带的点位名称、历史点位 id、暗号名等信息。',
+    manualCollectEnabled: ENABLE_MANUAL_SECRET_COLLECTION_FOR_TESTING,
+    manualCollectTip: ENABLE_MANUAL_SECRET_COLLECTION_FOR_TESTING
+      ? '当前为测试模式，列表中的“测试标记”按钮仅用于功能联调；正式使用时仅支持扫码收集。'
+      : '正式模式下仅支持扫码收集，学生不能手动标记暗号。'
   },
 
   onLoad() {
@@ -148,6 +155,15 @@ Page({
   },
 
   onToggleCheckin(event) {
+    if (!this.data.manualCollectEnabled) {
+      wx.showToast({
+        title: '正式模式下仅支持扫码收集',
+        icon: 'none',
+        duration: 1600
+      })
+      return
+    }
+
     const pointId = event.currentTarget?.dataset?.id
 
     if (!pointId) {
@@ -165,20 +181,25 @@ Page({
     this.refreshPageState()
 
     wx.showToast({
-      title: nextChecked ? '已标记为已收集' : '已取消收集',
+      title: nextChecked ? '已测试标记为已收集' : '已取消测试标记',
       icon: 'none',
       duration: 1600
     })
   },
 
   onMapTap(event) {
-    const pointId = event.currentTarget?.dataset?.id
+    const mapPointId = event.currentTarget?.dataset?.mapId
 
-    if (!pointId) {
+    if (!mapPointId) {
+      wx.showToast({
+        title: '该暗号点暂未接入地图定位',
+        icon: 'none',
+        duration: 1600
+      })
       return
     }
 
-    navigateToPage(`/pages/map/map?pointId=${pointId}`)
+    navigateToPage(`/pages/map/map?pointId=${mapPointId}`)
   },
 
   onMyPageTap() {
@@ -186,8 +207,12 @@ Page({
   },
 
   onBackTap() {
+    const pages = getCurrentPages()
+    const previousRoute = pages.length > 1 ? pages[pages.length - 2].route : ''
+    const delta = previousRoute === 'pages/my-page/my-page' ? 2 : 1
+
     wx.navigateBack({
-      delta: 1,
+      delta,
       fail: () => {
         wx.redirectTo({
           url: '/pages/index/index'

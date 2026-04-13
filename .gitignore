@@ -7,3 +7,12 @@ editor/dist
 editor/*.tsbuildinfo
 editor/vite.config.js
 editor/vite.config.d.ts
+docs/tracks/jyl.pdf
+docs/tracks/jyl_pdf_assets/images/
+docs/tracks/jyl_pdf_assets/manifest.json
+docs/tracks/jyl_pdf_assets/summary.txt
+docs/tracks/jyl_pdf_assets/icons/png/
+docs/tracks/jyl_pdf_assets/icons/svg/
+docs/tracks/jyl_pdf_assets/icons/manifest.json
+docs/tracks/jyl_pdf_assets/icons/summary.txt
+docs/tracks/jyl_pdf_assets/icons/contact_sheet.png

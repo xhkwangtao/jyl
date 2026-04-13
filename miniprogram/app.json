@@ -3,6 +3,7 @@
     "pages/index/index",
     "pages/map/map",
     "pages/my-page/my-page",
+    "pages/study-report/study-report",
     "pages/ai-chat/ai-chat",
     "pages/scenic-audio-list/scenic-audio-list",
     "pages/check-in/check-in"

@@ -1,10 +1,7 @@
 const auth = require('../../utils/auth')
 const {
-  JYL_MARKER_POINTS
-} = require('../../config/jyl-map-data')
-const {
-  getCheckinRecords
-} = require('../../utils/checkin')
+  buildSecretCollectionState
+} = require('../../utils/secret-collection')
 
 Page({
   data: {
@@ -17,7 +14,7 @@ Page({
     checkInTitle: '研学暗号收集',
     checkInDescription: '暗号点已整理完成\n到景点扫码后可逐个解锁图案',
     checkInAction: '去收集',
-    checkInTotalCount: JYL_MARKER_POINTS.length,
+    checkInTotalCount: 19,
     checkInCompletedCount: 0
   },
 
@@ -226,9 +223,9 @@ Page({
   },
 
   syncCheckInEntry() {
-    const records = getCheckinRecords()
-    const totalCount = JYL_MARKER_POINTS.length
-    const completedCount = Object.keys(records).length
+    const collectionState = buildSecretCollectionState()
+    const totalCount = collectionState.totalCount
+    const completedCount = collectionState.collectedCount
 
     let checkInDescription = `${totalCount}枚暗号等待收集\n到指定景点扫码后解锁研学报告`
     let checkInAction = '去收集'

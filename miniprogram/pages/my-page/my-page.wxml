@@ -14,6 +14,7 @@
       title-color="#333333"
       showUserAvatar="{{false}}"
       useCapsuleStyle="{{false}}"
+      useDefaultBack="{{false}}"
       bind:back="onBackTap"
       bind:home="onHomeTap"
     />
@@ -24,6 +25,45 @@
       <text class="hero-kicker">RESEARCH QUEST</text>
       <text class="hero-title">{{heroTitle}}</text>
       <text class="hero-desc">{{heroDesc}}</text>
+
+      <view class="officer-panel">
+        <view class="officer-copy">
+          <text class="officer-kicker">AI 官职成长</text>
+          <view class="officer-title-row">
+            <text class="officer-title">{{aiOfficerTitle}}</text>
+            <text class="officer-score">{{aiOfficerScoreText}}</text>
+          </view>
+          <text class="officer-desc">{{aiOfficerDesc}}</text>
+          <text class="officer-next">{{aiOfficerNextHint}}</text>
+        </view>
+
+        <view class="officer-avatar-shell">
+          <image class="officer-avatar" src="{{aiAvatarSrc}}" mode="aspectFit"></image>
+          <view class="officer-badge">
+            <text class="officer-badge-text">{{aiOfficerShortTitle}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="officer-progress-row">
+        <text class="officer-progress-label">{{aiOfficerScoreRuleText}}</text>
+        <text class="officer-progress-value">{{aiOfficerStageText}}</text>
+      </view>
+
+      <view class="officer-progress-track">
+        <view class="officer-progress-fill" style="width: {{aiOfficerProgressPercent}}%;"></view>
+      </view>
+
+      <view class="officer-rank-grid">
+        <view
+          class="officer-rank-chip {{item.reached ? 'officer-rank-chip-reached' : 'officer-rank-chip-locked'}} {{item.current ? 'officer-rank-chip-current' : ''}}"
+          wx:for="{{aiOfficerRankList}}"
+          wx:key="id"
+        >
+          <text class="officer-rank-chip-title">{{item.shortTitle}}</text>
+          <text class="officer-rank-chip-threshold">{{item.thresholdText}}</text>
+        </view>
+      </view>
 
       <view class="hero-progress-row">
         <view class="hero-progress-copy">
@@ -36,21 +76,6 @@
       <view class="progress-track">
         <view class="progress-fill" style="width: {{progressPercent}}%;"></view>
       </view>
-
-      <view class="stats-grid">
-        <view class="stat-card">
-          <text class="stat-label">全部暗号</text>
-          <text class="stat-value">{{totalCount}}</text>
-        </view>
-        <view class="stat-card stat-card-checked">
-          <text class="stat-label">已收集</text>
-          <text class="stat-value">{{collectedCount}}</text>
-        </view>
-        <view class="stat-card">
-          <text class="stat-label">未收集</text>
-          <text class="stat-value">{{pendingCount}}</text>
-        </view>
-      </view>
     </view>
 
     <view class="report-card {{reportUnlocked ? 'report-card-ready' : 'report-card-pending'}}">
@@ -61,7 +86,7 @@
       <text class="report-desc">{{reportDesc}}</text>
 
       <view class="report-actions">
-        <view class="report-action report-action-primary" bindtap="onReportTap">
+        <view class="report-action report-action-primary {{reportUnlocked ? '' : 'report-action-disabled'}}" bindtap="onReportTap">
           <text class="report-action-text report-action-text-primary">{{reportActionText}}</text>
         </view>
         <view class="report-action report-action-secondary" bindtap="onOpenCollectionPage">
@@ -93,86 +118,43 @@
 
     <view class="section-head">
       <view>
-        <text class="section-title">已收集暗号</text>
-        <text class="section-caption">已经通过景点二维码收下来的暗号图案会显示在这里。</text>
+        <text class="section-title">暗号图谱</text>
+        <text class="section-caption">未解锁为灰色，已解锁为黑色。只有 19 枚暗号全部点亮后，才可领取研学报告。</text>
       </view>
-      <text class="section-right">{{collectedCount}} 枚</text>
+      <text class="section-right">{{collectedCount}} / {{totalCount}}</text>
     </view>
 
-    <view class="secret-list" wx:if="{{collectedSecretList.length}}">
+    <view class="theme-summary-grid">
       <view
-        class="secret-card secret-card-collected"
-        wx:for="{{collectedSecretList}}"
+        class="theme-summary-card"
+        wx:for="{{themeSummaryList}}"
+        wx:key="themeName"
+      >
+        <text class="theme-summary-name">{{item.themeName}}</text>
+        <text class="theme-summary-value">{{item.collectedCount}} / {{item.totalCount}}</text>
+      </view>
+    </view>
+
+    <view class="secret-wall" wx:if="{{secretList.length}}">
+      <view
+        class="secret-icon-card {{item.collected ? 'secret-icon-card-active' : 'secret-icon-card-pending'}}"
+        wx:for="{{secretList}}"
         wx:key="id"
-        data-id="{{item.id}}"
+        data-map-id="{{item.mapPointId}}"
         bindtap="onSecretTap"
       >
-        <view class="secret-code-shell">
-          <text class="secret-code">{{item.secretIndexText}}</text>
-          <text class="secret-code-label">已解锁</text>
+        <view class="secret-icon-shell">
+          <image class="secret-icon-image" src="{{item.iconDisplayPath}}" mode="aspectFit"></image>
         </view>
-
-        <view class="secret-copy">
-          <view class="secret-meta-row">
-            <text class="secret-tag secret-tag-{{item.themeTone}}">{{item.patternLabel}}</text>
-            <view class="secret-status-chip secret-status-chip-collected">
-              <text class="secret-status-text">已收集</text>
-            </view>
-          </view>
-
-          <text class="secret-title">{{item.name}}</text>
-          <text class="secret-hint">{{item.sequenceText}} · {{item.themeTag}}</text>
-          <text class="secret-desc">{{item.collectionHint}}</text>
-          <text class="secret-time">{{item.timeText}}</text>
-        </view>
+        <text class="secret-icon-name">{{item.secretName}}</text>
+        <text class="secret-icon-caption">{{item.patternLabel}}</text>
+        <text class="secret-icon-index">{{item.secretIndexText}}</text>
       </view>
     </view>
 
     <view class="empty-state" wx:else>
-      <text class="empty-title">还没有收集到暗号图案</text>
-      <text class="empty-desc">到达指定景点后扫描二维码，第一枚暗号会显示在这里。</text>
-    </view>
-
-    <view class="section-head">
-      <view>
-        <text class="section-title">待收集暗号</text>
-        <text class="section-caption">这些暗号图案还未解锁，继续按路线前往景点扫码即可。</text>
-      </view>
-      <text class="section-right">{{pendingCount}} 枚</text>
-    </view>
-
-    <view class="secret-list" wx:if="{{pendingSecretList.length}}">
-      <view
-        class="secret-card secret-card-pending"
-        wx:for="{{pendingSecretList}}"
-        wx:key="id"
-        data-id="{{item.id}}"
-        bindtap="onSecretTap"
-      >
-        <view class="secret-code-shell">
-          <text class="secret-code">{{item.secretIndexText}}</text>
-          <text class="secret-code-label">待解锁</text>
-        </view>
-
-        <view class="secret-copy">
-          <view class="secret-meta-row">
-            <text class="secret-tag secret-tag-{{item.themeTone}}">{{item.patternLabel}}</text>
-            <view class="secret-status-chip secret-status-chip-pending">
-              <text class="secret-status-text">未收集</text>
-            </view>
-          </view>
-
-          <text class="secret-title">{{item.name}}</text>
-          <text class="secret-hint">{{item.sequenceText}} · {{item.themeTag}}</text>
-          <text class="secret-desc">{{item.collectionHint}}</text>
-          <text class="secret-time">{{item.timeText}}</text>
-        </view>
-      </view>
-    </view>
-
-    <view class="empty-state" wx:else>
-      <text class="empty-title">全部暗号都已解锁</text>
-      <text class="empty-desc">当前设备上的研学暗号收集任务已经完成，可以继续查看报告状态。</text>
+      <text class="empty-title">暗号图标加载中</text>
+      <text class="empty-desc">稍后将显示完整的 19 枚暗号图谱。</text>
     </view>
 
     <view class="bottom-actions">

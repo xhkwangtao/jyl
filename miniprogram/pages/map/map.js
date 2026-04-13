@@ -937,8 +937,13 @@ Page({
       return
     }
 
-    wx.switchTab({
-      url: '/pages/index/index'
+    wx.reLaunch({
+      url: '/pages/index/index',
+      fail: () => {
+        wx.redirectTo({
+          url: '/pages/index/index'
+        })
+      }
     })
   },
 

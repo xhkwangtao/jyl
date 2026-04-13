@@ -1,0 +1,105 @@
+<page-meta page-style="{{pageStyle}}"></page-meta>
+
+<view class="study-report-page" wx:if="{{pageReady}}" style="{{navBarHeightStyle}}">
+  <view class="background-layer">
+    <image class="background-svg" src="/images/ai-chat-bg.svg" mode="aspectFill" />
+  </view>
+
+  <view class="page-header">
+    <universal-navigation
+      title="研学报告"
+      show-back="{{true}}"
+      showHomeButton="{{true}}"
+      background-color="rgba(255, 255, 255, 0.12)"
+      title-color="#333333"
+      showUserAvatar="{{false}}"
+      useCapsuleStyle="{{false}}"
+      useDefaultBack="{{false}}"
+      bind:back="onBackTap"
+      bind:home="onHomeTap"
+    />
+  </view>
+
+  <view class="content-layer">
+    <view class="hero-card">
+      <view class="report-chip">
+        <text class="report-chip-text">{{aiOfficerTitle}}</text>
+      </view>
+      <text class="hero-kicker">STUDY REPORT</text>
+      <text class="hero-title">{{userNickname}} 的九眼楼研学报告</text>
+      <text class="hero-desc">已于 {{completedAtText}} 完成全部暗号收集，当前军功 {{aiOfficerScoreText}}，本页展示本次研学任务的解锁结果与主题完成情况。</text>
+
+      <view class="stats-grid">
+        <view class="stat-card">
+          <text class="stat-label">完成暗号</text>
+          <text class="stat-value">{{totalCount}}</text>
+        </view>
+        <view class="stat-card">
+          <text class="stat-label">完成主题</text>
+          <text class="stat-value">{{themeSummaryList.length}}</text>
+        </view>
+        <view class="stat-card">
+          <text class="stat-label">完成状态</text>
+          <text class="stat-value">已达成</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="summary-card">
+      <view class="section-head section-head-static">
+        <view>
+          <text class="section-title">完成摘要</text>
+          <text class="section-caption">暗号收集任务全部完成后，研学报告即刻解锁。</text>
+        </view>
+      </view>
+
+      <view class="summary-list">
+        <view class="summary-item" wx:for="{{reportSummaryList}}" wx:key="index">
+          <view class="summary-dot"></view>
+          <text class="summary-text">{{item}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-head">
+      <view>
+        <text class="section-title">主题完成度</text>
+        <text class="section-caption">四条研学线索均已点亮。</text>
+      </view>
+    </view>
+
+    <view class="theme-summary-grid">
+      <view class="theme-summary-card" wx:for="{{themeSummaryList}}" wx:key="themeName">
+        <text class="theme-summary-name">{{item.themeName}}</text>
+        <text class="theme-summary-value">{{item.collectedCount}} / {{item.totalCount}}</text>
+      </view>
+    </view>
+
+    <view class="section-head">
+      <view>
+        <text class="section-title">暗号全览</text>
+        <text class="section-caption">全部暗号均已解锁为黑色，可作为本次研学任务完成记录。</text>
+      </view>
+      <text class="section-right">{{totalCount}} 枚</text>
+    </view>
+
+    <view class="secret-wall">
+      <view class="secret-icon-card" wx:for="{{secretList}}" wx:key="id">
+        <view class="secret-icon-shell">
+          <image class="secret-icon-image" src="{{item.iconDarkPath}}" mode="aspectFit"></image>
+        </view>
+        <text class="secret-icon-name">{{item.secretName}}</text>
+        <text class="secret-icon-caption">{{item.patternLabel}}</text>
+      </view>
+    </view>
+
+    <view class="bottom-actions">
+      <view class="bottom-action bottom-action-primary" bindtap="onOpenMyPage">
+        <text class="bottom-action-text bottom-action-text-primary">返回我的档案</text>
+      </view>
+      <view class="bottom-action bottom-action-secondary" bindtap="onOpenCollectionPage">
+        <text class="bottom-action-text bottom-action-text-secondary">查看收集记录</text>
+      </view>
+    </view>
+  </view>
+</view>

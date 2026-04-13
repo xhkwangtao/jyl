@@ -200,6 +200,23 @@
   color: #70828a;
 }
 
+.manual-tip {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 10rpx;
+  font-size: 20rpx;
+  line-height: 1.6;
+}
+
+.manual-tip-testing {
+  color: #b06b2f;
+}
+
+.manual-tip-live {
+  color: #60717b;
+}
+
 .stats-grid {
   display: flex;
   gap: 14rpx;
@@ -505,13 +522,28 @@
   border: 1px solid rgba(45, 123, 122, 0.12);
 }
 
+.spot-action-disabled {
+  background: rgba(16, 24, 40, 0.04);
+  border-color: rgba(16, 24, 40, 0.06);
+}
+
 .spot-action-primary {
   background: linear-gradient(180deg, #2f807d 0%, #245f6d 100%);
   box-shadow: 0 12rpx 24rpx rgba(36, 95, 109, 0.12);
 }
 
+.spot-action-test-primary {
+  background: linear-gradient(180deg, #c9854b 0%, #a96835 100%);
+  box-shadow: 0 12rpx 24rpx rgba(169, 104, 53, 0.16);
+}
+
 .spot-action-secondary {
   background: rgba(16, 24, 40, 0.06);
+}
+
+.spot-action-test-secondary {
+  background: rgba(201, 133, 75, 0.12);
+  border: 1px solid rgba(201, 133, 75, 0.16);
 }
 
 .spot-action-text {
@@ -524,8 +556,20 @@
   color: #245f6d;
 }
 
+.spot-action-text-disabled {
+  color: #8d98a2;
+}
+
 .spot-action-text-primary {
   color: #ffffff;
+}
+
+.spot-action-text-test-primary {
+  color: #ffffff;
+}
+
+.spot-action-text-test-secondary {
+  color: #a96835;
 }
 
 .empty-state {

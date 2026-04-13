@@ -12,6 +12,7 @@
       theme="{{navTheme}}"
       showUserAvatar="{{false}}"
       useCapsuleStyle="{{false}}"
+      useDefaultBack="{{false}}"
       bind:back="onBackTap"
       bind:home="onHomeTap"
     />
@@ -62,6 +63,7 @@
       </view>
 
       <text class="scan-tip">{{scanTip}}</text>
+      <text class="manual-tip {{manualCollectEnabled ? 'manual-tip-testing' : 'manual-tip-live'}}">{{manualCollectTip}}</text>
     </view>
 
     <view class="filter-shell">
@@ -107,7 +109,7 @@
 
             <view class="spot-location-row">
               <image class="spot-location-icon" src="/images/poi-detail/location.svg" mode="widthFix"></image>
-              <text class="spot-location-text">{{item.sequenceText}} · {{item.themeTag}}</text>
+              <text class="spot-location-text">{{item.pointLabel}} · {{item.patternLabel}}</text>
             </view>
 
             <text class="spot-desc">{{item.collectionHint}}</text>
@@ -118,11 +120,20 @@
           <text class="spot-time {{item.collected ? 'spot-time-checked' : ''}}">{{item.timeText}}</text>
 
           <view class="spot-actions">
-            <view class="spot-action spot-action-ghost" data-id="{{item.id}}" bindtap="onMapTap">
-              <text class="spot-action-text spot-action-text-ghost">地图查看</text>
+            <view
+              class="spot-action spot-action-ghost {{item.navigable ? '' : 'spot-action-disabled'}}"
+              data-map-id="{{item.mapPointId}}"
+              bindtap="onMapTap"
+            >
+              <text class="spot-action-text spot-action-text-ghost {{item.navigable ? '' : 'spot-action-text-disabled'}}">{{item.navigable ? '地图查看' : '暂无地图'}}</text>
             </view>
-            <view class="spot-action {{item.collected ? 'spot-action-secondary' : 'spot-action-primary'}}" data-id="{{item.id}}" bindtap="onToggleCheckin">
-              <text class="spot-action-text {{item.collected ? 'spot-action-text-secondary' : 'spot-action-text-primary'}}">{{item.actionText}}</text>
+            <view
+              wx:if="{{manualCollectEnabled}}"
+              class="spot-action {{item.collected ? 'spot-action-test-secondary' : 'spot-action-test-primary'}}"
+              data-id="{{item.id}}"
+              bindtap="onToggleCheckin"
+            >
+              <text class="spot-action-text {{item.collected ? 'spot-action-text-test-secondary' : 'spot-action-text-test-primary'}}">{{item.collected ? '取消测试标记' : '测试标记收集'}}</text>
             </view>
           </view>
         </view>

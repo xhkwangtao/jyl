@@ -6,7 +6,7 @@
     showUserAvatar="{{false}}"
     useCapsuleStyle="{{true}}"
     theme="light"
-    useDefaultBack="{{true}}"
+    useDefaultBack="{{false}}"
     bind:back="onStatusBarBack"
     bind:user="goToUserPage"
   />
