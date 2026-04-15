@@ -64,11 +64,65 @@ function buildMockReply(question) {
   return '这个问题我可以继续展开讲。\n\n为了保持 UI 复刻干净，目前这里先用静态回答顶住样式层，下一步会把真实输入区和交互也补齐。'
 }
 
+function safeDecodeURIComponent(value) {
+  if (typeof value !== 'string') {
+    return value
+  }
+
+  try {
+    return decodeURIComponent(value)
+  } catch (error) {
+    return value
+  }
+}
+
+function buildRouteEntryInfo(routeInfo) {
+  if (!routeInfo || typeof routeInfo !== 'object') {
+    return null
+  }
+
+  const pointNames = Array.isArray(routeInfo.pointNames)
+    ? routeInfo.pointNames.filter(Boolean)
+    : []
+  const pointNamesPreview = pointNames.slice(0, 6)
+
+  return {
+    ...routeInfo,
+    description: routeInfo.description || '这是一条结合景区现有点位整理出的推荐游览路线。',
+    distanceText: routeInfo.distanceText || routeInfo.distance || '',
+    durationText: routeInfo.durationText || routeInfo.duration || '',
+    pointCount: routeInfo.pointCount || pointNames.length,
+    pointNames,
+    pointNamesPreview,
+    remainingPointCount: Math.max(pointNames.length - pointNamesPreview.length, 0)
+  }
+}
+
+function buildRouteIntroMessage(routeInfo) {
+  if (!routeInfo) {
+    return ''
+  }
+
+  const pointSummary = routeInfo.pointNamesPreview.join('、')
+  const pointSuffix = routeInfo.remainingPointCount > 0 ? ` 等 ${routeInfo.pointCount} 个点位` : ''
+  const lines = [
+    `已为你带入路线「${routeInfo.name || '推荐路线'}」。`,
+    routeInfo.description || '',
+    routeInfo.distanceText || routeInfo.durationText
+      ? `全程约 ${routeInfo.distanceText || '待确认'}，预计 ${routeInfo.durationText || '待确认'}。`
+      : '',
+    pointSummary ? `沿途会经过 ${pointSummary}${pointSuffix}。` : ''
+  ].filter(Boolean)
+
+  return lines.join('\n\n')
+}
+
 Page({
   data: {
     pageReady: false,
     navHeight: 84,
     messageList: MOCK_MESSAGES,
+    entryRouteInfo: null,
     quickQuestionsExpanded: false,
     isGenerating: false,
     isAILoading: false,
@@ -85,8 +139,17 @@ Page({
     this.clearReplyTimer()
   },
 
-  onLoad() {
+  onLoad(options = {}) {
+    const entryRouteInfo = this.resolveEntryRouteInfo(options)
+    const presetMessage = safeDecodeURIComponent(options.message || '')
+
     this.initLayoutMetrics()
+    this.setData({
+      entryRouteInfo,
+      messageList: entryRouteInfo
+        ? [MOCK_MESSAGES[0], createAIMessage(buildRouteIntroMessage(entryRouteInfo))]
+        : MOCK_MESSAGES
+    })
 
     setTimeout(() => {
       this.setData({
@@ -95,6 +158,10 @@ Page({
         setTimeout(() => {
           this.measureChatViewport()
           this.scrollToBottom()
+
+          if (!entryRouteInfo && presetMessage) {
+            this.sendMessage(presetMessage)
+          }
         }, 80)
       })
     }, 180)
@@ -130,15 +197,75 @@ Page({
     }
   },
 
-  onGoToMap() {
+  resolveEntryRouteInfo(options = {}) {
+    if (options.hasRouteInfo !== 'true') {
+      return null
+    }
+
+    const app = getApp()
+    const rawRouteInfo = app?.globalData?.aiChatRouteInfo || null
+
+    if (app?.globalData) {
+      app.globalData.aiChatRouteInfo = null
+    }
+
+    return buildRouteEntryInfo(rawRouteInfo)
+  },
+
+  openMapWithRoute(routeData) {
+    const safeRouteData = routeData && typeof routeData === 'object' ? routeData : null
+    const pages = getCurrentPages()
+    const previousPage = pages[pages.length - 2]
+
+    if (safeRouteData && previousPage?.route === 'pages/map/map') {
+      const app = getApp()
+      const pendingNavigation = {
+        routeData: safeRouteData
+      }
+
+      if (app) {
+        app.globalData = app.globalData || {}
+        app.globalData.pendingNavigation = pendingNavigation
+      }
+
+      wx.setStorageSync('pending_navigation', pendingNavigation)
+      wx.navigateBack({
+        delta: 1
+      })
+      return
+    }
+
+    const routeQuery = safeRouteData
+      ? `?routeData=${encodeURIComponent(JSON.stringify(safeRouteData))}`
+      : ''
+
     wx.navigateTo({
-      url: '/pages/map/map',
+      url: `/pages/map/map${routeQuery}`,
       fail: () => {
         wx.redirectTo({
-          url: '/pages/map/map'
+          url: `/pages/map/map${routeQuery}`
         })
       }
     })
+  },
+
+  onGoToMap() {
+    this.openMapWithRoute(this.data.entryRouteInfo?.routeData || null)
+  },
+
+  onPreviewEntryRoute() {
+    const routeData = this.data.entryRouteInfo?.routeData
+
+    if (!routeData) {
+      wx.showToast({
+        title: '当前没有可预览的路线',
+        icon: 'none',
+        duration: 1600
+      })
+      return
+    }
+
+    this.openMapWithRoute(routeData)
   },
 
   onCopyText(event) {

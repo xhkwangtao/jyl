@@ -28,6 +28,45 @@
       bind:scroll="onChatScroll"
       bind:scrolltolower="onScrollToLower"
     >
+      <view class="entry-route-card" wx:if="{{entryRouteInfo}}">
+        <view class="entry-route-head">
+          <text class="entry-route-kicker">路线已带入</text>
+          <text class="entry-route-title">{{entryRouteInfo.name}}</text>
+        </view>
+
+        <text class="entry-route-description">{{entryRouteInfo.description}}</text>
+
+        <view class="entry-route-metrics">
+          <view class="entry-route-metric">
+            <text class="entry-route-metric-value">{{entryRouteInfo.durationText || '--'}}</text>
+            <text class="entry-route-metric-label">预计时长</text>
+          </view>
+          <view class="entry-route-metric">
+            <text class="entry-route-metric-value">{{entryRouteInfo.distanceText || '--'}}</text>
+            <text class="entry-route-metric-label">路线距离</text>
+          </view>
+          <view class="entry-route-metric">
+            <text class="entry-route-metric-value">{{entryRouteInfo.pointCount || 0}} 个</text>
+            <text class="entry-route-metric-label">途经点位</text>
+          </view>
+        </view>
+
+        <view class="entry-route-tags" wx:if="{{entryRouteInfo.pointNamesPreview.length > 0}}">
+          <text
+            class="entry-route-tag"
+            wx:for="{{entryRouteInfo.pointNamesPreview}}"
+            wx:key="*this"
+          >{{item}}</text>
+          <text class="entry-route-tag entry-route-tag-more" wx:if="{{entryRouteInfo.remainingPointCount > 0}}">
+            +{{entryRouteInfo.remainingPointCount}}
+          </text>
+        </view>
+
+        <view class="entry-route-action" bindtap="onPreviewEntryRoute">
+          <text class="entry-route-action-text">去地图看路线</text>
+        </view>
+      </view>
+
       <chat-message-list
         messages="{{messageList}}"
         is-loading="{{isAILoading}}"

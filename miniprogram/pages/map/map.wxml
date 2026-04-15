@@ -24,6 +24,7 @@
     <audio-player-guide
       id="audioPlayerGuide"
       visible="{{showAudioPlayer && (!navigationActive || navigationAudioMode === 'full')}}"
+      keep-playing-when-hidden="{{navigationActive && navigationAudioMode === 'mini'}}"
       current-poi="{{currentAudioPoi}}"
       user-score="{{userScore}}"
       user-rank-percent="{{userRankPercent}}"
@@ -33,8 +34,33 @@
       bind:audioStop="onAudioStop"
       bind:audioEnded="onAudioEnded"
       bind:audioTimeUpdate="onAudioTimeUpdate"
+      bind:playStateChange="onAudioPlayStateChange"
+      bind:openAIChat="onOpenAIChat"
       bind:close="onCloseAudioPlayer"
     />
+
+    <view class="mini-audio-player" wx:if="{{navigationActive && showAudioPlayer && navigationAudioMode === 'mini' && currentAudioPoi}}">
+      <view class="mini-audio-player-main" bindtap="onRestoreFullAudioPlayer">
+        <view class="mini-audio-player-avatar">
+          <image class="mini-audio-player-avatar-image" src="/images/ai-assistant-xiaoying.png" mode="aspectFit"></image>
+        </view>
+        <view class="mini-audio-player-copy">
+          <text class="mini-audio-player-title">{{currentAudioPoi.name || currentAudioPoi.displayName || '景点讲解'}}</text>
+          <text class="mini-audio-player-subtitle">{{audioMuted ? '讲解已静音，点击展开' : (audioPlaying ? '讲解播放中' : '讲解已暂停，点击展开')}}</text>
+        </view>
+      </view>
+      <view class="mini-audio-player-actions">
+        <view class="mini-audio-player-action mini-audio-player-action-secondary" catchtap="onMiniAudioToggleVolume">
+          <text class="mini-audio-player-action-text mini-audio-player-action-text-secondary">{{audioMuted ? '开声' : '静音'}}</text>
+        </view>
+        <view class="mini-audio-player-action" catchtap="onMiniAudioPlayPause">
+          <text class="mini-audio-player-action-text">{{audioPlaying ? '暂停' : '播放'}}</text>
+        </view>
+        <view class="mini-audio-player-action mini-audio-player-action-ghost" catchtap="onCloseMiniAudioPlayer">
+          <text class="mini-audio-player-action-text mini-audio-player-action-text-ghost">关闭</text>
+        </view>
+      </view>
+    </view>
 
     <view class="top-toolbar-container {{!showAudioPlayer ? 'no-audio-player' : ''}}" wx:if="{{!navigationActive}}">
       <poi-filter
@@ -43,6 +69,80 @@
         default-filter="{{currentPoiFilter}}"
         bind:filterChange="onPoiFilterChange"
       />
+    </view>
+
+    <view class="popup-overlay {{showPoiPopup ? '' : 'hide'}}" wx:if="{{showPoiPopup && currentPopupData}}">
+      <view class="popup-container" catchtap="noop">
+        <view class="jyl-poi-popup-card">
+          <view class="jyl-poi-popup-bg jyl-poi-popup-bg-1"></view>
+          <view class="jyl-poi-popup-bg jyl-poi-popup-bg-2"></view>
+          <view class="jyl-poi-popup-bg jyl-poi-popup-bg-3"></view>
+          <view class="jyl-poi-popup-bg jyl-poi-popup-bg-4"></view>
+
+          <view class="jyl-poi-popup-head">
+            <text class="jyl-poi-popup-title">{{currentPopupData.title}}</text>
+            <view class="jyl-poi-popup-close" bindtap="onClosePoiPopup">
+              <text class="jyl-poi-popup-close-text">×</text>
+            </view>
+          </view>
+
+          <view class="jyl-poi-popup-main">
+            <view class="jyl-poi-popup-cover-shell">
+              <image class="jyl-poi-popup-cover" src="{{currentPopupData.coverImage}}" mode="aspectFill"></image>
+              <view class="jyl-poi-popup-cover-mask"></view>
+              <view class="jyl-poi-popup-icon-shell">
+                <image class="jyl-poi-popup-icon" src="{{currentPopupData.markerIconPath}}" mode="aspectFit"></image>
+              </view>
+              <view class="jyl-poi-popup-badge">
+                <text class="jyl-poi-popup-badge-text">{{currentPopupData.typeLabel}}</text>
+              </view>
+            </view>
+
+            <view class="jyl-poi-popup-side">
+              <view class="jyl-poi-popup-stats">
+                <view class="jyl-poi-popup-stat">
+                  <view class="jyl-poi-popup-stat-value-row">
+                    <text class="jyl-poi-popup-stat-value">{{currentPopupData.primaryMetricValue}}</text>
+                    <text class="jyl-poi-popup-stat-unit" wx:if="{{currentPopupData.primaryMetricUnit}}">{{currentPopupData.primaryMetricUnit}}</text>
+                  </view>
+                  <text class="jyl-poi-popup-stat-caption">{{currentPopupData.primaryMetricCaption}}</text>
+                </view>
+
+                <view class="jyl-poi-popup-stat-divider"></view>
+
+                <view class="jyl-poi-popup-stat jyl-poi-popup-stat-right">
+                  <view class="jyl-poi-popup-stat-value-row">
+                    <text class="jyl-poi-popup-stat-value">{{currentPopupData.secondaryMetricValue}}</text>
+                    <text class="jyl-poi-popup-stat-unit" wx:if="{{currentPopupData.secondaryMetricUnit}}">{{currentPopupData.secondaryMetricUnit}}</text>
+                  </view>
+                  <text class="jyl-poi-popup-stat-caption">{{currentPopupData.secondaryMetricCaption}}</text>
+                </view>
+              </view>
+
+              <view class="jyl-poi-popup-copy">
+                <view class="jyl-poi-popup-chip-row">
+                  <text class="jyl-poi-popup-chip">{{currentPopupData.themeTag}}</text>
+                  <text class="jyl-poi-popup-stay">{{currentPopupData.stayText}}</text>
+                </view>
+                <text class="jyl-poi-popup-desc">{{currentPopupData.description}}</text>
+                <text class="jyl-poi-popup-tip">{{currentPopupData.guideTip}}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="jyl-poi-popup-actions {{currentPopupData.showSecondaryAction ? 'jyl-poi-popup-actions-double' : 'jyl-poi-popup-actions-single'}}">
+            <view class="jyl-poi-popup-action" bindtap="onPrimaryPoiAction">
+              <view class="jyl-poi-popup-action-bg"></view>
+              <text class="jyl-poi-popup-action-text">{{currentPopupData.primaryActionText}}</text>
+            </view>
+
+            <view wx:if="{{currentPopupData.showSecondaryAction}}" class="jyl-poi-popup-action" bindtap="onSecondaryPoiAction">
+              <view class="jyl-poi-popup-action-bg"></view>
+              <text class="jyl-poi-popup-action-text">{{currentPopupData.secondaryActionText}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
     </view>
 
     <map-core
@@ -63,7 +163,68 @@
       bind:poiTap="onPOITap"
     />
 
-    <view class="intelligent-route-button-wrapper" wx:if="{{!navigationActive}}">
+    <view class="navigation-status-card" wx:if="{{navigationActive && navigationInfo}}">
+      <view class="navigation-status-main">
+        <view class="navigation-status-copy">
+          <text class="navigation-status-title">{{navigationInfo.title}}</text>
+          <text class="navigation-status-subtitle">{{navigationInfo.subtitle}}</text>
+          <view class="navigation-status-tags">
+            <text class="navigation-status-tag navigation-status-tag-{{navigationInfo.statusTone}}">{{navigationInfo.statusText}}</text>
+            <text class="navigation-status-tag navigation-status-tag-muted" wx:if="{{navigationInfo.sourceTagText}}">{{navigationInfo.sourceTagText}}</text>
+            <text class="navigation-status-tag navigation-status-tag-muted">{{navigationInfo.routeGapText}}</text>
+            <text class="navigation-status-tag navigation-status-tag-muted" wx:if="{{navigationInfo.updatedText}}">{{navigationInfo.updatedText}}</text>
+          </view>
+        </view>
+        <view class="navigation-status-metrics">
+          <view class="navigation-status-metric">
+            <view class="navigation-status-metric-row">
+              <text class="navigation-status-metric-value">{{navigationInfo.distanceValue}}</text>
+              <text class="navigation-status-metric-unit">{{navigationInfo.distanceUnit}}</text>
+            </view>
+            <text class="navigation-status-metric-caption">{{navigationInfo.distanceCaption}}</text>
+          </view>
+          <view class="navigation-status-metric navigation-status-metric-right">
+            <view class="navigation-status-metric-row">
+              <text class="navigation-status-metric-value">{{navigationInfo.durationValue}}</text>
+              <text class="navigation-status-metric-unit">{{navigationInfo.durationUnit}}</text>
+            </view>
+            <text class="navigation-status-metric-caption">{{navigationInfo.durationCaption}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="navigation-status-actions">
+        <view class="navigation-status-button navigation-status-button-secondary {{navigationRecalculating && !navigationInfo.arrived ? 'navigation-status-button-disabled' : ''}}" bindtap="onNavigationSecondaryAction">
+          <text class="navigation-status-button-text">{{navigationInfo.arrived ? '查看景点' : (navigationRecalculating ? '重算中...' : '重新规划')}}</text>
+        </view>
+        <view class="navigation-status-button" bindtap="onNavigationPrimaryAction">
+          <text class="navigation-status-button-text">{{navigationInfo.arrived ? '完成导航' : '退出导航'}}</text>
+        </view>
+      </view>
+
+      <view class="navigation-status-progress" wx:if="{{navigationInfo.progressText || navigationInfo.audioHintText}}">
+        <view class="navigation-status-progress-head">
+          <text class="navigation-status-progress-copy">{{navigationInfo.progressText}}</text>
+          <text class="navigation-status-progress-copy navigation-status-progress-copy-right" wx:if="{{navigationInfo.nextGuideText}}">{{navigationInfo.nextGuideText}}</text>
+        </view>
+        <view class="navigation-status-progress-track">
+          <view class="navigation-status-progress-fill" style="width: {{navigationInfo.progressPercent || 0}}%;"></view>
+        </view>
+        <text class="navigation-status-progress-hint" wx:if="{{navigationInfo.audioHintText}}">{{navigationInfo.audioHintText}}</text>
+      </view>
+
+      <view class="navigation-status-steps" wx:if="{{navigationInfo.stepItems && navigationInfo.stepItems.length}}">
+        <view class="navigation-status-step" wx:for="{{navigationInfo.stepItems}}" wx:key="key">
+          <view class="navigation-status-step-dot navigation-status-step-dot-{{item.state}}"></view>
+          <view class="navigation-status-step-copy">
+            <text class="navigation-status-step-label">{{item.label}}</text>
+            <text class="navigation-status-step-value">{{item.value}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="intelligent-route-button-wrapper" wx:if="{{!navigationActive && !showPoiPopup}}">
       <gradient-button bind:tap="onIntelligentRoutePlanning">
         <image class="button-icon" src="/images/icons/intelligent-route.svg" mode="aspectFit"></image>
         <text>{{intelligentRoutePlanningText}}</text>
@@ -72,7 +233,7 @@
 
     <view
       class="audio-list-floating-button"
-      wx:if="{{audioPoiList.length > 0}}"
+      wx:if="{{audioPoiList.length > 0 && !showPoiPopup}}"
       bindtap="onToggleAudioListDrawer"
     >
       <image class="audio-list-icon" src="/images/icons/voice-static.svg" mode="aspectFit"></image>
@@ -83,6 +244,7 @@
       routes="{{plannerRoutes}}"
       selected-route-id="{{selectedIntelligentRouteId}}"
       bind:routeSelected="onIntelligentRouteSelected"
+      bind:openAIChat="onOpenAIChat"
       bind:close="onCloseIntelligentPlanner"
     />
 

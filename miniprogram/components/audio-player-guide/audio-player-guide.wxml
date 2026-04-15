@@ -1,5 +1,5 @@
 <!--components/audio-player-guide/audio-player-guide.wxml-->
-<view class="audio-player-guide {{visible ? 'visible' : 'hidden'}}"  wx:if="{{visible}}">
+<view class="audio-player-guide {{visible ? 'visible' : 'hidden'}}">
   <!-- 主容器 -->
   <view class="player-container">
     
@@ -80,6 +80,13 @@
         <view class="wave wave-10"></view>
         <view class="wave wave-11"></view>
         <view class="wave wave-12"></view>
+      </view>
+    </view>
+
+    <view class="chat-entry" bind:tap="openAIChat">
+      <text class="chat-text">{{chatButtonText}}</text>
+      <view class="chat-icon">
+        <image class="arrow-icon" src="/images/icons/question-start.svg" mode="aspectFit" />
       </view>
     </view>
     

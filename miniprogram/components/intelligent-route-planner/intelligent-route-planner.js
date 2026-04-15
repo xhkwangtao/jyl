@@ -102,6 +102,25 @@ Component({
       this.startPlanning(routeId)
     },
 
+    onOpenAIChat() {
+      if (this.data.isPlanning) {
+        return
+      }
+
+      const routeId = this.data.internalSelectedRouteId || this.properties.selectedRouteId || ''
+      const route = this.properties.routes.find((item) => item.id === routeId) || null
+      const message = route
+        ? `我想详细了解一下${route.name}，包括适合人群、游览节奏和沿途点位亮点。`
+        : '我想了解更多关于游览路线的详情。'
+
+      this.triggerEvent('openAIChat', {
+        context: 'route_planning',
+        routeId,
+        route,
+        message
+      })
+    },
+
     startPlanning(routeId) {
       let progress = 0
 

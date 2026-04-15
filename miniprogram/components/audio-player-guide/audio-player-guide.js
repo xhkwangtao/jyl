@@ -6,6 +6,10 @@ Component({
       type: Boolean,
       value: true
     },
+    keepPlayingWhenHidden: {
+      type: Boolean,
+      value: false
+    },
     currentPoi: {
       type: Object,
       value: null
@@ -33,7 +37,9 @@ Component({
     scoreLabel: '积分：',
     rankTextPrefix: '您已超过 ',
     rankTextSuffix: '% 的用户',
+    chatButtonText: '问 AI',
     isPlaying: false,
+    isMuted: false,
     audioProgress: 0,
     currentTime: 0,
     totalTime: 180
@@ -44,7 +50,7 @@ Component({
       this.syncPoint(point)
     },
     visible(isVisible) {
-      if (!isVisible) {
+      if (!isVisible && !this.properties.keepPlayingWhenHidden) {
         this.stopPlayback(false)
       }
     }
@@ -72,10 +78,12 @@ Component({
         },
         animationState: point ? 'breathing' : 'idle',
         isPlaying: false,
+        isMuted: false,
         audioProgress: 0,
         currentTime: 0,
         totalTime: 180
       })
+      this.triggerPlayStateChange()
     },
 
     togglePlay() {
@@ -92,9 +100,59 @@ Component({
         animationState: 'talking'
       })
       this.startProgressTimer()
+      this.triggerPlayStateChange()
       this.triggerEvent('audioPlay', {
         poi: this.properties.currentPoi
       })
+    },
+
+    playAudio() {
+      if (this.data.isPlaying) {
+        return
+      }
+
+      this.setData({
+        isPlaying: true,
+        animationState: 'talking'
+      })
+      this.startProgressTimer()
+      this.triggerEvent('audioPlay', {
+        poi: this.properties.currentPoi
+      })
+      this.triggerPlayStateChange()
+    },
+
+    pauseAudio() {
+      if (!this.data.isPlaying) {
+        return
+      }
+
+      this.stopPlayback(false)
+      this.triggerEvent('audioPause', {
+        poi: this.properties.currentPoi
+      })
+    },
+
+    getPlayStatus() {
+      return {
+        currentPoi: this.properties.currentPoi,
+        isPlaying: this.data.isPlaying,
+        isMuted: this.data.isMuted,
+        currentTime: this.data.currentTime,
+        totalTime: this.data.totalTime,
+        progress: this.data.audioProgress
+      }
+    },
+
+    stopAudio() {
+      this.stopPlayback(true)
+    },
+
+    setMuted(muted) {
+      this.setData({
+        isMuted: !!muted
+      })
+      this.triggerPlayStateChange()
     },
 
     startProgressTimer() {
@@ -140,6 +198,7 @@ Component({
         isPlaying: false,
         animationState: this.properties.currentPoi ? 'breathing' : 'idle'
       })
+      this.triggerPlayStateChange()
 
       if (triggerStopEvent) {
         this.triggerEvent('audioStop', {
@@ -149,8 +208,17 @@ Component({
     },
 
     closePlayer() {
+      if (this.properties.keepPlayingWhenHidden) {
+        this.triggerEvent('close', {
+          preservePlayback: this.data.isPlaying
+        })
+        return
+      }
+
       this.stopPlayback(true)
-      this.triggerEvent('close')
+      this.triggerEvent('close', {
+        preservePlayback: false
+      })
     },
 
     formatTime(value) {
@@ -158,6 +226,22 @@ Component({
       const minutes = `${Math.floor(safeValue / 60)}`.padStart(2, '0')
       const seconds = `${safeValue % 60}`.padStart(2, '0')
       return `${minutes}:${seconds}`
+    },
+
+    openAIChat() {
+      const point = this.properties.currentPoi
+      const poiName = point?.name || point?.displayName || ''
+      this.triggerEvent('openAIChat', {
+        poiId: point?.id || point?.markerId || '',
+        poiName,
+        message: poiName
+          ? `我想了解${poiName}的讲解重点和游览建议。`
+          : '我想了解当前景点的讲解重点和游览建议。'
+      })
+    },
+
+    triggerPlayStateChange() {
+      this.triggerEvent('playStateChange', this.getPlayStatus())
     }
   }
 })
