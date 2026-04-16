@@ -16,3 +16,5 @@ docs/tracks/jyl_pdf_assets/icons/svg/
 docs/tracks/jyl_pdf_assets/icons/manifest.json
 docs/tracks/jyl_pdf_assets/icons/summary.txt
 docs/tracks/jyl_pdf_assets/icons/contact_sheet.png
+scripts/wechat_config.json
+scripts/.wechat_token_cache.json

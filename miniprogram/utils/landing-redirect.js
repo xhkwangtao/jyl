@@ -1,3 +1,7 @@
+const {
+  resolvePoiSourceCodeToCanonical
+} = require('./poi-source-code.js')
+
 const STORAGE_KEYS = {
   scene: 'landingScene',
   sourceCode: 'landingSourceCode',
@@ -6,6 +10,22 @@ const STORAGE_KEYS = {
 }
 
 const VIP_SUBSCRIBE_PATH = '/pages/payment/subscribe/subscribe'
+const ROUTE_SOURCE_CODES = new Set(['route-highlight', 'route-deep'])
+const POINT_SOURCE_TYPES = new Set(['bsp'])
+const ROUTE_SOURCE_TYPES = new Set(['route'])
+const FILTER_SOURCE_TYPES = new Set(['filter'])
+
+function buildRouteDataQueryValue(routeId = '') {
+  const normalizedRouteId = normalizeSourceCode(routeId)
+
+  if (!normalizedRouteId) {
+    return ''
+  }
+
+  return JSON.stringify({
+    routeId: normalizedRouteId
+  })
+}
 
 function safeDecode(value) {
   if (typeof value !== 'string') {
@@ -59,15 +79,23 @@ function normalizeSourceCode(value) {
   return safeDecode(value).toLowerCase()
 }
 
+function isKeyValueScenePayload(scene = '') {
+  return /(^|&)[^=&]+=/.test(safeDecode(scene))
+}
+
 function normalizeLandingOptions(options = {}) {
   const scene = safeDecode(options.scene || '')
-  const sceneParams = parseQueryString(scene)
+  const hasKeyValueScenePayload = isKeyValueScenePayload(scene)
+  const sceneParams = hasKeyValueScenePayload ? parseQueryString(scene) : {}
+  const bareSceneValue = !hasKeyValueScenePayload ? scene : ''
 
   const sourceCode = normalizeSourceCode(sceneParams.s || options.s || '')
-  const serialNumber = safeDecode(sceneParams.sn || options.sn || '')
+  const serialNumber = safeDecode(sceneParams.sn || sceneParams.scene || options.sn || bareSceneValue || '')
 
   return {
     scene,
+    sceneParams,
+    bareSceneValue,
     sourceCode,
     serialNumber
   }
@@ -188,14 +216,52 @@ function getLandingRedirectConfig(sourceCode = '', fallbackToDefault = true) {
   return fallbackToDefault ? LANDING_REDIRECT_CONFIG.default : null
 }
 
+function buildMapPageUrlFromLanding(options = {}) {
+  const landingOptions = normalizeLandingOptions(options)
+  const sourceCode = landingOptions.sourceCode
+  const serialNumber = normalizeSourceCode(landingOptions.serialNumber)
+  const canonicalPoiSerialNumber = resolvePoiSourceCodeToCanonical(serialNumber)
+
+  if (POINT_SOURCE_TYPES.has(sourceCode) && canonicalPoiSerialNumber) {
+    return buildQuery('/pages/map/map', {
+      poiId: canonicalPoiSerialNumber
+    })
+  }
+
+  if (ROUTE_SOURCE_TYPES.has(sourceCode) && (ROUTE_SOURCE_CODES.has(serialNumber) || serialNumber.startsWith('route-'))) {
+    return buildQuery('/pages/map/map', {
+      routeData: buildRouteDataQueryValue(serialNumber)
+    })
+  }
+
+  if (FILTER_SOURCE_TYPES.has(sourceCode) && serialNumber) {
+    return buildQuery('/pages/map/map', {
+      filter: serialNumber
+    })
+  }
+
+  return ''
+}
+
 function buildLandingPageUrl(options = {}) {
   const landingOptions = normalizeLandingOptions(options)
 
-  if (!landingOptions.scene && !landingOptions.sourceCode && !landingOptions.serialNumber) {
+  if (
+    !landingOptions.scene
+    && !landingOptions.sourceCode
+    && !landingOptions.serialNumber
+  ) {
     return ''
   }
 
   if (landingOptions.scene) {
+    if (landingOptions.sourceCode && landingOptions.bareSceneValue) {
+      return buildQuery('/pages/landing/index', {
+        s: landingOptions.sourceCode,
+        scene: landingOptions.bareSceneValue
+      })
+    }
+
     return buildQuery('/pages/landing/index', {
       scene: landingOptions.scene
     })
@@ -238,6 +304,7 @@ module.exports = {
   normalizeLandingOptions,
   hasLandingPayload,
   buildLandingPageUrl,
+  buildMapPageUrlFromLanding,
   persistLandingContext,
   getLandingRedirectConfig
 }

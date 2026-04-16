@@ -1,7 +1,8 @@
 const { isFeaturePaid } = require('../../utils/audio-access')
 const {
   persistLandingContext,
-  getLandingRedirectConfig
+  getLandingRedirectConfig,
+  buildMapPageUrlFromLanding
 } = require('../../utils/landing-redirect')
 
 const HOME_PAGE_URL = '/pages/index/index'
@@ -9,10 +10,10 @@ const MY_PAGE_URL = '/pages/my-page/my-page'
 const SUBSCRIBE_PAGE_URL = '/pages/payment/subscribe/subscribe?feature=vip&from=landing_video'
 const VIDEO_VIEW_COUNT_STORAGE_KEY = 'landing_video_view_count'
 const VIP_FEATURE_KEY = 'vip'
-const DEFAULT_FLASHCARD_NAME = '闪卡VIP'
-const DEFAULT_FLASHCARD_IMAGE_URL = '/images/badges/vip-card.svg'
-const DEFAULT_PRODUCT_TYPE = 'flashcard'
-const DEFAULT_PRODUCT_TYPE_NAME = '闪卡'
+const DEFAULT_ENTRY_IMAGE_URL = '/images/xiaojiu.png'
+const DEFAULT_ENTRY_TITLE = '欢迎来到九眼楼'
+const DEFAULT_ENTRY_BADGE_NAME = '九眼楼入口'
+const DEFAULT_ENTRY_DESCRIPTION = '入口参数已识别，点击下方按钮即可进入九眼楼开始游览。'
 
 function buildNavigationMetrics() {
   try {
@@ -74,16 +75,13 @@ Page({
     currentVideo: null,
     source: '',
     serialNumber: '',
-    flashCardName: DEFAULT_FLASHCARD_NAME,
-    flashCardImageUrl: DEFAULT_FLASHCARD_IMAGE_URL,
-    activationDate: '',
-    productType: DEFAULT_PRODUCT_TYPE,
-    productTypeName: DEFAULT_PRODUCT_TYPE_NAME,
-    collectionOrder: 1,
-    isAutoActivating: false,
-    hasAutoActivated: false,
-    activationSuccess: true,
-    activationMessage: '',
+    entryTitle: DEFAULT_ENTRY_TITLE,
+    entrySummary: DEFAULT_ENTRY_DESCRIPTION,
+    entryBadgeName: DEFAULT_ENTRY_BADGE_NAME,
+    entryImageUrl: DEFAULT_ENTRY_IMAGE_URL,
+    entryMetaText: '',
+    primaryActionText: '进入九眼楼',
+    targetPageUrl: HOME_PAGE_URL,
     badgeEntranceSpeed: 'double-rotation',
     badgeEntranceClass: '',
     confettiColors: ['#6366F1', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EF4444', '#14B8A6']
@@ -114,15 +112,10 @@ Page({
   checkParamsAndRedirect(landingOptions = {}) {
     const source = landingOptions.sourceCode || ''
     const serialNumber = landingOptions.serialNumber || ''
+    const mapPageUrl = buildMapPageUrlFromLanding(landingOptions)
 
-    if (serialNumber) {
-      this.setData({
-        shouldShowPage: true,
-        shouldShowVideo: false,
-        hasAutoActivated: true,
-        activationSuccess: true,
-        activationMessage: '激活成功'
-      })
+    if (mapPageUrl) {
+      this.executeRedirect(mapPageUrl)
       return
     }
 
@@ -167,6 +160,10 @@ Page({
       shouldShowPage: true,
       shouldShowVideo: false
     })
+
+    if (serialNumber) {
+      wx.hideLoading()
+    }
   },
 
   isVipActive() {
@@ -261,15 +258,33 @@ Page({
   parseUrlParams(landingOptions = {}) {
     const source = landingOptions.sourceCode || ''
     const serialNumber = landingOptions.serialNumber || ''
+    const mapPageUrl = buildMapPageUrlFromLanding(landingOptions)
+    const summaryParts = []
+    const metaParts = []
+
+    if (source) {
+      summaryParts.push(`来源：${source}`)
+      metaParts.push(`来源 ${source}`)
+    }
+
+    if (serialNumber) {
+      summaryParts.push(`凭证号：${serialNumber}`)
+      metaParts.push(`凭证 ${serialNumber}`)
+    }
+
+    const today = new Date()
+    const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`
 
     this.setData({
       source,
       serialNumber,
-      flashCardName: DEFAULT_FLASHCARD_NAME,
-      flashCardImageUrl: DEFAULT_FLASHCARD_IMAGE_URL,
-      productType: DEFAULT_PRODUCT_TYPE,
-      productTypeName: DEFAULT_PRODUCT_TYPE_NAME,
-      collectionOrder: 1
+      entryTitle: summaryParts.length ? '扫码入口已识别' : DEFAULT_ENTRY_TITLE,
+      entrySummary: summaryParts.length ? summaryParts.join('  ·  ') : DEFAULT_ENTRY_DESCRIPTION,
+      entryBadgeName: source || DEFAULT_ENTRY_BADGE_NAME,
+      entryImageUrl: DEFAULT_ENTRY_IMAGE_URL,
+      entryMetaText: [dateStr, ...metaParts].join('  ·  '),
+      primaryActionText: mapPageUrl ? '进入地图查看' : '进入九眼楼',
+      targetPageUrl: mapPageUrl || HOME_PAGE_URL
     })
   },
 
@@ -283,16 +298,7 @@ Page({
   },
 
   initUIEnhancements() {
-    this.setActivationDate()
-  },
-
-  setActivationDate() {
-    const today = new Date()
-    const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`
-
-    this.setData({
-      activationDate: dateStr
-    })
+    this.loadFonts()
   },
 
   loadFonts() {
@@ -388,38 +394,30 @@ Page({
     })
   },
 
-  goToMap() {
-    wx.setStorageSync('vipActivationInfo', {
-      source: this.data.source,
-      serialNumber: this.data.serialNumber,
-      flashCardName: this.data.flashCardName,
-      activationDate: this.data.activationDate,
-      activationSuccess: this.data.activationSuccess
-    })
-
-    this.goToHome()
+  goToTarget() {
+    this.executeRedirect(this.data.targetPageUrl || HOME_PAGE_URL)
   },
 
   onShareAppMessage() {
     return {
-      title: `我刚刚激活了${this.data.flashCardName}！`,
-      path: HOME_PAGE_URL,
-      imageUrl: this.data.flashCardImageUrl
+      title: '欢迎来到九眼楼',
+      path: this.data.targetPageUrl || HOME_PAGE_URL,
+      imageUrl: this.data.entryImageUrl
     }
   },
 
   onShareTimeline() {
     return {
-      title: `我刚刚激活了${this.data.flashCardName}！`,
-      imageUrl: this.data.flashCardImageUrl
+      title: '欢迎来到九眼楼',
+      imageUrl: this.data.entryImageUrl
     }
   },
 
-  onFlashcardImageLoad() {},
+  onEntryImageLoad() {},
 
-  onFlashcardImageError() {
+  onEntryImageError() {
     this.setData({
-      flashCardImageUrl: DEFAULT_FLASHCARD_IMAGE_URL
+      entryImageUrl: DEFAULT_ENTRY_IMAGE_URL
     })
   },
 

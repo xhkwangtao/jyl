@@ -12,6 +12,9 @@ const {
   resetAudioTrialState,
   setFeaturePaid
 } = require('../../utils/audio-access.js')
+const {
+  resolvePoiSourceCodeToMarkerId
+} = require('../../utils/poi-source-code.js')
 
 const DEFAULT_ENTRY_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => point.type === 'start') || JYL_ROUTE_MARKER_POINTS[0] || null
 const DEFAULT_ENTRY_SCALE = 19
@@ -69,6 +72,33 @@ function safeDecodeURIComponent(value) {
 
 function normalizeLookupText(value) {
   return String(value || '').trim().replace(/\s+/g, '')
+}
+
+function normalizeBooleanValue(value, defaultValue = false) {
+  if (value === undefined || value === null || value === '') {
+    return defaultValue
+  }
+
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  const normalizedValue = String(value).trim().toLowerCase()
+
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalizedValue)) {
+    return true
+  }
+
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalizedValue)) {
+    return false
+  }
+
+  return defaultValue
+}
+
+function toFiniteCoordinateValue(value) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : null
 }
 
 function buildCenter(points) {
@@ -1340,10 +1370,15 @@ function resolveDisplayPointFromValue(value) {
     return resolveDisplayPointFromValue(
       value.pointId
       || value.poiId
+      || value.poi_id
       || value.id
       || value.markerId
+      || value.code
+      || value.poiCode
+      || value.poi_code
       || value.poi
       || value.poiName
+      || value.poi_name
       || value.pointName
       || value.name
       || value.title
@@ -1376,6 +1411,133 @@ function parseRouteDataInput(routeData) {
     return JSON.parse(decodedValue)
   } catch (error) {
     return null
+  }
+}
+
+function normalizeMapPageOptionValue(options, key, optionsConfig = {}) {
+  const { decode = true } = optionsConfig
+  const rawValue = options?.[key]
+
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return ''
+  }
+
+  const stringValue = String(rawValue).trim()
+  return decode ? safeDecodeURIComponent(stringValue) : stringValue
+}
+
+function normalizeMapPageOptions(rawOptions = {}) {
+  if (!rawOptions || typeof rawOptions !== 'object') {
+    return {}
+  }
+
+  return {
+    filter: normalizeMapPageOptionValue(rawOptions, 'filter'),
+    poi: normalizeMapPageOptionValue(rawOptions, 'poi'),
+    poiId: normalizeMapPageOptionValue(rawOptions, 'poiId'),
+    poiName: normalizeMapPageOptionValue(rawOptions, 'poiName'),
+    showAIRoute: normalizeMapPageOptionValue(rawOptions, 'showAIRoute'),
+    action: normalizeMapPageOptionValue(rawOptions, 'action'),
+    routeData: normalizeMapPageOptionValue(rawOptions, 'routeData', { decode: false })
+  }
+}
+
+function extractCoordinateFromRequest(value) {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const coordinate = value.coordinate || value.location || value.coords || null
+  const latitude = toFiniteCoordinateValue(
+    coordinate?.latitude
+    ?? coordinate?.lat
+    ?? value.latitude
+    ?? value.lat
+  )
+  const longitude = toFiniteCoordinateValue(
+    coordinate?.longitude
+    ?? coordinate?.lng
+    ?? coordinate?.lon
+    ?? value.longitude
+    ?? value.lng
+    ?? value.lon
+  )
+
+  if (latitude === null || longitude === null) {
+    return null
+  }
+
+  return {
+    latitude,
+    longitude
+  }
+}
+
+function findNearestDisplayPointByCoordinate(coordinate) {
+  if (!coordinate) {
+    return null
+  }
+
+  let nearestPoint = null
+  let nearestDistance = Number.POSITIVE_INFINITY
+
+  ALL_ROUTE_DISPLAY_POINTS.forEach((point) => {
+    if (!point || !Number.isFinite(point.latitude) || !Number.isFinite(point.longitude)) {
+      return
+    }
+
+    const distance = haversineMeters(coordinate, point)
+    if (distance < nearestDistance) {
+      nearestDistance = distance
+      nearestPoint = point
+    }
+  })
+
+  return nearestPoint
+}
+
+function normalizeEntryRequest(rawRequest) {
+  if (!rawRequest || typeof rawRequest !== 'object') {
+    return null
+  }
+
+  const parsedRouteData = parseRouteDataInput(rawRequest.routeData)
+  const mergedRequest = parsedRouteData
+    ? { ...rawRequest, ...parsedRouteData }
+    : { ...rawRequest }
+
+  return {
+    ...mergedRequest,
+    pointId: mergedRequest.pointId
+      || mergedRequest.poiId
+      || mergedRequest.poi_id
+      || mergedRequest.point_id
+      || mergedRequest.code
+      || mergedRequest.poiCode
+      || mergedRequest.poi_code
+      || '',
+    poiId: mergedRequest.poiId
+      || mergedRequest.poi_id
+      || mergedRequest.pointId
+      || mergedRequest.point_id
+      || mergedRequest.code
+      || mergedRequest.poiCode
+      || mergedRequest.poi_code
+      || '',
+    poiName: mergedRequest.poiName
+      || mergedRequest.poi_name
+      || mergedRequest.pointName
+      || mergedRequest.point_name
+      || mergedRequest.destination
+      || '',
+    filter: mergedRequest.filter
+      || mergedRequest.poiFilter
+      || mergedRequest.filterType
+      || '',
+    routeId: mergedRequest.routeId
+      || mergedRequest.route_code
+      || '',
+    coordinate: extractCoordinateFromRequest(mergedRequest)
   }
 }
 
@@ -1618,7 +1780,14 @@ const DEFAULT_ENTRY_CENTER = DEFAULT_ENTRY_POINT
   : DEFAULT_SCENIC_CENTER
 
 function getDisplayPointById(pointId) {
-  return ALL_ROUTE_DISPLAY_POINTS.find((point) => String(point.id) === String(pointId) || String(point.markerId) === String(pointId)) || null
+  const rawPointId = String(pointId || '').trim()
+  const resolvedMarkerId = resolvePoiSourceCodeToMarkerId(rawPointId)
+
+  return ALL_ROUTE_DISPLAY_POINTS.find((point) => (
+    String(point.id) === rawPointId
+      || String(point.markerId) === rawPointId
+      || (resolvedMarkerId && String(point.markerId) === resolvedMarkerId)
+  )) || null
 }
 
 function getFilteredDisplayPoints(filterType) {
@@ -1806,11 +1975,34 @@ Page({
 
     this.selectedIntelligentRoute = null
     this.preNavigationSelectedRoute = null
-    this.pageOptions = options
+    const pageOptions = normalizeMapPageOptions(options)
+    const hasDirectEntryTarget = Boolean(
+      pageOptions.filter
+        || pageOptions.poi
+        || pageOptions.poiId
+        || pageOptions.poiName
+        || pageOptions.routeData
+    )
+
+    this.pageOptions = pageOptions
     this.setData({
       navigationBarTotalHeight
     }, () => {
-      this.handleEntryRequest(options)
+      this.handleEntryRequest(pageOptions)
+
+      if (!hasDirectEntryTarget && pageOptions.action === 'executeAIRouteTest') {
+        const previewRoute = INTELLIGENT_ROUTE_OPTIONS[0] || null
+        if (previewRoute) {
+          this.applyPreviewRoute(previewRoute, {
+            toastTitle: `已加载${previewRoute.name}`
+          })
+        }
+        return
+      }
+
+      if (!hasDirectEntryTarget && normalizeBooleanValue(pageOptions.showAIRoute)) {
+        this.onIntelligentRoutePlanning()
+      }
     })
   },
 
@@ -2941,11 +3133,17 @@ Page({
       return
     }
 
-    const request = parseRouteDataInput(rawRequest?.routeData) || rawRequest
-    if (!request || typeof request !== 'object') {
+    const request = normalizeEntryRequest(rawRequest)
+    if (!request) {
       return
     }
     const requestFilterType = normalizePoiFilter(request.filter || request.poiFilter || request.filterType)
+    const shouldAutoNavigate = normalizeBooleanValue(request.autoNavigate)
+      || normalizeBooleanValue(request.startNavigation)
+      || request.action === 'navigate'
+    const shouldShowPopup = request.showPopup === undefined
+      ? true
+      : normalizeBooleanValue(request.showPopup, true)
 
     const route = this.resolveRouteFromEntryRequest(request)
     if (route) {
@@ -2969,19 +3167,43 @@ Page({
       return
     }
 
-    if (!point) {
-      if (request.routeData && request.routeData !== rawRequest?.routeData) {
-        this.handleEntryRequest(request.routeData)
+    if (!point && request.coordinate) {
+      const nearestPoint = findNearestDisplayPointByCoordinate(request.coordinate)
+
+      if (nearestPoint) {
+        if (shouldAutoNavigate) {
+          this.planNavigationToPoint(nearestPoint, {
+            suppressToast: false,
+            seedLocation: request.coordinate
+          })
+          return
+        }
+
+        this.focusPointById(nearestPoint.id, {
+          showPopup: shouldShowPopup
+        })
+        return
       }
+
+      this.setData({
+        longitude: request.coordinate.longitude,
+        latitude: request.coordinate.latitude,
+        scale: DEFAULT_ENTRY_SCALE,
+        showPoiPopup: false,
+        currentPopupData: null
+      })
       return
     }
 
-    if (request.autoNavigate || request.action === 'navigate' || request.startNavigation) {
+    if (!point) {
+      return
+    }
+
+    if (shouldAutoNavigate) {
       this.planNavigationToPoint(point)
       return
     }
 
-    const shouldShowPopup = request.showPopup !== false
     setTimeout(() => {
       this.focusPointById(point.id, {
         showPopup: shouldShowPopup

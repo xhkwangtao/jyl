@@ -19,7 +19,7 @@
       <view class="ellipse ellipse-3"></view>
       <view class="ellipse ellipse-4"></view>
       <view class="ellipse ellipse-5"></view>
-      <view class="map-decoration">VIP</view>
+      <view class="map-decoration">JYL</view>
 
       <view class="page-burst-effects">
         <view class="page-burst page-burst-1">
@@ -62,14 +62,10 @@
     </view>
 
     <view class="content-container">
-      <view class="badge-title">{{productTypeName || '闪卡'}}激活成功</view>
+      <view class="badge-title">{{entryTitle}}</view>
 
       <view class="success-text">
-        <text>恭喜您成为</text>
-        <text class="highlight">{{flashCardName || '闪卡'}}</text>
-        <text>{{productTypeName || '闪卡'}}第</text>
-        <text class="highlight">{{collectionOrder}}</text>
-        <text>位拥有者</text>
+        <text>{{entrySummary}}</text>
       </view>
 
       <view class="badge-container">
@@ -113,23 +109,23 @@
 
         <image
           class="badge-svg {{badgeEntranceClass}}"
-          src="{{flashCardImageUrl || '/images/badges/vip-card.svg'}}"
+          src="{{entryImageUrl || '/images/xiaojiu.png'}}"
           mode="aspectFit"
-          bind:load="onFlashcardImageLoad"
-          bind:error="onFlashcardImageError"
+          bind:load="onEntryImageLoad"
+          bind:error="onEntryImageError"
         ></image>
       </view>
 
       <view class="badge-name">
         <image class="olive-branch olive-branch-left" src="/images/badges/olive-branch.svg"></image>
-        <text class="name-text">{{flashCardName || 'VIP闪卡'}}</text>
+        <text class="name-text">{{entryBadgeName}}</text>
         <image class="olive-branch olive-branch-right" src="/images/badges/olive-branch.svg"></image>
       </view>
 
-      <view class="badge-date">{{activationDate}} 激活</view>
+      <view class="badge-date">{{entryMetaText}}</view>
 
-      <view class="action-button" bind:tap="goToMap">
-        <text class="button-text">开启 九眼楼 之旅</text>
+      <view class="action-button" bind:tap="goToTarget">
+        <text class="button-text">{{primaryActionText}}</text>
         <image class="button-icon" src="/images/icons/arrow-right.svg"></image>
       </view>
     </view>
