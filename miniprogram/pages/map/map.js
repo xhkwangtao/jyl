@@ -4,6 +4,14 @@ const {
   JYL_ROUTE_MARKER_POINTS,
   JYL_ROUTE_POLYLINES
 } = require('../../config/jyl-map-data.js')
+const {
+  AUDIO_FEATURE_KEY,
+  AUDIO_FREE_TRIAL_LIMIT,
+  consumeAudioAccess,
+  getAudioAccessStatus,
+  resetAudioTrialState,
+  setFeaturePaid
+} = require('../../utils/audio-access.js')
 
 const DEFAULT_ENTRY_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => point.type === 'start') || JYL_ROUTE_MARKER_POINTS[0] || null
 const DEFAULT_ENTRY_SCALE = 19
@@ -33,6 +41,8 @@ const NAVIGATION_RECALCULATE_COOLDOWN_MS = 28000
 const NAVIGATION_GUIDE_NEAR_ROUTE_MAX_METERS = 28
 const NAVIGATION_STEP_PREVIEW_COUNT = 2
 const ARRIVED_AUDIO_POI_LIMIT = 6
+const AUDIO_PAYWALL_PRICE = 7.8
+const AUDIO_PAYWALL_THROTTLE_MS = 1200
 
 function navigateToPage(url) {
   wx.navigateTo({
@@ -965,14 +975,15 @@ function buildPoiPopupData(point, options = {}) {
   const {
     arrived = false,
     audioPlaying = false,
-    navigationActive = false
+    navigationActive = false,
+    audioLocked = false
   } = options
   const primaryMetric = buildPopupPrimaryMetric(point)
   const secondaryMetric = buildPopupSecondaryMetric(point)
   const typeLabel = getPointTypeLabel(point)
   const isScenicPoint = point.type === 'scenic'
   let primaryActionType = isScenicPoint ? 'playaudio' : 'navigate'
-  let primaryActionText = isScenicPoint ? '播放讲解' : '到这去'
+  let primaryActionText = isScenicPoint ? (audioLocked ? '解锁讲解' : '播放讲解') : '到这去'
   let showSecondaryAction = isScenicPoint
   let secondaryActionType = 'navigate'
   let secondaryActionText = '到这去'
@@ -980,13 +991,13 @@ function buildPoiPopupData(point, options = {}) {
   if (arrived) {
     if (navigationActive) {
       primaryActionType = isScenicPoint ? 'playaudio' : 'completeNavigation'
-      primaryActionText = isScenicPoint ? (audioPlaying ? '继续讲解' : '开始讲解') : '完成导航'
+      primaryActionText = isScenicPoint ? (audioLocked ? '解锁讲解' : (audioPlaying ? '继续讲解' : '开始讲解')) : '完成导航'
       showSecondaryAction = isScenicPoint
       secondaryActionType = 'completeNavigation'
       secondaryActionText = '完成导航'
     } else {
       primaryActionType = isScenicPoint ? 'playaudio' : 'noop'
-      primaryActionText = isScenicPoint ? (audioPlaying ? '继续讲解' : '开始讲解') : '已到达'
+      primaryActionText = isScenicPoint ? (audioLocked ? '解锁讲解' : (audioPlaying ? '继续讲解' : '开始讲解')) : '已到达'
       showSecondaryAction = false
       secondaryActionType = 'noop'
       secondaryActionText = ''
@@ -1760,6 +1771,10 @@ Page({
     audioCurrentTime: 0,
     audioTotalTime: 180,
     audioMuted: false,
+    audioAccessPaid: false,
+    audioFreeTrialLimit: AUDIO_FREE_TRIAL_LIMIT,
+    audioTrialUsedCount: 0,
+    audioRemainingFreeCount: AUDIO_FREE_TRIAL_LIMIT,
     navigationActive: false,
     navigationInfo: null,
     navigationDestination: null,
@@ -1800,6 +1815,7 @@ Page({
   },
 
   onShow() {
+    this.refreshAudioAccessState()
     this.checkLocationPermission()
     this.checkPendingNavigationRequest()
 
@@ -1812,6 +1828,117 @@ Page({
 
   onHide() {
     this.stopNavigationTracking()
+  },
+
+  refreshAudioAccessState() {
+    const accessStatus = getAudioAccessStatus()
+
+    this.setData({
+      audioAccessPaid: !!accessStatus.paid,
+      audioFreeTrialLimit: accessStatus.freeLimit,
+      audioTrialUsedCount: accessStatus.usedCount,
+      audioRemainingFreeCount: accessStatus.remainingFreeCount
+    }, () => {
+      this.syncCurrentPopupDataWithAudioAccess()
+    })
+  },
+
+  syncCurrentPopupDataWithAudioAccess() {
+    const popupData = this.data.currentPopupData
+    if (!popupData) {
+      return
+    }
+
+    const point = getDisplayPointById(popupData.id || popupData.markerId)
+    if (!point) {
+      return
+    }
+
+    this.setData({
+      currentPopupData: this.buildPointPopupData(point, {
+        arrived: !!popupData.arrived,
+        audioPlaying: !!this.data.audioPlaying,
+        navigationActive: !!this.data.navigationActive
+      })
+    })
+  },
+
+  buildPointPopupData(point, options = {}) {
+    const accessStatus = getAudioAccessStatus(point?.id || point?.markerId || point?.name)
+    return buildPoiPopupData(point, {
+      ...options,
+      audioLocked: point?.type === 'scenic' && accessStatus.requiresPayment
+    })
+  },
+
+  buildAudioPaywallUrl(point) {
+    const pointName = point?.name || point?.displayName || '当前景点'
+    const description = `前三个景点讲解可免费试听，开通后可继续收听${pointName}等全部讲解内容`
+
+    return `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(AUDIO_FEATURE_KEY)}&featureName=${encodeURIComponent('景点语音讲解')}&productName=${encodeURIComponent('景点语音讲解')}&description=${encodeURIComponent(description)}&amount=${AUDIO_PAYWALL_PRICE}&originalPrice=69`
+  },
+
+  openAudioPaywall(point, options = {}) {
+    const now = Date.now()
+    if (this.lastAudioPaywallAt && now - this.lastAudioPaywallAt < AUDIO_PAYWALL_THROTTLE_MS) {
+      return
+    }
+
+    this.lastAudioPaywallAt = now
+
+    if (options.showToast !== false) {
+      wx.showToast({
+        title: '免费讲解已用完',
+        icon: 'none',
+        duration: 1600
+      })
+    }
+
+    setTimeout(() => {
+      navigateToPage(this.buildAudioPaywallUrl(point))
+    }, options.navigateDelayMs ?? 180)
+  },
+
+  requestAudioAccessForPoint(point, options = {}) {
+    const {
+      source = 'manual',
+      openPaywallOnBlocked = source !== 'auto'
+    } = options
+    const accessResult = consumeAudioAccess(point?.id || point?.markerId || point?.name)
+
+    this.refreshAudioAccessState()
+
+    if (accessResult.granted) {
+      if (accessResult.consumedFreeSlot && !accessResult.paid && source !== 'auto') {
+        wx.showToast({
+          title: `免费讲解 ${accessResult.usedCount}/${accessResult.freeLimit}`,
+          icon: 'none',
+          duration: 1400
+        })
+      }
+      return true
+    }
+
+    const blockedHint = '免费讲解已用完，开通后可继续收听全部讲解'
+    if (this.data.navigationActive) {
+      this.setNavigationAudioHint(blockedHint)
+    }
+
+    if (source === 'auto') {
+      wx.showToast({
+        title: blockedHint,
+        icon: 'none',
+        duration: 1800
+      })
+    }
+
+    if (openPaywallOnBlocked) {
+      this.openAudioPaywall(point, {
+        showToast: source !== 'auto'
+      })
+    }
+
+    return false
   },
 
   onUnload() {
@@ -2020,6 +2147,17 @@ Page({
       return
     }
 
+    const finishBlockedAutoPlay = () => {
+      this.markNavigationGuidePlayed(point.id || point.markerId || point.name)
+      this.setData({
+        navigationAutoAudioHint: '免费讲解已用完，可开通后继续自动播放'
+      }, () => {
+        this.updateNavigationInfoState(this.data.userLocation, {
+          recalculating: this.data.navigationRecalculating
+        })
+      })
+    }
+
     const finishAutoPlay = () => {
       this.markNavigationGuidePlayed(point.id || point.markerId || point.name)
       this.setData({
@@ -2037,6 +2175,14 @@ Page({
     }
 
     if (this.data.audioPlaying && !isSamePoi) {
+      return
+    }
+
+    if (!this.requestAudioAccessForPoint(point, {
+      source: 'auto',
+      openPaywallOnBlocked: false
+    })) {
+      finishBlockedAutoPlay()
       return
     }
 
@@ -2093,6 +2239,13 @@ Page({
       return
     }
 
+    if (!this.requestAudioAccessForPoint(point, {
+      source: 'auto',
+      openPaywallOnBlocked: false
+    })) {
+      return
+    }
+
     const startPlayback = () => {
       audioPlayer.playAudio()
     }
@@ -2116,7 +2269,7 @@ Page({
   },
 
   buildArrivedPopupData(point) {
-    return buildPoiPopupData(point, {
+    return this.buildPointPopupData(point, {
       arrived: true,
       audioPlaying: !!this.data.audioPlaying,
       navigationActive: !!this.data.navigationActive
@@ -2140,7 +2293,7 @@ Page({
     } = options
 
     this.setData({
-      currentPopupData: buildPoiPopupData(point, {
+      currentPopupData: this.buildPointPopupData(point, {
         arrived: true,
         audioPlaying,
         navigationActive
@@ -2208,7 +2361,7 @@ Page({
       intelligentRoutePlanningText: '智能线路规划',
       showAudioListDrawer: false,
       showPoiPopup: true,
-      currentPopupData: buildPoiPopupData(point, {
+      currentPopupData: this.buildPointPopupData(point, {
         arrived: true,
         audioPlaying: !!this.data.audioPlaying,
         navigationActive: false
@@ -2543,7 +2696,7 @@ Page({
       scale: DEFAULT_ENTRY_SCALE,
       showAudioListDrawer: false,
       showPoiPopup: showPopup,
-      currentPopupData: showPopup ? buildPoiPopupData(point) : null
+      currentPopupData: showPopup ? this.buildPointPopupData(point) : null
     })
   },
 
@@ -2609,6 +2762,10 @@ Page({
     const nextPopupData = keepPopupVisible ? this.buildArrivedPopupData(point) : null
 
     if (isSamePoi) {
+      if (!this.data.audioPlaying && !this.requestAudioAccessForPoint(point)) {
+        return
+      }
+
       this.setData({
         showAudioPlayer: true,
         showPoiPopup: keepPopupVisible,
@@ -2622,6 +2779,10 @@ Page({
 
         audioPlayer.togglePlay()
       })
+      return
+    }
+
+    if (!this.requestAudioAccessForPoint(point)) {
       return
     }
 
@@ -3301,6 +3462,24 @@ Page({
       return
     }
 
+    if (!this.requestAudioAccessForPoint(this.data.currentAudioPoi)) {
+      return
+    }
+
+    audioPlayer.playAudio()
+  },
+
+  onAudioPlayerRequestPlay(event) {
+    const targetPoi = event?.detail?.poi || this.data.currentAudioPoi
+    if (!this.requestAudioAccessForPoint(targetPoi)) {
+      return
+    }
+
+    const audioPlayer = this.selectComponent('#audioPlayerGuide')
+    if (!audioPlayer || typeof audioPlayer.playAudio !== 'function') {
+      return
+    }
+
     audioPlayer.playAudio()
   },
 
@@ -3355,6 +3534,33 @@ Page({
       if (audioPlayer && typeof audioPlayer.setMuted === 'function') {
         audioPlayer.setMuted(false)
       }
+    })
+  },
+
+  onToggleAudioPaidForTesting() {
+    const nextPaid = !this.data.audioAccessPaid
+    setFeaturePaid(AUDIO_FEATURE_KEY, nextPaid)
+    this.refreshAudioAccessState()
+
+    if (this.data.navigationActive) {
+      this.setNavigationAudioHint(nextPaid ? '已切换为付费状态，全部讲解已解锁' : '已切换为未付费状态，将按免费次数限制讲解')
+    }
+
+    wx.showToast({
+      title: nextPaid ? '已设为付费' : '已设为未付费',
+      icon: 'none',
+      duration: 1400
+    })
+  },
+
+  onResetAudioTrialForTesting() {
+    resetAudioTrialState()
+    this.refreshAudioAccessState()
+
+    wx.showToast({
+      title: '已重置免费讲解次数',
+      icon: 'none',
+      duration: 1400
     })
   },
 

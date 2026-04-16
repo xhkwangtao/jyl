@@ -35,6 +35,7 @@
       bind:audioEnded="onAudioEnded"
       bind:audioTimeUpdate="onAudioTimeUpdate"
       bind:playStateChange="onAudioPlayStateChange"
+      bind:requestPlay="onAudioPlayerRequestPlay"
       bind:openAIChat="onOpenAIChat"
       bind:close="onCloseAudioPlayer"
     />
@@ -237,6 +238,21 @@
       bindtap="onToggleAudioListDrawer"
     >
       <image class="audio-list-icon" src="/images/icons/voice-static.svg" mode="aspectFit"></image>
+    </view>
+
+    <view class="audio-access-test-panel" wx:if="{{!showPoiPopup}}">
+      <view class="audio-access-test-copy">
+        <text class="audio-access-test-title">{{audioAccessPaid ? '讲解已付费' : ('讲解免费 ' + audioTrialUsedCount + '/' + audioFreeTrialLimit)}}</text>
+        <text class="audio-access-test-desc">{{audioAccessPaid ? '当前已解锁全部讲解内容' : ('剩余免费 ' + audioRemainingFreeCount + ' 个景点')}}</text>
+      </view>
+      <view class="audio-access-test-actions">
+        <view class="audio-access-test-button {{audioAccessPaid ? 'audio-access-test-button-paid' : ''}}" catchtap="onToggleAudioPaidForTesting">
+          <text class="audio-access-test-button-text">{{audioAccessPaid ? '改为未付费' : '设为已付费'}}</text>
+        </view>
+        <view class="audio-access-test-reset" catchtap="onResetAudioTrialForTesting">
+          <text class="audio-access-test-reset-text">重置试听</text>
+        </view>
+      </view>
     </view>
 
     <intelligent-route-planner

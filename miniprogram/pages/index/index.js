@@ -2,6 +2,10 @@ const auth = require('../../utils/auth')
 const {
   buildSecretCollectionState
 } = require('../../utils/secret-collection')
+const {
+  hasLandingPayload,
+  buildLandingPageUrl
+} = require('../../utils/landing-redirect')
 
 Page({
   data: {
@@ -18,12 +22,21 @@ Page({
     checkInCompletedCount: 0
   },
 
-  onLoad() {
-    this.initLayoutMetrics()
-    this.syncCheckInEntry()
+  onLoad(options = {}) {
+    this.pendingLandingRedirect = false
+
+    if (this.handleLandingRedirect(options)) {
+      return
+    }
+
+    this.initializePage()
   },
 
   onShow() {
+    if (this.pendingLandingRedirect) {
+      return
+    }
+
     this.syncCheckInEntry()
     this.pendingAIChatNavigation = false
     this.setData({
@@ -46,12 +59,48 @@ Page({
 
   onUnload() {
     this.pendingAIChatNavigation = false
+    this.pendingLandingRedirect = false
   },
 
   onPullDownRefresh() {
     setTimeout(() => {
       wx.stopPullDownRefresh()
     }, 250)
+  },
+
+  initializePage() {
+    this.initLayoutMetrics()
+    this.syncCheckInEntry()
+  },
+
+  handleLandingRedirect(options = {}) {
+    if (!hasLandingPayload(options)) {
+      return false
+    }
+
+    const landingPageUrl = buildLandingPageUrl(options)
+
+    if (!landingPageUrl) {
+      return false
+    }
+
+    this.pendingLandingRedirect = true
+
+    wx.redirectTo({
+      url: landingPageUrl,
+      fail: () => {
+        this.pendingLandingRedirect = false
+        this.initializePage()
+
+        wx.showToast({
+          title: '扫码入口跳转失败',
+          icon: 'none',
+          duration: 1800
+        })
+      }
+    })
+
+    return true
   },
 
   initLayoutMetrics() {

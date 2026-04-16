@@ -1,0 +1,73 @@
+<universal-navigation title="开通VIP" theme="light" backgroundColor="rgba(0, 0, 0, 0.3)" showHomeButton="{{true}}" showUserAvatar="{{false}}" useCapsuleStyle="{{true}}" useDefaultBack="{{true}}" bind:home="onGoHome" />
+
+<view class="subscribe-page">
+  <view class="background-gradient"></view>
+  <view class="background-overlay"></view>
+
+  <view class="decoration-elements">
+    <view class="decoration circle-1"></view>
+    <view class="decoration circle-2"></view>
+    <image class="decoration square-1" src="/images/badges/arc-emerald.svg" mode="aspectFit"></image>
+    <image class="decoration square-2" src="/images/badges/long.svg" mode="aspectFit"></image>
+    <image class="decoration triangle-1" src="/images/badges/arc-orange-yellow.svg" mode="aspectFit"></image>
+    <view class="decoration triangle-2"></view>
+  </view>
+
+  <view class="title-section">
+    <text class="main-title">欢迎来到九眼楼</text>
+    <text class="subtitle">我是小九，您的专属智能导游，</text>
+    <text class="subtitle">有任何旅行问题都可以找我哦！</text>
+  </view>
+
+  <view class="ai-character-section">
+    <view class="ai-character-container">
+      <image class="ai-character-image" src="{{heroImageSrc}}" mode="aspectFit" binderror="onHeroImageError"></image>
+      <view class="ai-face">
+        <image class="ai-icon" src="/images/icons/question-start.svg" mode="aspectFit"></image>
+      </view>
+    </view>
+
+    <view class="feature-tags">
+      <view class="feature-tag tag-1">景点讲解</view>
+      <view class="feature-tag tag-2">AI聊天</view>
+      <view class="feature-tag tag-3">路线规划</view>
+      <view class="feature-tag tag-4">AI拍照</view>
+      <view class="feature-tag tag-5">景点导航</view>
+    </view>
+  </view>
+
+  <view class="purchase-card">
+    <view class="sale-badge">抢购中</view>
+    <view class="card-content">
+      <text class="promotion-title">限时特惠·立即购买</text>
+      <text class="promotion-subtitle">已有98%游客选择，剩余名额不多</text>
+      <view class="price-section">
+        <text class="price-symbol">¥</text>
+        <text class="price-value">{{displayAmount}}</text>
+        <view class="original-price-section">
+          <text class="original-price">¥{{displayOriginalPrice}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <button class="purchase-button" loading="{{loading}}" disabled="{{loading}}" bindtap="handlePay">立即购买</button>
+
+  <view class="agreement-section">
+    <view class="agreement-checkbox-hitbox" bindtap="toggleAgreement">
+      <view class="agreement-checkbox">
+        <view class="checkbox {{agreed ? 'checked' : ''}}"></view>
+      </view>
+    </view>
+    <text class="agreement-text">
+      已阅读并同意
+      <text class="agreement-link" bindtap="showServiceAgreement">《服务协议》</text>
+      和
+      <text class="agreement-link" bindtap="showPrivacyPolicy">《隐私政策》</text>
+    </text>
+  </view>
+
+  <view class="home-indicator"></view>
+
+  <view wx:if="{{paymentError}}" class="payment-error">{{paymentError}}</view>
+</view>

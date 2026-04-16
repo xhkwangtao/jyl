@@ -95,13 +95,7 @@ Component({
         return
       }
 
-      this.setData({
-        isPlaying: true,
-        animationState: 'talking'
-      })
-      this.startProgressTimer()
-      this.triggerPlayStateChange()
-      this.triggerEvent('audioPlay', {
+      this.triggerEvent('requestPlay', {
         poi: this.properties.currentPoi
       })
     },

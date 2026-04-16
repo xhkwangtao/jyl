@@ -1,0 +1,198 @@
+<block wx:if="{{shouldShowPage}}">
+  <universal-navigation
+    title=""
+    backgroundColor="transparent"
+    showHomeButton="{{true}}"
+    showUserAvatar="{{false}}"
+    useCapsuleStyle="{{true}}"
+    theme="light"
+    useDefaultBack="{{false}}"
+    bind:back="goBack"
+    bind:home="goToHome"
+    bind:user="goToUser"
+  />
+
+  <view class="badge-reward-page" style="padding-top: {{navigationBarTotalHeight}}px;">
+    <view class="background-decorations">
+      <view class="ellipse ellipse-1"></view>
+      <view class="ellipse ellipse-2"></view>
+      <view class="ellipse ellipse-3"></view>
+      <view class="ellipse ellipse-4"></view>
+      <view class="ellipse ellipse-5"></view>
+      <view class="map-decoration">VIP</view>
+
+      <view class="page-burst-effects">
+        <view class="page-burst page-burst-1">
+          <image class="arc-image" src="/images/badges/arc-red.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-2">
+          <image class="arc-image" src="/images/badges/arc-cyan.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-3">
+          <image class="arc-image" src="/images/badges/arc-yellow.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-4">
+          <image class="arc-image" src="/images/badges/arc-pink.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-5">
+          <image class="arc-image" src="/images/badges/arc-blue.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-6">
+          <image class="arc-image" src="/images/badges/arc-green.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-7">
+          <image class="arc-image" src="/images/badges/arc-deep-red.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-8">
+          <image class="arc-image" src="/images/badges/arc-orange.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-9">
+          <image class="arc-image" src="/images/badges/arc-purple.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-10">
+          <image class="arc-image" src="/images/badges/arc-emerald.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-11">
+          <image class="arc-image" src="/images/badges/arc-orange-yellow.svg" mode="aspectFit" />
+        </view>
+        <view class="page-burst page-burst-12">
+          <image class="arc-image" src="/images/badges/arc-light-pink.svg" mode="aspectFit" />
+        </view>
+      </view>
+    </view>
+
+    <view class="content-container">
+      <view class="badge-title">{{productTypeName || '闪卡'}}激活成功</view>
+
+      <view class="success-text">
+        <text>恭喜您成为</text>
+        <text class="highlight">{{flashCardName || '闪卡'}}</text>
+        <text>{{productTypeName || '闪卡'}}第</text>
+        <text class="highlight">{{collectionOrder}}</text>
+        <text>位拥有者</text>
+      </view>
+
+      <view class="badge-container">
+        <view class="explosion-effects">
+          <view class="glow-effect"></view>
+
+          <view class="confetti-burst">
+            <view class="burst burst-1">
+              <image class="burst-svg" src="/images/badges/arc-purple.svg" mode="aspectFit"></image>
+            </view>
+            <view class="burst burst-2">
+              <image class="burst-svg" src="/images/badges/arc-pink.svg" mode="aspectFit"></image>
+            </view>
+            <view class="burst burst-3">
+              <image class="burst-svg" src="/images/badges/arc-orange.svg" mode="aspectFit"></image>
+            </view>
+            <view class="burst burst-4">
+              <image class="burst-svg" src="/images/badges/arc-green.svg" mode="aspectFit"></image>
+            </view>
+            <view class="burst burst-5">
+              <image class="burst-svg" src="/images/badges/arc-blue.svg" mode="aspectFit"></image>
+            </view>
+            <view class="burst burst-6">
+              <image class="burst-svg" src="/images/badges/arc-purple.svg" mode="aspectFit"></image>
+            </view>
+            <view class="burst burst-7">
+              <image class="burst-svg" src="/images/badges/arc-red.svg" mode="aspectFit"></image>
+            </view>
+            <view class="burst burst-8">
+              <image class="burst-svg" src="/images/badges/arc-cyan.svg" mode="aspectFit"></image>
+            </view>
+          </view>
+
+          <view class="stars-burst">
+            <view class="star-particle star-particle-1">⭐</view>
+            <view class="star-particle star-particle-2">⭐</view>
+            <view class="star-particle star-particle-3">⭐</view>
+            <view class="star-particle star-particle-4">⭐</view>
+          </view>
+        </view>
+
+        <image
+          class="badge-svg {{badgeEntranceClass}}"
+          src="{{flashCardImageUrl || '/images/badges/vip-card.svg'}}"
+          mode="aspectFit"
+          bind:load="onFlashcardImageLoad"
+          bind:error="onFlashcardImageError"
+        ></image>
+      </view>
+
+      <view class="badge-name">
+        <image class="olive-branch olive-branch-left" src="/images/badges/olive-branch.svg"></image>
+        <text class="name-text">{{flashCardName || 'VIP闪卡'}}</text>
+        <image class="olive-branch olive-branch-right" src="/images/badges/olive-branch.svg"></image>
+      </view>
+
+      <view class="badge-date">{{activationDate}} 激活</view>
+
+      <view class="action-button" bind:tap="goToMap">
+        <text class="button-text">开启 九眼楼 之旅</text>
+        <image class="button-icon" src="/images/icons/arrow-right.svg"></image>
+      </view>
+    </view>
+  </view>
+</block>
+
+<block wx:elif="{{shouldShowVideo}}">
+  <universal-navigation
+    title="AI伴游介绍"
+    backgroundColor="rgba(0, 0, 0, 0.8)"
+    showHomeButton="{{true}}"
+    showUserAvatar="{{false}}"
+    useCapsuleStyle="{{true}}"
+    theme="dark"
+    useDefaultBack="{{false}}"
+    bind:back="goToHome"
+    bind:home="goToHome"
+  />
+
+  <view class="video-container" style="padding-top: {{navigationBarTotalHeight}}px;">
+    <video
+      id="introVideo"
+      class="intro-video"
+      src="{{currentVideo.url}}"
+      controls="{{true}}"
+      autoplay="{{false}}"
+      loop="{{false}}"
+      muted="{{false}}"
+      show-center-play-btn="{{true}}"
+      show-play-btn="{{true}}"
+      show-fullscreen-btn="{{true}}"
+      bind:play="onVideoPlay"
+      bind:pause="onVideoPause"
+      bind:ended="onVideoEnded"
+      bind:error="onVideoError"
+      bind:loadstart="onVideoLoadStart"
+    ></video>
+
+    <view class="video-info">
+      <view class="video-title">{{currentVideo.title}}</view>
+      <view class="video-description">{{currentVideo.description}}</view>
+
+      <view class="video-actions">
+        <view wx:if="{{!videoEnded}}" class="action-hint">
+          <text class="hint-text">观看视频了解AI伴游如何提升您的旅行体验</text>
+        </view>
+
+        <view class="action-buttons">
+          <button class="action-btn primary-btn" bind:tap="goToHome">
+            <text class="btn-text">开启AI伴游</text>
+            <image class="btn-icon" src="/images/icons/arrow-right.svg"></image>
+          </button>
+
+          <button wx:if="{{videoEnded}}" class="action-btn secondary-btn" bind:tap="replayVideo">
+            <text class="btn-text">重新播放</text>
+            <image class="btn-icon" src="/images/icons/replay.svg"></image>
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
+</block>
+
+<block wx:else>
+  <view class="redirect-page"></view>
+</block>

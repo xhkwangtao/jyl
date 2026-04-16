@@ -1,0 +1,22 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="vipGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EC4899;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="rgba(0,0,0,0.25)"/>
+    </filter>
+  </defs>
+
+  <rect x="10" y="20" width="100" height="80" rx="12" ry="12" fill="url(#vipGradient)" filter="url(#shadow)"/>
+  <rect x="12" y="22" width="96" height="76" rx="10" ry="10" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+
+  <text x="60" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">VIP</text>
+  <text x="60" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="rgba(255,255,255,0.9)">会员</text>
+
+  <polygon points="25,35 27,40 32,40 28,43 30,48 25,45 20,48 22,43 18,40 23,40" fill="rgba(255,255,255,0.6)"/>
+  <polygon points="95,35 97,40 102,40 98,43 100,48 95,45 90,48 92,43 88,40 93,40" fill="rgba(255,255,255,0.6)"/>
+  <polygon points="60,25 65,30 60,35 55,30" fill="rgba(255,255,255,0.4)"/>
+</svg>
