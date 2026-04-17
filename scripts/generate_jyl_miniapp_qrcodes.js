@@ -5,7 +5,10 @@ const fs = require('fs')
 const path = require('path')
 const https = require('https')
 
-const { POI_SOURCE_CODE_ITEMS } = require('../miniprogram/utils/poi-source-code.js')
+const {
+  POI_SOURCE_CODE_ITEMS,
+  resolvePoiSourceCodeItem
+} = require('../miniprogram/utils/poi-source-code.js')
 
 const PROJECT_ROOT = path.resolve(__dirname, '..')
 const PROJECT_CONFIG_PATH = path.join(PROJECT_ROOT, 'miniprogram', 'project.config.json')
@@ -75,6 +78,7 @@ function parseArgs(argv) {
     width: DEFAULT_WIDTH,
     envVersion: DEFAULT_ENV_VERSION,
     only: [],
+    markdownListPath: '',
     overwrite: false,
     dryRun: false
   }
@@ -125,6 +129,12 @@ function parseArgs(argv) {
       continue
     }
 
+    if (arg === '--markdown-list') {
+      options.markdownListPath = path.resolve(argv[index + 1] || '')
+      index += 1
+      continue
+    }
+
     if (arg === '--overwrite') {
       options.overwrite = true
       continue
@@ -159,6 +169,7 @@ function printHelpAndExit(exitCode) {
   --env-version      release | trial | develop，默认 ${DEFAULT_ENV_VERSION}
   --width            二维码宽度，默认 ${DEFAULT_WIDTH}
   --only             仅生成指定 scene 码，逗号分隔，例如 jqdm,jyl,mtz
+  --markdown-list    从 Markdown 清单解析生成记录，例如 docs/poi-qrcode-final-delivery-list.md
   --overwrite        已存在同名文件时覆盖重生成
   --dry-run          仅输出清单，不调用微信接口
   --help, -h         显示帮助
@@ -195,7 +206,171 @@ function ensureSceneLength(scenePayload) {
   }
 }
 
-function buildPoiRecords(options) {
+function normalizeBacktickedValue(value = '') {
+  return String(value || '').trim().replace(/^`|`$/g, '')
+}
+
+function splitMarkdownRow(line) {
+  return String(line || '')
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim())
+}
+
+function isMarkdownSeparatorRow(cells) {
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+}
+
+function parseLandingPath(landingPath) {
+  const normalized = String(landingPath || '').trim()
+
+  if (!normalized) {
+    throw new Error('landing 路径为空。')
+  }
+
+  const [pagePath, queryString = ''] = normalized.split('?')
+  const params = new URLSearchParams(queryString)
+  const sceneCode = String(params.get('scene') || '').trim()
+  const source = String(params.get('s') || '').trim()
+  const scenePayload = queryString || buildScenePayload(source || DEFAULT_SOURCE, sceneCode)
+
+  if (!pagePath) {
+    throw new Error(`landing 路径缺少 page: ${normalized}`)
+  }
+
+  if (!sceneCode) {
+    throw new Error(`landing 路径缺少 scene 参数: ${normalized}`)
+  }
+
+  return {
+    pagePath,
+    source: source || DEFAULT_SOURCE,
+    sceneCode,
+    scenePayload
+  }
+}
+
+function parseMarkdownListRecords(markdownListPath, options) {
+  if (!fs.existsSync(markdownListPath)) {
+    throw new Error(`Markdown 清单不存在: ${markdownListPath}`)
+  }
+
+  const lines = fs.readFileSync(markdownListPath, 'utf8').split(/\r?\n/)
+  const records = []
+  let sequence = 0
+
+  lines.forEach((line) => {
+    const trimmedLine = String(line || '').trim()
+
+    if (!trimmedLine.startsWith('|')) {
+      return
+    }
+
+    const cells = splitMarkdownRow(trimmedLine)
+
+    if (!cells.length || isMarkdownSeparatorRow(cells)) {
+      return
+    }
+
+    if (cells.length >= 4 && /^(\d+|P\d+|G\d+|A\d+|B\d+)$/i.test(cells[0])) {
+      const listLabel = cells[0]
+      const name = cells[1]
+      const explicitSceneCode = normalizeBacktickedValue(cells[2])
+      const landingPath = normalizeBacktickedValue(cells[3])
+      const parsedLanding = parseLandingPath(landingPath)
+
+      if (explicitSceneCode && explicitSceneCode !== parsedLanding.sceneCode) {
+        throw new Error(
+          `Markdown 清单 scene 不一致: ${name} -> ${explicitSceneCode} !== ${parsedLanding.sceneCode}`
+        )
+      }
+
+      sequence += 1
+      records.push({
+        order: sequence,
+        listLabel,
+        name,
+        sceneCode: explicitSceneCode || parsedLanding.sceneCode,
+        source: parsedLanding.source || options.source,
+        scenePayload: parsedLanding.scenePayload,
+        landingPath,
+        pagePath: parsedLanding.pagePath,
+        recordType: 'markdown-table'
+      })
+      return
+    }
+
+    if (cells.length >= 2 && !/^名称$/i.test(cells[0])) {
+      const name = cells[0]
+      const landingPath = normalizeBacktickedValue(cells[1])
+
+      if (!landingPath.includes('scene=')) {
+        return
+      }
+
+      const parsedLanding = parseLandingPath(landingPath)
+
+      sequence += 1
+      records.push({
+        order: sequence,
+        listLabel: String(sequence),
+        name,
+        sceneCode: parsedLanding.sceneCode,
+        source: parsedLanding.source || options.source,
+        scenePayload: parsedLanding.scenePayload,
+        landingPath,
+        pagePath: parsedLanding.pagePath,
+        recordType: 'markdown-legacy'
+      })
+    }
+  })
+
+  const filteredRecords = options.only.length
+    ? records.filter((record) => options.only.includes(record.sceneCode))
+    : records
+
+  const sceneCodeSet = new Set()
+  filteredRecords.forEach((record) => {
+    ensureSceneLength(record.scenePayload)
+
+    if (sceneCodeSet.has(record.sceneCode)) {
+      throw new Error(`Markdown 清单中存在重复 scene: ${record.sceneCode}`)
+    }
+
+    sceneCodeSet.add(record.sceneCode)
+  })
+
+  const padLength = Math.max(2, String(filteredRecords.length).length)
+
+  return filteredRecords.map((record, index) => {
+    const poiItem = resolvePoiSourceCodeItem(record.sceneCode)
+    const isAvailableInMiniapp = Boolean(poiItem)
+    const fileIndex = String(index + 1).padStart(padLength, '0')
+    const fileBaseName = `${fileIndex}-${record.sceneCode}-${sanitizeFilename(record.name)}`
+
+    return {
+      markerId: poiItem ? poiItem.markerId : '',
+      pointId: poiItem ? poiItem.pointId : record.sceneCode,
+      name: record.name,
+      sceneCode: record.sceneCode,
+      source: record.source,
+      scenePayload: record.scenePayload,
+      landingPath: record.landingPath,
+      pagePath: record.pagePath,
+      listOrder: index + 1,
+      listLabel: record.listLabel,
+      recordType: record.recordType,
+      isAvailableInMiniapp,
+      miniappStatus: isAvailableInMiniapp ? '已在小程序中可用' : '尚未投入',
+      fileBaseName,
+      pngFileName: `${fileBaseName}.png`
+    }
+  })
+}
+
+function buildDefaultPoiRecords(options) {
   const sortedItems = [...POI_SOURCE_CODE_ITEMS].sort((left, right) => {
     return Number(left.markerId) - Number(right.markerId)
   })
@@ -221,10 +396,24 @@ function buildPoiRecords(options) {
       source: options.source,
       scenePayload,
       landingPath: `${options.page}?s=${options.source}&scene=${sceneCode}`,
+      pagePath: options.page,
+      listOrder: Number(item.markerId),
+      listLabel: String(item.markerId),
+      recordType: 'poi-config',
+      isAvailableInMiniapp: true,
+      miniappStatus: '已在小程序中可用',
       fileBaseName,
       pngFileName
     }
   })
+}
+
+function buildPoiRecords(options) {
+  if (options.markdownListPath) {
+    return parseMarkdownListRecords(options.markdownListPath, options)
+  }
+
+  return buildDefaultPoiRecords(options)
 }
 
 function requestJson(url, options = {}, body = null) {
@@ -355,6 +544,55 @@ function ensureOutputDir(outputDir) {
   fs.mkdirSync(outputDir, { recursive: true })
 }
 
+function buildTimestampString() {
+  const now = new Date()
+  const parts = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')
+  ]
+  const timeParts = [
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0')
+  ]
+
+  return `${parts.join('-')} ${timeParts.join(':')}`
+}
+
+function writeMarkdownManifest(outputDir, records) {
+  const markdownPath = path.join(outputDir, 'manifest.md')
+  const availableCount = records.filter((record) => record.isAvailableInMiniapp).length
+  const pendingCount = records.length - availableCount
+  const lines = [
+    '# 九眼楼小程序二维码生成清单',
+    '',
+    `生成时间：${buildTimestampString()}`,
+    '',
+    '统计：',
+    '',
+    `- 总计：\`${records.length}\` 条`,
+    `- 已在小程序中可用：\`${availableCount}\` 条`,
+    `- 尚未投入：\`${pendingCount}\` 条`,
+    '',
+    '| 序号 | 名称 | `scene` | landing 路径 | 小程序当前状态 | 输出文件 |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...records.map((record, index) => {
+      return [
+        String(index + 1).padStart(2, '0'),
+        record.name,
+        `\`${record.sceneCode}\``,
+        `\`${record.landingPath}\``,
+        record.miniappStatus,
+        `\`${record.pngFileName}\``
+      ].join(' | ').replace(/^/, '| ').concat(' |')
+    }),
+    ''
+  ]
+
+  fs.writeFileSync(markdownPath, lines.join('\n'))
+}
+
 function writeManifest(outputDir, records) {
   const manifestPath = path.join(outputDir, 'manifest.json')
   const csvPath = path.join(outputDir, 'manifest.csv')
@@ -365,10 +603,15 @@ function writeManifest(outputDir, records) {
     'markerId',
     'pointId',
     'name',
+    'listOrder',
+    'listLabel',
+    'recordType',
     'source',
     'sceneCode',
     'scenePayload',
+    'pagePath',
     'landingPath',
+    'miniappStatus',
     'pngFileName'
   ]
 
@@ -379,23 +622,29 @@ function writeManifest(outputDir, records) {
         record.markerId,
         record.pointId,
         record.name,
+        record.listOrder,
+        record.listLabel,
+        record.recordType,
         record.source,
         record.sceneCode,
         record.scenePayload,
+        record.pagePath,
         record.landingPath,
+        record.miniappStatus,
         record.pngFileName
       ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')
     })
   ]
 
   fs.writeFileSync(csvPath, `${csvLines.join('\n')}\n`)
+  writeMarkdownManifest(outputDir, records)
 }
 
 async function generateQrcode(accessToken, record, options) {
   const requestUrl = `https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(accessToken)}`
   const payload = {
     scene: record.scenePayload,
-    page: options.page,
+    page: record.pagePath || options.page,
     env_version: options.envVersion,
     width: options.width,
     check_path: false
@@ -420,6 +669,9 @@ async function main() {
   console.log(`🔖 固定来源码: ${options.source}`)
   console.log(`🖼️ 二维码宽度: ${options.width}`)
   console.log(`📝 待生成数量: ${records.length}`)
+  if (options.markdownListPath) {
+    console.log(`🗂️ Markdown 清单: ${options.markdownListPath}`)
+  }
 
   if (options.dryRun) {
     console.log('🧪 dry-run 模式，不调用微信接口。')
