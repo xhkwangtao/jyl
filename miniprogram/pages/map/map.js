@@ -5,13 +5,16 @@ const {
   JYL_ROUTE_POLYLINES
 } = require('../../config/jyl-map-data.js')
 const {
+  JYL_SECRET_POINTS
+} = require('../../config/jyl-secret-data.js')
+const {
   AUDIO_FEATURE_KEY,
-  AUDIO_FREE_TRIAL_LIMIT,
-  consumeAudioAccess,
-  getAudioAccessStatus,
-  resetAudioTrialState,
+  isFeaturePaid,
   setFeaturePaid
 } = require('../../utils/audio-access.js')
+const {
+  isPointChecked
+} = require('../../utils/checkin')
 const {
   resolvePoiSourceCodeToMarkerId
 } = require('../../utils/poi-source-code.js')
@@ -44,8 +47,27 @@ const NAVIGATION_RECALCULATE_COOLDOWN_MS = 28000
 const NAVIGATION_GUIDE_NEAR_ROUTE_MAX_METERS = 28
 const NAVIGATION_STEP_PREVIEW_COUNT = 2
 const ARRIVED_AUDIO_POI_LIMIT = 6
+const AUTO_AUDIO_TRACK_INTERVAL_MS = 10000
+const AUTO_AUDIO_ACCURACY_THRESHOLD_METERS = 60
+const AUTO_AUDIO_DEFAULT_TRIGGER_RADIUS_METERS = 36
+const AUTO_AUDIO_SAME_POI_COOLDOWN_MS = 120000
+const AUTO_AUDIO_CROSS_POI_COOLDOWN_MS = 8000
 const AUDIO_PAYWALL_PRICE = 7.8
 const AUDIO_PAYWALL_THROTTLE_MS = 1200
+const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
+const AI_CHAT_PAYMENT_FEATURE_KEY = 'ai.chat.send-message'
+const AI_CHAT_SUBSCRIBE_DESCRIPTION = '开通VIP后即可使用AI聊天与智能路线问答服务'
+const MAP_ROUTE_PLANNING_FEATURE_KEY = 'map.route.planning'
+const MAP_POI_PRIMARY_ACTION_FEATURE_KEY = 'map.poi.primary-action'
+const SECRET_POINT_BY_MAP_POINT_ID = JYL_SECRET_POINTS.reduce((accumulator, point) => {
+  const mapPointId = String(point?.mapPointId || '').trim()
+
+  if (mapPointId) {
+    accumulator[mapPointId] = point
+  }
+
+  return accumulator
+}, {})
 
 function navigateToPage(url) {
   wx.navigateTo({
@@ -1006,17 +1028,20 @@ function buildPoiPopupData(point, options = {}) {
     arrived = false,
     audioPlaying = false,
     navigationActive = false,
-    audioLocked = false
+    audioLocked = false,
+    secretMeta = null
   } = options
   const primaryMetric = buildPopupPrimaryMetric(point)
   const secondaryMetric = buildPopupSecondaryMetric(point)
   const typeLabel = getPointTypeLabel(point)
   const isScenicPoint = point.type === 'scenic'
-  let primaryActionType = isScenicPoint ? 'playaudio' : 'navigate'
-  let primaryActionText = isScenicPoint ? (audioLocked ? '解锁讲解' : '播放讲解') : '到这去'
+  const showAudioAction = isScenicPoint
+  const hasSecretAction = !!secretMeta
+  let primaryActionType = 'navigate'
+  let primaryActionText = '到这去'
   let showSecondaryAction = isScenicPoint
-  let secondaryActionType = 'navigate'
-  let secondaryActionText = '到这去'
+  let secondaryActionType = isScenicPoint ? 'playaudio' : 'noop'
+  let secondaryActionText = isScenicPoint ? (audioLocked ? '解锁讲解' : (audioPlaying ? '继续讲解' : '播放讲解')) : ''
 
   if (arrived) {
     if (navigationActive) {
@@ -1057,6 +1082,16 @@ function buildPoiPopupData(point, options = {}) {
     showSecondaryAction,
     secondaryActionType,
     secondaryActionText,
+    showAudioAction,
+    audioActionType: showAudioAction ? 'playaudio' : 'noop',
+    audioActionText: audioLocked ? '解锁讲解' : (audioPlaying ? '继续讲解' : '播放讲解'),
+    audioPlaying: !!audioPlaying,
+    showSecretAction: hasSecretAction,
+    secretActionType: hasSecretAction ? 'checkin' : 'noop',
+    secretActionText: hasSecretAction ? (secretMeta.collected ? '查看暗号' : '去收集暗号') : '',
+    secretCodeName: secretMeta?.secretCodeName || '',
+    secretThemeTag: secretMeta?.themeTag || '',
+    secretCollected: !!secretMeta?.collected,
     arrived
   }
 }
@@ -1662,6 +1697,53 @@ function buildRouteAIChatInfo(route, customMessage = '') {
   }
 }
 
+function buildRouteAIChatPageUrl(route, customMessage = '') {
+  if (!route) {
+    return ''
+  }
+
+  return `/pages/ai-chat/ai-chat?context=route_planning&hasRouteInfo=true&routeId=${encodeURIComponent(route.id)}`
+}
+
+function buildDefaultAIChatPageUrl(message = '') {
+  const encodedMessage = encodeURIComponent(message || '我想了解更多关于游览路线的详情。')
+  return `/pages/ai-chat/ai-chat?context=route_planning&message=${encodedMessage}`
+}
+
+function buildPoiNavigationPageUrl(point) {
+  if (!point) {
+    return '/pages/map/map'
+  }
+
+  const pointId = point.id || point.markerId || ''
+  return `/pages/map/map?poiId=${encodeURIComponent(pointId)}&action=navigate`
+}
+
+function buildAudioPlaybackPageUrl(point) {
+  if (!point) {
+    return '/pages/map/map'
+  }
+
+  const pointId = point.id || point.markerId || ''
+  return `/pages/map/map?poiId=${encodeURIComponent(pointId)}&action=playaudio`
+}
+
+function buildCheckInPageUrl(point, secretMeta = null) {
+  const query = []
+  const mapPointId = String(point?.id || point?.markerId || '').trim()
+  const secretId = String(secretMeta?.id || '').trim()
+
+  if (mapPointId) {
+    query.push(`mapPointId=${encodeURIComponent(mapPointId)}`)
+  }
+
+  if (secretId) {
+    query.push(`secretId=${encodeURIComponent(secretId)}`)
+  }
+
+  return `/pages/check-in/check-in${query.length ? `?${query.join('&')}` : ''}`
+}
+
 function collectRouteViewportPoints(route) {
   if (!route) {
     return []
@@ -1724,6 +1806,9 @@ function buildViewportIncludePoints(points) {
 
 const ALL_ROUTE_DISPLAY_POINTS = JYL_ROUTE_MARKER_POINTS.map(createDisplayPoint)
 const ALL_AUDIO_POI_POINTS = JYL_MARKER_POINTS.map(buildAudioPoi)
+const AUTO_AUDIO_POI_POINTS = JYL_MARKER_POINTS
+  .filter((point) => point.type === 'scenic')
+  .map((point) => buildAudioPoi(point))
 const ALL_ROUTE_POLYLINE_POINTS = JYL_ROUTE_POLYLINES.flatMap((polyline) => polyline.points)
 const PRIMARY_ROUTE_POLYLINES = buildEntranceToMainPolylines(JYL_ROUTE_POLYLINES, DEFAULT_ENTRY_POINT)
 const FULL_ROUTE_PLAN_POINTS = uniquePoints([DEFAULT_ENTRY_POINT, ...JYL_MARKER_POINTS])
@@ -1918,7 +2003,7 @@ Page({
     longitude: DEFAULT_ENTRY_CENTER.longitude,
     latitude: DEFAULT_ENTRY_CENTER.latitude,
     scale: DEFAULT_ENTRY_SCALE,
-    showLocation: false,
+    showLocation: true,
     enablePOI: ENABLE_POI,
     allowedZooms: ALLOWED_ZOOMS,
     mapBoundaryLimit: null,
@@ -1941,9 +2026,7 @@ Page({
     audioTotalTime: 180,
     audioMuted: false,
     audioAccessPaid: false,
-    audioFreeTrialLimit: AUDIO_FREE_TRIAL_LIMIT,
-    audioTrialUsedCount: 0,
-    audioRemainingFreeCount: AUDIO_FREE_TRIAL_LIMIT,
+    autoAudioEnabled: true,
     navigationActive: false,
     navigationInfo: null,
     navigationDestination: null,
@@ -1962,6 +2045,14 @@ Page({
   },
 
   onLoad(options = {}) {
+    this.locationPermissionPromptShown = false
+    this.locationPermissionPrompting = false
+    this.keepScreenOnReasons = new Set()
+    this.keepScreenOnEnabled = false
+    this.autoAudioState = {
+      lastAutoPoiId: '',
+      lastTriggerTime: 0
+    }
     const systemInfo = wx.getSystemInfoSync()
     const menuButton = typeof wx.getMenuButtonBoundingClientRect === 'function'
       ? wx.getMenuButtonBoundingClientRect()
@@ -2011,6 +2102,10 @@ Page({
     this.checkLocationPermission()
     this.checkPendingNavigationRequest()
 
+    if (this.data.audioPlaying) {
+      this.requestKeepScreenOn('audio')
+    }
+
     if (this.data.navigationActive) {
       this.startNavigationTracking({
         immediate: true
@@ -2020,22 +2115,21 @@ Page({
 
   onHide() {
     this.stopNavigationTracking()
+    this.stopAutoAudioTracking()
+    this.locationPermissionPromptShown = false
+    this.locationPermissionPrompting = false
+    this.disableKeepScreenOn()
   },
 
   refreshAudioAccessState() {
-    const accessStatus = getAudioAccessStatus()
-
     this.setData({
-      audioAccessPaid: !!accessStatus.paid,
-      audioFreeTrialLimit: accessStatus.freeLimit,
-      audioTrialUsedCount: accessStatus.usedCount,
-      audioRemainingFreeCount: accessStatus.remainingFreeCount
+      audioAccessPaid: this.hasVipAccess()
     }, () => {
       this.syncCurrentPopupDataWithAudioAccess()
     })
   },
 
-  syncCurrentPopupDataWithAudioAccess() {
+  syncCurrentPopupDataWithAudioAccess(options = {}) {
     const popupData = this.data.currentPopupData
     if (!popupData) {
       return
@@ -2046,28 +2140,50 @@ Page({
       return
     }
 
+    const {
+      audioPlaying = !!this.data.audioPlaying,
+      navigationActive = !!this.data.navigationActive
+    } = options
+
     this.setData({
       currentPopupData: this.buildPointPopupData(point, {
         arrived: !!popupData.arrived,
-        audioPlaying: !!this.data.audioPlaying,
-        navigationActive: !!this.data.navigationActive
+        audioPlaying,
+        navigationActive
       })
     })
   },
 
+  resolveSecretMetaForPoint(point) {
+    if (!point) {
+      return null
+    }
+
+    const linkedSecretPoint = SECRET_POINT_BY_MAP_POINT_ID[String(point.id || point.markerId || '').trim()]
+    if (!linkedSecretPoint) {
+      return null
+    }
+
+    return {
+      ...linkedSecretPoint,
+      collected: isPointChecked(linkedSecretPoint.id)
+    }
+  },
+
   buildPointPopupData(point, options = {}) {
-    const accessStatus = getAudioAccessStatus(point?.id || point?.markerId || point?.name)
     return buildPoiPopupData(point, {
       ...options,
-      audioLocked: point?.type === 'scenic' && accessStatus.requiresPayment
+      audioLocked: point?.type === 'scenic' && !this.hasVipAccess(),
+      secretMeta: this.resolveSecretMetaForPoint(point)
     })
   },
 
   buildAudioPaywallUrl(point) {
     const pointName = point?.name || point?.displayName || '当前景点'
-    const description = `前三个景点讲解可免费试听，开通后可继续收听${pointName}等全部讲解内容`
+    const description = '解锁景点语音讲解需要VIP权限'
+    const successRedirect = buildAudioPlaybackPageUrl(point)
 
-    return `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(AUDIO_FEATURE_KEY)}&featureName=${encodeURIComponent('景点语音讲解')}&productName=${encodeURIComponent('景点语音讲解')}&description=${encodeURIComponent(description)}&amount=${AUDIO_PAYWALL_PRICE}&originalPrice=69`
+    return `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(AUDIO_FEATURE_KEY)}&featureName=${encodeURIComponent('景点语音讲解')}&productName=${encodeURIComponent('景点语音讲解')}&description=${encodeURIComponent(description)}&amount=${AUDIO_PAYWALL_PRICE}&originalPrice=69&successRedirect=${encodeURIComponent(successRedirect)}`
   },
 
   openAudioPaywall(point, options = {}) {
@@ -2080,7 +2196,7 @@ Page({
 
     if (options.showToast !== false) {
       wx.showToast({
-        title: '免费讲解已用完',
+        title: '请先开通讲解权限',
         icon: 'none',
         duration: 1600
       })
@@ -2096,27 +2212,19 @@ Page({
       source = 'manual',
       openPaywallOnBlocked = source !== 'auto'
     } = options
-    const accessResult = consumeAudioAccess(point?.id || point?.markerId || point?.name)
 
     this.refreshAudioAccessState()
 
-    if (accessResult.granted) {
-      if (accessResult.consumedFreeSlot && !accessResult.paid && source !== 'auto') {
-        wx.showToast({
-          title: `免费讲解 ${accessResult.usedCount}/${accessResult.freeLimit}`,
-          icon: 'none',
-          duration: 1400
-        })
-      }
+    if (this.hasVipAccess()) {
       return true
     }
 
-    const blockedHint = '免费讲解已用完，开通后可继续收听全部讲解'
+    const blockedHint = '开通VIP后可继续收听全部讲解'
     if (this.data.navigationActive) {
       this.setNavigationAudioHint(blockedHint)
     }
 
-    if (source === 'auto') {
+    if (source === 'auto' && openPaywallOnBlocked) {
       wx.showToast({
         title: blockedHint,
         icon: 'none',
@@ -2135,6 +2243,64 @@ Page({
 
   onUnload() {
     this.stopNavigationTracking()
+    this.stopAutoAudioTracking()
+    this.locationPermissionPromptShown = false
+    this.locationPermissionPrompting = false
+    this.resetScreenOnState()
+  },
+
+  applyKeepScreenOnState() {
+    const nextEnabled = !!(this.keepScreenOnReasons && this.keepScreenOnReasons.size)
+
+    if (nextEnabled === this.keepScreenOnEnabled) {
+      return
+    }
+
+    this.keepScreenOnEnabled = nextEnabled
+    wx.setKeepScreenOn({
+      keepScreenOn: nextEnabled,
+      fail: () => {
+        this.keepScreenOnEnabled = false
+      }
+    })
+  },
+
+  requestKeepScreenOn(reason = 'default') {
+    if (!this.keepScreenOnReasons) {
+      this.keepScreenOnReasons = new Set()
+    }
+
+    this.keepScreenOnReasons.add(String(reason || 'default'))
+    this.applyKeepScreenOnState()
+  },
+
+  releaseKeepScreenOn(reason = 'default') {
+    if (!this.keepScreenOnReasons) {
+      return
+    }
+
+    this.keepScreenOnReasons.delete(String(reason || 'default'))
+    this.applyKeepScreenOnState()
+  },
+
+  disableKeepScreenOn() {
+    if (!this.keepScreenOnEnabled) {
+      return
+    }
+
+    this.keepScreenOnEnabled = false
+    wx.setKeepScreenOn({
+      keepScreenOn: false,
+      fail: () => {}
+    })
+  },
+
+  resetScreenOnState() {
+    if (this.keepScreenOnReasons) {
+      this.keepScreenOnReasons.clear()
+    }
+
+    this.disableKeepScreenOn()
   },
 
   onMapReady(event) {
@@ -2474,22 +2640,9 @@ Page({
       return
     }
 
-    const point = getDisplayPointById(popupData.id || popupData.markerId) || this.getNavigationTargetPoint()
-    if (!point) {
-      return
-    }
-
-    const {
-      audioPlaying = this.data.audioPlaying,
-      navigationActive = this.data.navigationActive
-    } = options
-
-    this.setData({
-      currentPopupData: this.buildPointPopupData(point, {
-        arrived: true,
-        audioPlaying,
-        navigationActive
-      })
+    this.syncCurrentPopupDataWithAudioAccess({
+      audioPlaying: options.audioPlaying,
+      navigationActive: options.navigationActive
     })
   },
 
@@ -2568,6 +2721,9 @@ Page({
       navigationAutoAudioHint: '',
       preNavigationState: null
     }, () => {
+      this.ensureAutoAudioTrackingState({
+        immediate: true
+      })
       this.focusPointInViewport(point)
       if (showToast) {
         wx.showToast({
@@ -2709,6 +2865,164 @@ Page({
       clearInterval(this.navigationTrackingTimer)
       this.navigationTrackingTimer = null
     }
+  },
+
+  shouldKeepAutoAudioTrackingRunning() {
+    return !!this.data.showLocation
+      && !this.data.navigationActive
+      && this.data.autoAudioEnabled !== false
+  },
+
+  ensureAutoAudioTrackingState(options = {}) {
+    if (this.shouldKeepAutoAudioTrackingRunning()) {
+      this.startAutoAudioTracking(options)
+      return
+    }
+
+    this.stopAutoAudioTracking()
+  },
+
+  stopAutoAudioTracking() {
+    if (this.autoAudioTrackingTimer) {
+      clearInterval(this.autoAudioTrackingTimer)
+      this.autoAudioTrackingTimer = null
+    }
+  },
+
+  startAutoAudioTracking(options = {}) {
+    const {
+      immediate = false
+    } = options
+
+    if (!this.shouldKeepAutoAudioTrackingRunning()) {
+      this.stopAutoAudioTracking()
+      return
+    }
+
+    const isRunning = !!this.autoAudioTrackingTimer
+    if (!isRunning) {
+      this.autoAudioTrackingTimer = setInterval(() => {
+        this.refreshAutoAudioTracking()
+      }, AUTO_AUDIO_TRACK_INTERVAL_MS)
+    }
+
+    if (immediate || !isRunning) {
+      this.refreshAutoAudioTracking()
+    }
+  },
+
+  refreshAutoAudioTracking() {
+    if (!this.shouldKeepAutoAudioTrackingRunning()) {
+      return
+    }
+
+    this.fetchCurrentLocation()
+      .then((userLocation) => {
+        this.handleAutoAudioLocationUpdate(userLocation)
+      })
+      .catch(() => {})
+  },
+
+  handleAutoAudioLocationUpdate(userLocation) {
+    if (!this.shouldKeepAutoAudioTrackingRunning() || !userLocation) {
+      return
+    }
+
+    this.setData({
+      userLocation
+    })
+
+    this.handleAutoAudioPlayback(userLocation)
+  },
+
+  findNearestAutoAudioPoi(userLocation) {
+    if (!userLocation || !AUTO_AUDIO_POI_POINTS.length) {
+      return null
+    }
+
+    let candidate = null
+    let minDistance = Number.POSITIVE_INFINITY
+
+    AUTO_AUDIO_POI_POINTS.forEach((point) => {
+      const distance = haversineMeters(userLocation, point)
+      const triggerRadius = Math.max(16, Number(point.triggerRadiusM) || AUTO_AUDIO_DEFAULT_TRIGGER_RADIUS_METERS)
+
+      if (distance <= triggerRadius && distance < minDistance) {
+        minDistance = distance
+        candidate = {
+          ...point,
+          triggerRadius
+        }
+      }
+    })
+
+    return candidate
+  },
+
+  handleAutoAudioPlayback(userLocation) {
+    if (!this.shouldKeepAutoAudioTrackingRunning() || !userLocation) {
+      return
+    }
+
+    if (!this.isLocationInScenicArea(userLocation)) {
+      return
+    }
+
+    if (typeof userLocation.accuracy === 'number' && userLocation.accuracy > AUTO_AUDIO_ACCURACY_THRESHOLD_METERS) {
+      return
+    }
+
+    const nearestPoi = this.findNearestAutoAudioPoi(userLocation)
+    if (!nearestPoi) {
+      return
+    }
+
+    const poiId = String(nearestPoi.id || nearestPoi.markerId || nearestPoi.name || '')
+    const currentPoiId = String(this.data.currentAudioPoi?.id || this.data.currentAudioPoi?.markerId || this.data.currentAudioPoi?.name || '')
+
+    if (this.data.audioPlaying) {
+      if (poiId && currentPoiId && poiId === currentPoiId) {
+        return
+      }
+
+      return
+    }
+
+    const now = Date.now()
+    const lastAutoPoiId = String(this.autoAudioState?.lastAutoPoiId || '')
+    const lastTriggerTime = Number(this.autoAudioState?.lastTriggerTime || 0)
+
+    if (poiId && lastAutoPoiId === poiId && now - lastTriggerTime < AUTO_AUDIO_SAME_POI_COOLDOWN_MS) {
+      return
+    }
+
+    if (lastAutoPoiId && lastAutoPoiId !== poiId && now - lastTriggerTime < AUTO_AUDIO_CROSS_POI_COOLDOWN_MS) {
+      return
+    }
+
+    const currentPopupPointId = String(this.data.currentPopupData?.id || this.data.currentPopupData?.markerId || '')
+    const keepPopupVisible = !!this.data.showPoiPopup && currentPopupPointId === poiId
+    const nextPopupData = keepPopupVisible
+      ? this.buildPointPopupData(nearestPoi, {
+        arrived: !!this.data.currentPopupData?.arrived,
+        audioPlaying: true,
+        navigationActive: false
+      })
+      : null
+
+    this.autoAudioState = {
+      lastAutoPoiId: poiId,
+      lastTriggerTime: now
+    }
+
+    this.startPointAudioPlayback(nearestPoi, {
+      keepPopupVisible,
+      nextPopupData,
+      fallbackPoiName: nearestPoi.name || '景点讲解',
+      forcePlay: true,
+      accessSource: 'auto',
+      openPaywallOnBlocked: false
+    })
   },
 
   startNavigationTracking(options = {}) {
@@ -2921,23 +3235,45 @@ Page({
     })
   },
 
-  onPrimaryPoiAction() {
-    const popupData = this.data.currentPopupData
-    if (!popupData) {
+  onPoiPopupButtonAction(event) {
+    const actionType = event?.detail?.action || ''
+    const popupData = event?.detail?.popupData || this.data.currentPopupData
+
+    this.handlePoiPopupAction(actionType, popupData)
+  },
+
+  handlePoiPopupAction(actionType, popupData = this.data.currentPopupData) {
+    if (!popupData || !actionType || actionType === 'noop') {
       return
     }
 
-    if (popupData.primaryActionType === 'noop') {
-      return
-    }
-
-    if (popupData.primaryActionType === 'navigate') {
+    if (actionType === 'navigate') {
       this.onNavigatePoi()
       return
     }
 
-    if (popupData.primaryActionType === 'completeNavigation') {
+    if (actionType === 'completeNavigation') {
       this.completeNavigationAtDestination()
+      return
+    }
+
+    if (actionType === 'checkin') {
+      this.onCheckinPoi(popupData)
+      return
+    }
+
+    this.handlePopupAudioAction(popupData)
+  },
+
+  onPrimaryPoiAction() {
+    const popupData = this.data.currentPopupData
+    const actionType = popupData?.primaryActionType || ''
+
+    this.handlePoiPopupAction(actionType, popupData)
+  },
+
+  handlePopupAudioAction(popupData = this.data.currentPopupData) {
+    if (!popupData) {
       return
     }
 
@@ -2946,16 +3282,52 @@ Page({
       return
     }
 
+    const currentAudioPoiId = String(this.data.currentAudioPoi?.id || this.data.currentAudioPoi?.markerId || '')
+    const targetPointId = String(point.id || point.markerId || '')
+    const isSamePoi = !!currentAudioPoiId && currentAudioPoiId === targetPointId
+    const nextAudioPlaying = isSamePoi ? !this.data.audioPlaying : true
+    const keepPopupVisible = !!popupData.arrived || !!popupData.showAudioAction
+    const nextPopupData = keepPopupVisible
+      ? this.buildPointPopupData(point, {
+        arrived: !!popupData.arrived,
+        audioPlaying: nextAudioPlaying,
+        navigationActive: !!this.data.navigationActive
+      })
+      : null
+
+    this.startPointAudioPlayback(point, {
+      keepPopupVisible,
+      nextPopupData,
+      fallbackPoiName: popupData.poiName || popupData.title || '景点讲解',
+      useTogglePlay: true
+    })
+  },
+
+  startPointAudioPlayback(point, options = {}) {
+    if (!point) {
+      return false
+    }
+
+    const {
+      keepPopupVisible = false,
+      nextPopupData = null,
+      fallbackPoiName = point.name || '景点讲解',
+      useTogglePlay = false,
+      forcePlay = false,
+      accessSource = 'manual',
+      openPaywallOnBlocked = accessSource !== 'auto'
+    } = options
     const nextAudioPoi = buildAudioPoi(point)
-    const currentAudioPoiId = this.data.currentAudioPoi?.id || this.data.currentAudioPoi?.markerId
-    const nextAudioPoiId = nextAudioPoi?.id || nextAudioPoi?.markerId
-    const isSamePoi = String(currentAudioPoiId) === String(nextAudioPoiId)
-    const keepPopupVisible = !!popupData.arrived
-    const nextPopupData = keepPopupVisible ? this.buildArrivedPopupData(point) : null
+    const currentAudioPoiId = String(this.data.currentAudioPoi?.id || this.data.currentAudioPoi?.markerId || '')
+    const nextAudioPoiId = String(nextAudioPoi?.id || nextAudioPoi?.markerId || '')
+    const isSamePoi = currentAudioPoiId && currentAudioPoiId === nextAudioPoiId
 
     if (isSamePoi) {
-      if (!this.data.audioPlaying && !this.requestAudioAccessForPoint(point)) {
-        return
+      if (!this.data.audioPlaying && !this.requestAudioAccessForPoint(point, {
+        source: accessSource,
+        openPaywallOnBlocked
+      })) {
+        return false
       }
 
       this.setData({
@@ -2964,18 +3336,33 @@ Page({
         currentPopupData: nextPopupData
       }, () => {
         const audioPlayer = this.selectComponent('#audioPlayerGuide')
-        if (!audioPlayer || typeof audioPlayer.togglePlay !== 'function') {
-          navigateToPage(`/pages/scenic-audio-list/scenic-audio-list?poiName=${encodeURIComponent(popupData.poiName || popupData.title || '景点讲解')}`)
+        if (!audioPlayer) {
+          navigateToPage(`/pages/scenic-audio-list/scenic-audio-list?poiName=${encodeURIComponent(fallbackPoiName)}`)
           return
         }
 
-        audioPlayer.togglePlay()
+        if (forcePlay && typeof audioPlayer.playAudio === 'function') {
+          audioPlayer.playAudio()
+          return
+        }
+
+        if (useTogglePlay && typeof audioPlayer.togglePlay === 'function') {
+          audioPlayer.togglePlay()
+          return
+        }
+
+        if (typeof audioPlayer.playAudio === 'function') {
+          audioPlayer.playAudio()
+        }
       })
-      return
+      return true
     }
 
-    if (!this.requestAudioAccessForPoint(point)) {
-      return
+    if (!this.requestAudioAccessForPoint(point, {
+      source: accessSource,
+      openPaywallOnBlocked
+    })) {
+      return false
     }
 
     this.setData({
@@ -2986,31 +3373,54 @@ Page({
       currentPopupData: nextPopupData
     }, () => {
       const audioPlayer = this.selectComponent('#audioPlayerGuide')
-      if (!audioPlayer || typeof audioPlayer.togglePlay !== 'function') {
-        navigateToPage(`/pages/scenic-audio-list/scenic-audio-list?poiName=${encodeURIComponent(popupData.poiName || popupData.title || '景点讲解')}`)
+      if (!audioPlayer) {
+        navigateToPage(`/pages/scenic-audio-list/scenic-audio-list?poiName=${encodeURIComponent(fallbackPoiName)}`)
         return
       }
 
-      audioPlayer.togglePlay()
+      if (forcePlay && typeof audioPlayer.playAudio === 'function') {
+        audioPlayer.playAudio()
+        return
+      }
+
+      if (useTogglePlay && typeof audioPlayer.togglePlay === 'function') {
+        audioPlayer.togglePlay()
+        return
+      }
+
+      if (typeof audioPlayer.playAudio === 'function') {
+        audioPlayer.playAudio()
+      }
     })
+
+    return true
   },
 
   onSecondaryPoiAction() {
     const popupData = this.data.currentPopupData
+    const actionType = popupData?.secondaryActionType || ''
+
+    this.handlePoiPopupAction(actionType, popupData)
+  },
+
+  onCheckinPoi(popupData = this.data.currentPopupData) {
     if (!popupData) {
       return
     }
 
-    if (popupData.secondaryActionType === 'noop') {
+    const point = getDisplayPointById(popupData.id || popupData.markerId)
+    const secretMeta = point ? this.resolveSecretMetaForPoint(point) : null
+
+    if (!point || !secretMeta) {
+      wx.showToast({
+        title: '该点位暂未接入暗号收集',
+        icon: 'none',
+        duration: 1600
+      })
       return
     }
 
-    if (popupData.secondaryActionType === 'completeNavigation') {
-      this.completeNavigationAtDestination()
-      return
-    }
-
-    this.onNavigatePoi()
+    navigateToPage(buildCheckInPageUrl(point, secretMeta))
   },
 
   onNavigatePoi() {
@@ -3026,6 +3436,15 @@ Page({
         icon: 'none',
         duration: 1600
       })
+      return
+    }
+
+    if (!this.requireMapVipAccess(MAP_POI_PRIMARY_ACTION_FEATURE_KEY, {
+      action: 'navigate',
+      poiId: point.id || point.markerId || '',
+      poiName: point.name || popupData.poiName || popupData.title || '',
+      successRedirect: buildPoiNavigationPageUrl(point)
+    })) {
       return
     }
 
@@ -3075,35 +3494,121 @@ Page({
     return getMinDistanceBetweenPoints(ALL_ROUTE_POLYLINE_POINTS, [location]) <= NAVIGATION_IN_SCENIC_MAX_METERS
   },
 
-  checkLocationPermission() {
-    wx.getSetting({
-      success: ({ authSetting = {} }) => {
-        const hasLocationPermission = !!authSetting['scope.userLocation']
-        if (hasLocationPermission === this.data.showLocation) {
-          if (hasLocationPermission && this.data.navigationActive && !this.navigationTrackingTimer) {
-            this.startNavigationTracking({
-              immediate: true
-            })
-          }
+  applyLocationPermissionState(hasLocationPermission) {
+    const nextShowLocation = !!hasLocationPermission
+
+    if (nextShowLocation === this.data.showLocation) {
+      if (nextShowLocation && this.data.navigationActive && !this.navigationTrackingTimer) {
+        this.startNavigationTracking({
+          immediate: true
+        })
+      }
+
+      this.ensureAutoAudioTrackingState({
+        immediate: nextShowLocation && !this.data.navigationActive
+      })
+      return
+    }
+
+    this.setData({
+      showLocation: nextShowLocation
+    }, () => {
+      if (this.data.navigationActive) {
+        if (nextShowLocation) {
+          this.startNavigationTracking({
+            immediate: true
+          })
+        } else {
+          this.stopNavigationTracking()
+          this.updateNavigationInfoState(null, {
+            recalculating: this.data.navigationRecalculating
+          })
+        }
+      }
+
+      this.ensureAutoAudioTrackingState({
+        immediate: nextShowLocation && !this.data.navigationActive
+      })
+    })
+  },
+
+  promptLocationPermission() {
+    if (this.locationPermissionPromptShown || this.locationPermissionPrompting) {
+      return
+    }
+
+    this.locationPermissionPromptShown = true
+    this.locationPermissionPrompting = true
+
+    wx.showModal({
+      title: '位置权限',
+      content: '地图导览需要获取您的位置信息，以在地图上显示当前位置并提供导航服务',
+      confirmText: '授权',
+      cancelText: '暂不开启',
+      success: (modalRes) => {
+        if (!modalRes.confirm) {
           return
         }
 
-        this.setData({
-          showLocation: hasLocationPermission
-        }, () => {
-          if (this.data.navigationActive) {
-            if (hasLocationPermission) {
-              this.startNavigationTracking({
-                immediate: true
-              })
-            } else {
-              this.stopNavigationTracking()
-              this.updateNavigationInfoState(null, {
-                recalculating: this.data.navigationRecalculating
-              })
-            }
+        wx.authorize({
+          scope: 'scope.userLocation',
+          success: () => {
+            this.applyLocationPermissionState(true)
+            wx.showToast({
+              title: '位置权限已开启',
+              icon: 'success',
+              duration: 1600
+            })
+          },
+          fail: () => {
+            wx.showModal({
+              title: '需要位置权限',
+              content: '为了更准确地展示您的当前位置并提供导航服务，请在设置中开启位置权限',
+              confirmText: '去设置',
+              cancelText: '暂不开启',
+              success: (settingRes) => {
+                if (!settingRes.confirm) {
+                  return
+                }
+
+                wx.openSetting({
+                  success: ({ authSetting = {} }) => {
+                    const hasLocationPermission = !!authSetting['scope.userLocation']
+                    this.applyLocationPermissionState(hasLocationPermission)
+
+                    if (hasLocationPermission) {
+                      wx.showToast({
+                        title: '位置权限已开启',
+                        icon: 'success',
+                        duration: 1600
+                      })
+                    }
+                  }
+                })
+              }
+            })
           }
         })
+      },
+      complete: () => {
+        this.locationPermissionPrompting = false
+      }
+    })
+  },
+
+  checkLocationPermission(options = {}) {
+    const {
+      promptOnDenied = true
+    } = options
+
+    wx.getSetting({
+      success: ({ authSetting = {} }) => {
+        const hasLocationPermission = !!authSetting['scope.userLocation']
+        this.applyLocationPermissionState(hasLocationPermission)
+
+        if (!hasLocationPermission && promptOnDenied) {
+          this.promptLocationPermission()
+        }
       }
     })
   },
@@ -3141,6 +3646,7 @@ Page({
     const shouldAutoNavigate = normalizeBooleanValue(request.autoNavigate)
       || normalizeBooleanValue(request.startNavigation)
       || request.action === 'navigate'
+    const shouldAutoPlayAudio = request.action === 'playaudio'
     const shouldShowPopup = request.showPopup === undefined
       ? true
       : normalizeBooleanValue(request.showPopup, true)
@@ -3196,6 +3702,21 @@ Page({
     }
 
     if (!point) {
+      return
+    }
+
+    if (shouldAutoPlayAudio) {
+      setTimeout(() => {
+        this.focusPointById(point.id, {
+          showPopup: false
+        })
+        this.startPointAudioPlayback(point, {
+          keepPopupVisible: false,
+          nextPopupData: null,
+          fallbackPoiName: request.poiName || request.pointName || request.destination || point.name || '景点讲解',
+          forcePlay: true
+        })
+      }, ENTRY_REQUEST_RETRY_DELAY)
       return
     }
 
@@ -3273,6 +3794,9 @@ Page({
       userLocation: null,
       preNavigationState: null
     }, () => {
+      this.ensureAutoAudioTrackingState({
+        immediate: true
+      })
       this.focusRouteInViewport(route, {
         padding: [140, 56, 320, 56]
       })
@@ -3385,6 +3909,7 @@ Page({
       showLocation: true,
       userLocation: seedLocation || this.data.userLocation || null
     }, () => {
+      this.ensureAutoAudioTrackingState()
       this.focusRouteInViewport(route, {
         padding: [150, 56, 360, 56]
       })
@@ -3525,6 +4050,10 @@ Page({
         currentPopupData: null,
         showIntelligentPlanner: false,
         userLocation: preNavigationState.userLocation || null
+      }, () => {
+        this.ensureAutoAudioTrackingState({
+          immediate: true
+        })
       })
     } else {
       this.setData({
@@ -3555,6 +4084,10 @@ Page({
         navigationAutoAudioHint: '',
         userLocation: null,
         preNavigationState: null
+      }, () => {
+        this.ensureAutoAudioTrackingState({
+          immediate: true
+        })
       })
     }
 
@@ -3576,11 +4109,12 @@ Page({
     this.setData({
       audioPlaying: true
     }, () => {
+      this.requestKeepScreenOn('audio')
       if (this.data.navigationActive) {
         const currentName = this.data.currentAudioPoi?.name || this.data.currentAudioPoi?.displayName
         this.setNavigationAudioHint(currentName ? `正在播放${currentName}讲解` : '讲解播放中')
       }
-      this.syncArrivedPopupData({
+      this.syncCurrentPopupDataWithAudioAccess({
         audioPlaying: true
       })
     })
@@ -3596,13 +4130,19 @@ Page({
       audioCurrentTime: typeof detail.currentTime === 'number' ? detail.currentTime : this.data.audioCurrentTime,
       audioTotalTime: typeof detail.totalTime === 'number' ? detail.totalTime : this.data.audioTotalTime
     }, () => {
+      if (detail.isPlaying) {
+        this.requestKeepScreenOn('audio')
+      } else {
+        this.releaseKeepScreenOn('audio')
+      }
+
       if (this.data.navigationActive) {
         const currentName = this.data.currentAudioPoi?.name || this.data.currentAudioPoi?.displayName
         this.setNavigationAudioHint(detail.isPlaying
           ? (currentName ? `正在播放${currentName}讲解` : '讲解播放中')
           : (this.navigationDestinationReached ? '讲解已暂停，可继续播放或完成导航' : '讲解已暂停，可稍后继续播放'))
       }
-      this.syncArrivedPopupData({
+      this.syncCurrentPopupDataWithAudioAccess({
         audioPlaying: !!detail.isPlaying
       })
     })
@@ -3612,10 +4152,11 @@ Page({
     this.setData({
       audioPlaying: false
     }, () => {
+      this.releaseKeepScreenOn('audio')
       if (this.data.navigationActive) {
         this.setNavigationAudioHint(this.navigationDestinationReached ? '讲解已暂停，可继续播放或完成导航' : '讲解已暂停，可稍后继续播放')
       }
-      this.syncArrivedPopupData({
+      this.syncCurrentPopupDataWithAudioAccess({
         audioPlaying: false
       })
     })
@@ -3627,10 +4168,11 @@ Page({
       audioProgress: 0,
       audioCurrentTime: 0
     }, () => {
+      this.releaseKeepScreenOn('audio')
       if (this.data.navigationActive) {
         this.setNavigationAudioHint(this.navigationDestinationReached ? '讲解已停止，可点击完成导航' : '讲解已停止，可继续跟随路线')
       }
-      this.syncArrivedPopupData({
+      this.syncCurrentPopupDataWithAudioAccess({
         audioPlaying: false
       })
     })
@@ -3642,10 +4184,11 @@ Page({
       audioProgress: 100,
       audioCurrentTime: this.data.audioTotalTime
     }, () => {
+      this.releaseKeepScreenOn('audio')
       if (this.data.navigationActive) {
         this.setNavigationAudioHint(this.navigationDestinationReached ? '讲解已结束，可点击完成导航' : '当前讲解已结束，可继续沿路线前进')
       }
-      this.syncArrivedPopupData({
+      this.syncCurrentPopupDataWithAudioAccess({
         audioPlaying: false
       })
     })
@@ -3736,6 +4279,7 @@ Page({
       navigationAudioMode: 'mini',
       audioMuted: false
     }, () => {
+      this.releaseKeepScreenOn('audio')
       if (this.data.navigationActive) {
         this.setNavigationAudioHint('讲解已关闭，可在景点卡或讲解列表重新打开')
       }
@@ -3762,10 +4306,11 @@ Page({
   onToggleAudioPaidForTesting() {
     const nextPaid = !this.data.audioAccessPaid
     setFeaturePaid(AUDIO_FEATURE_KEY, nextPaid)
+    setFeaturePaid(AI_CHAT_ACCESS_FEATURE_KEY, nextPaid)
     this.refreshAudioAccessState()
 
     if (this.data.navigationActive) {
-      this.setNavigationAudioHint(nextPaid ? '已切换为付费状态，全部讲解已解锁' : '已切换为未付费状态，将按免费次数限制讲解')
+      this.setNavigationAudioHint(nextPaid ? '已切换为付费状态，全部讲解已解锁' : '已切换为未付费状态，讲解将按VIP逻辑拦截')
     }
 
     wx.showToast({
@@ -3775,18 +4320,15 @@ Page({
     })
   },
 
-  onResetAudioTrialForTesting() {
-    resetAudioTrialState()
-    this.refreshAudioAccessState()
-
-    wx.showToast({
-      title: '已重置免费讲解次数',
-      icon: 'none',
-      duration: 1400
-    })
-  },
-
   onIntelligentRoutePlanning() {
+    if (!this.requireMapVipAccess(MAP_ROUTE_PLANNING_FEATURE_KEY, {
+      action: 'intelligent_route_planning',
+      poiName: '智能路线规划',
+      successRedirect: '/pages/map/map?showAIRoute=1'
+    })) {
+      return
+    }
+
     this.setData({
       showIntelligentPlanner: true,
       showAudioListDrawer: false,
@@ -3834,6 +4376,57 @@ Page({
     return this.selectedIntelligentRoute || null
   },
 
+  hasAIChatAccess() {
+    return isFeaturePaid(AI_CHAT_ACCESS_FEATURE_KEY)
+  },
+
+  hasVipAccess() {
+    return isFeaturePaid(AI_CHAT_ACCESS_FEATURE_KEY)
+  },
+
+  buildAIChatSubscribeUrl(targetUrl = '') {
+    return `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(AI_CHAT_PAYMENT_FEATURE_KEY)}&featureName=${encodeURIComponent('AI智能对话')}&productName=${encodeURIComponent('AI聊天权限')}&description=${encodeURIComponent(AI_CHAT_SUBSCRIBE_DESCRIPTION)}${targetUrl ? `&successRedirect=${encodeURIComponent(targetUrl)}` : ''}`
+  },
+
+  redirectToAIChatSubscribe(targetUrl = '') {
+    const subscribeUrl = this.buildAIChatSubscribeUrl(targetUrl)
+
+    navigateToPage(subscribeUrl)
+  },
+
+  buildMapVipPaymentUrl(featureKey, context = {}) {
+    const metaByFeatureKey = {
+      [MAP_ROUTE_PLANNING_FEATURE_KEY]: {
+        featureName: '智能路线规划',
+        productName: '智能路线规划权限',
+        description: '使用智能路线规划功能需要VIP权限'
+      },
+      [MAP_POI_PRIMARY_ACTION_FEATURE_KEY]: {
+        featureName: '景点导航',
+        productName: '地图互动权限',
+        description: '继续使用地图互动功能需要VIP权限'
+      }
+    }
+
+    const meta = metaByFeatureKey[featureKey] || {
+      featureName: 'VIP尊享功能',
+      productName: '地图互动权限',
+      description: '使用此功能需要VIP权限'
+    }
+    const successRedirect = String(context.successRedirect || '').trim()
+
+    return `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(featureKey)}&featureName=${encodeURIComponent(meta.featureName)}&productName=${encodeURIComponent(meta.productName)}&description=${encodeURIComponent(meta.description)}${successRedirect ? `&successRedirect=${encodeURIComponent(successRedirect)}` : ''}`
+  },
+
+  requireMapVipAccess(featureKey, context = {}) {
+    if (this.hasVipAccess()) {
+      return true
+    }
+
+    navigateToPage(this.buildMapVipPaymentUrl(featureKey, context))
+    return false
+  },
+
   onOpenAIChat(event) {
     const detail = event?.detail || {}
     const route = this.resolveAIChatRoute(detail)
@@ -3841,18 +4434,30 @@ Page({
     if (route) {
       const app = getApp()
       const routeInfo = buildRouteAIChatInfo(route, detail.message)
+      const targetUrl = buildRouteAIChatPageUrl(route, detail.message)
 
       if (routeInfo && app) {
         app.globalData = app.globalData || {}
         app.globalData.aiChatRouteInfo = routeInfo
       }
 
-      navigateToPage(`/pages/ai-chat/ai-chat?context=route_planning&hasRouteInfo=true&routeId=${encodeURIComponent(route.id)}`)
+      if (!this.hasAIChatAccess()) {
+        this.redirectToAIChatSubscribe(targetUrl)
+        return
+      }
+
+      navigateToPage(targetUrl)
       return
     }
 
-    const encodedMessage = encodeURIComponent(detail.message || '我想了解更多关于游览路线的详情。')
-    navigateToPage(`/pages/ai-chat/ai-chat?context=route_planning&message=${encodedMessage}`)
+    const targetUrl = buildDefaultAIChatPageUrl(detail.message)
+
+    if (!this.hasAIChatAccess()) {
+      this.redirectToAIChatSubscribe(targetUrl)
+      return
+    }
+
+    navigateToPage(targetUrl)
   },
 
   onStatusBarBack() {

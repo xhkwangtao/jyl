@@ -88,7 +88,7 @@
 
     <view class="spot-list" wx:if="{{visibleSecretList.length}}">
       <view
-        class="spot-card {{item.collected ? 'spot-card-checked' : 'spot-card-pending'}}"
+        class="spot-card {{item.collected ? 'spot-card-checked' : 'spot-card-pending'}} {{targetSecretId === item.id ? 'spot-card-focused' : ''}}"
         wx:for="{{visibleSecretList}}"
         wx:key="id"
       >

@@ -4,6 +4,7 @@ const {
   getLandingRedirectConfig,
   buildMapPageUrlFromLanding
 } = require('../../utils/landing-redirect')
+const landingService = require('../../services/landing-service')
 
 const HOME_PAGE_URL = '/pages/index/index'
 const MY_PAGE_URL = '/pages/my-page/my-page'
@@ -14,6 +15,10 @@ const DEFAULT_ENTRY_IMAGE_URL = '/images/xiaojiu.png'
 const DEFAULT_ENTRY_TITLE = '欢迎来到九眼楼'
 const DEFAULT_ENTRY_BADGE_NAME = '九眼楼入口'
 const DEFAULT_ENTRY_DESCRIPTION = '入口参数已识别，点击下方按钮即可进入九眼楼开始游览。'
+
+function normalizeSourceCode(value = '') {
+  return String(value || '').trim().toLowerCase()
+}
 
 function buildNavigationMetrics() {
   try {
@@ -87,14 +92,14 @@ Page({
     confettiColors: ['#6366F1', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EF4444', '#14B8A6']
   },
 
-  onLoad(options = {}) {
+  async onLoad(options = {}) {
     this.updateBadgeEntranceClass()
     const landingOptions = persistLandingContext(options)
 
     this.parseUrlParams(landingOptions)
     this.initSystemInfo()
     this.initUIEnhancements()
-    this.checkParamsAndRedirect(landingOptions)
+    await this.checkParamsAndRedirect(landingOptions)
   },
 
   onShow() {
@@ -109,10 +114,20 @@ Page({
     wx.hideLoading()
   },
 
-  checkParamsAndRedirect(landingOptions = {}) {
+  async checkParamsAndRedirect(landingOptions = {}) {
     const source = landingOptions.sourceCode || ''
     const serialNumber = landingOptions.serialNumber || ''
     const mapPageUrl = buildMapPageUrlFromLanding(landingOptions)
+    const remoteConfig = source
+      ? await landingService.getRedirectConfig(source, {
+        scene: landingOptions.scene,
+        serialNumber
+      })
+      : null
+
+    if (this.tryExecuteLandingConfig(remoteConfig, landingOptions)) {
+      return
+    }
 
     if (mapPageUrl) {
       this.executeRedirect(mapPageUrl)
@@ -164,6 +179,55 @@ Page({
     if (serialNumber) {
       wx.hideLoading()
     }
+  },
+
+  tryExecuteLandingConfig(config, landingOptions = {}) {
+    if (!this.shouldUseLandingConfig(config, landingOptions)) {
+      return false
+    }
+
+    if (config.action === 'video') {
+      const isVip = this.isVipActive()
+      const viewCount = this.getVideoViewCount()
+
+      if (!isVip && viewCount >= 3) {
+        this.redirectToSubscribe()
+        return true
+      }
+
+      this.incrementVideoViewCount()
+      this.setData({
+        shouldShowPage: false,
+        shouldShowVideo: true,
+        videoPlaying: false,
+        videoEnded: false,
+        videoViewCount: viewCount + 1,
+        currentVideo: {
+          url: config.redirectUrl,
+          title: config.description || '视频介绍',
+          description: config.description || ''
+        }
+      })
+      return true
+    }
+
+    this.executeRedirect(config.redirectUrl)
+    return true
+  },
+
+  shouldUseLandingConfig(config, landingOptions = {}) {
+    if (!config || !config.enabled || !config.redirectUrl) {
+      return false
+    }
+
+    const requestedSourceCode = normalizeSourceCode(landingOptions.sourceCode)
+    const responseSourceCode = normalizeSourceCode(config.sourceCode)
+
+    if (!requestedSourceCode) {
+      return Boolean(responseSourceCode)
+    }
+
+    return requestedSourceCode === responseSourceCode
   },
 
   isVipActive() {

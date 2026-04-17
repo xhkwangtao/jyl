@@ -74,75 +74,12 @@
 
     <view class="popup-overlay {{showPoiPopup ? '' : 'hide'}}" wx:if="{{showPoiPopup && currentPopupData}}">
       <view class="popup-container" catchtap="noop">
-        <view class="jyl-poi-popup-card">
-          <view class="jyl-poi-popup-bg jyl-poi-popup-bg-1"></view>
-          <view class="jyl-poi-popup-bg jyl-poi-popup-bg-2"></view>
-          <view class="jyl-poi-popup-bg jyl-poi-popup-bg-3"></view>
-          <view class="jyl-poi-popup-bg jyl-poi-popup-bg-4"></view>
-
-          <view class="jyl-poi-popup-head">
-            <text class="jyl-poi-popup-title">{{currentPopupData.title}}</text>
-            <view class="jyl-poi-popup-close" bindtap="onClosePoiPopup">
-              <text class="jyl-poi-popup-close-text">×</text>
-            </view>
-          </view>
-
-          <view class="jyl-poi-popup-main">
-            <view class="jyl-poi-popup-cover-shell">
-              <image class="jyl-poi-popup-cover" src="{{currentPopupData.coverImage}}" mode="aspectFill"></image>
-              <view class="jyl-poi-popup-cover-mask"></view>
-              <view class="jyl-poi-popup-icon-shell">
-                <image class="jyl-poi-popup-icon" src="{{currentPopupData.markerIconPath}}" mode="aspectFit"></image>
-              </view>
-              <view class="jyl-poi-popup-badge">
-                <text class="jyl-poi-popup-badge-text">{{currentPopupData.typeLabel}}</text>
-              </view>
-            </view>
-
-            <view class="jyl-poi-popup-side">
-              <view class="jyl-poi-popup-stats">
-                <view class="jyl-poi-popup-stat">
-                  <view class="jyl-poi-popup-stat-value-row">
-                    <text class="jyl-poi-popup-stat-value">{{currentPopupData.primaryMetricValue}}</text>
-                    <text class="jyl-poi-popup-stat-unit" wx:if="{{currentPopupData.primaryMetricUnit}}">{{currentPopupData.primaryMetricUnit}}</text>
-                  </view>
-                  <text class="jyl-poi-popup-stat-caption">{{currentPopupData.primaryMetricCaption}}</text>
-                </view>
-
-                <view class="jyl-poi-popup-stat-divider"></view>
-
-                <view class="jyl-poi-popup-stat jyl-poi-popup-stat-right">
-                  <view class="jyl-poi-popup-stat-value-row">
-                    <text class="jyl-poi-popup-stat-value">{{currentPopupData.secondaryMetricValue}}</text>
-                    <text class="jyl-poi-popup-stat-unit" wx:if="{{currentPopupData.secondaryMetricUnit}}">{{currentPopupData.secondaryMetricUnit}}</text>
-                  </view>
-                  <text class="jyl-poi-popup-stat-caption">{{currentPopupData.secondaryMetricCaption}}</text>
-                </view>
-              </view>
-
-              <view class="jyl-poi-popup-copy">
-                <view class="jyl-poi-popup-chip-row">
-                  <text class="jyl-poi-popup-chip">{{currentPopupData.themeTag}}</text>
-                  <text class="jyl-poi-popup-stay">{{currentPopupData.stayText}}</text>
-                </view>
-                <text class="jyl-poi-popup-desc">{{currentPopupData.description}}</text>
-                <text class="jyl-poi-popup-tip">{{currentPopupData.guideTip}}</text>
-              </view>
-            </view>
-          </view>
-
-          <view class="jyl-poi-popup-actions {{currentPopupData.showSecondaryAction ? 'jyl-poi-popup-actions-double' : 'jyl-poi-popup-actions-single'}}">
-            <view class="jyl-poi-popup-action" bindtap="onPrimaryPoiAction">
-              <view class="jyl-poi-popup-action-bg"></view>
-              <text class="jyl-poi-popup-action-text">{{currentPopupData.primaryActionText}}</text>
-            </view>
-
-            <view wx:if="{{currentPopupData.showSecondaryAction}}" class="jyl-poi-popup-action" bindtap="onSecondaryPoiAction">
-              <view class="jyl-poi-popup-action-bg"></view>
-              <text class="jyl-poi-popup-action-text">{{currentPopupData.secondaryActionText}}</text>
-            </view>
-          </view>
-        </view>
+        <poi-popup
+          visible="{{true}}"
+          popup-data="{{currentPopupData}}"
+          bind:close="onClosePoiPopup"
+          bind:button-action="onPoiPopupButtonAction"
+        />
       </view>
     </view>
 
@@ -242,15 +179,12 @@
 
     <view class="audio-access-test-panel" wx:if="{{!showPoiPopup}}">
       <view class="audio-access-test-copy">
-        <text class="audio-access-test-title">{{audioAccessPaid ? '讲解已付费' : ('讲解免费 ' + audioTrialUsedCount + '/' + audioFreeTrialLimit)}}</text>
-        <text class="audio-access-test-desc">{{audioAccessPaid ? '当前已解锁全部讲解内容' : ('剩余免费 ' + audioRemainingFreeCount + ' 个景点')}}</text>
+        <text class="audio-access-test-title">{{audioAccessPaid ? '讲解已付费' : '讲解未付费'}}</text>
+        <text class="audio-access-test-desc">{{audioAccessPaid ? '当前已解锁全部讲解内容' : '当前讲解将按VIP付费逻辑拦截'}}</text>
       </view>
       <view class="audio-access-test-actions">
         <view class="audio-access-test-button {{audioAccessPaid ? 'audio-access-test-button-paid' : ''}}" catchtap="onToggleAudioPaidForTesting">
           <text class="audio-access-test-button-text">{{audioAccessPaid ? '改为未付费' : '设为已付费'}}</text>
-        </view>
-        <view class="audio-access-test-reset" catchtap="onResetAudioTrialForTesting">
-          <text class="audio-access-test-reset-text">重置试听</text>
         </view>
       </view>
     </view>

@@ -1,4 +1,30 @@
 let messageSeed = 0
+const {
+  isFeaturePaid
+} = require('../../utils/audio-access.js')
+
+const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
+const AI_CHAT_TEXT_FEATURE_KEY = 'ai.chat.send-message'
+const AI_CHAT_VOICE_SEND_FEATURE_KEY = 'ai.chat.voice-send'
+const AI_CHAT_VOICE_PLAY_FEATURE_KEY = 'ai.chat.voice-play'
+
+const AI_CHAT_PAYWALL_CONFIG = {
+  [AI_CHAT_TEXT_FEATURE_KEY]: {
+    featureName: 'AI智能对话',
+    productName: 'AI聊天权限',
+    description: '体验AI智能导览对话需要VIP权限'
+  },
+  [AI_CHAT_VOICE_SEND_FEATURE_KEY]: {
+    featureName: 'AI语音对话',
+    productName: 'AI语音聊天权限',
+    description: '体验AI语音对话功能需要VIP权限'
+  },
+  [AI_CHAT_VOICE_PLAY_FEATURE_KEY]: {
+    featureName: 'AI语音播放',
+    productName: 'AI语音播放权限',
+    description: '播放AI语音回复需要VIP权限'
+  }
+}
 
 const MOCK_MESSAGES = [
   {
@@ -140,6 +166,7 @@ Page({
   },
 
   onLoad(options = {}) {
+    this.entryOptions = { ...options }
     const entryRouteInfo = this.resolveEntryRouteInfo(options)
     const presetMessage = safeDecodeURIComponent(options.message || '')
 
@@ -159,7 +186,7 @@ Page({
           this.measureChatViewport()
           this.scrollToBottom()
 
-          if (!entryRouteInfo && presetMessage) {
+          if (!entryRouteInfo && presetMessage && this.hasAIChatAccess()) {
             this.sendMessage(presetMessage)
           }
         }, 80)
@@ -281,6 +308,10 @@ Page({
   },
 
   onPlayAudio() {
+    if (!this.ensureAIChatAccess(AI_CHAT_VOICE_PLAY_FEATURE_KEY)) {
+      return
+    }
+
     wx.showToast({
       title: '语音播报暂未接入',
       icon: 'none',
@@ -296,7 +327,9 @@ Page({
       return
     }
 
-    this.sendMessage(question)
+    this.sendMessage(question, {
+      featureKey: AI_CHAT_TEXT_FEATURE_KEY
+    })
   },
 
   onQuickQuestionExpandChange(event) {
@@ -313,14 +346,26 @@ Page({
       return
     }
 
-    this.sendMessage(message)
+    this.sendMessage(message, {
+      featureKey: AI_CHAT_TEXT_FEATURE_KEY
+    })
   },
 
   onVoiceSend(event) {
     const detail = event.detail || {}
     const message = (detail.message || '帮我介绍一下黄崖关长城有什么特色？').trim()
 
-    this.sendMessage(message)
+    if (!message) {
+      return
+    }
+
+    if (!this.ensureAIChatAccess(AI_CHAT_VOICE_SEND_FEATURE_KEY)) {
+      return
+    }
+
+    this.sendMessage(message, {
+      skipAccessCheck: true
+    })
   },
 
   onChatScroll(event) {
@@ -360,8 +405,17 @@ Page({
     }
   },
 
-  sendMessage(message) {
+  sendMessage(message, options = {}) {
     if (this.data.isGenerating) {
+      return
+    }
+
+    const {
+      featureKey = AI_CHAT_TEXT_FEATURE_KEY,
+      skipAccessCheck = false
+    } = options
+
+    if (!skipAccessCheck && !this.ensureAIChatAccess(featureKey)) {
       return
     }
 
@@ -464,6 +518,57 @@ Page({
       this.setData({
         chatViewportHeight: rect.height
       })
+    })
+  },
+
+  hasAIChatAccess() {
+    return isFeaturePaid(AI_CHAT_ACCESS_FEATURE_KEY)
+  },
+
+  ensureAIChatAccess(featureKey = AI_CHAT_TEXT_FEATURE_KEY) {
+    if (this.hasAIChatAccess()) {
+      return true
+    }
+
+    this.navigateToVipPayment(featureKey)
+    return false
+  },
+
+  getCurrentPageUrl() {
+    const options = this.entryOptions || {}
+    const query = Object.keys(options).reduce((result, key) => {
+      const value = options[key]
+
+      if (value === undefined || value === null || value === '') {
+        return result
+      }
+
+      result.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(safeDecodeURIComponent(value)))}`)
+      return result
+    }, []).join('&')
+
+    return query ? `/pages/ai-chat/ai-chat?${query}` : '/pages/ai-chat/ai-chat'
+  },
+
+  navigateToVipPayment(featureKey = AI_CHAT_TEXT_FEATURE_KEY) {
+    const subscribeConfig = AI_CHAT_PAYWALL_CONFIG[featureKey] || AI_CHAT_PAYWALL_CONFIG[AI_CHAT_TEXT_FEATURE_KEY]
+    const app = getApp()
+    const successRedirectUrl = this.getCurrentPageUrl()
+
+    if (this.data.entryRouteInfo && app) {
+      app.globalData = app.globalData || {}
+      app.globalData.aiChatRouteInfo = this.data.entryRouteInfo
+    }
+
+    const subscribeUrl = `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(featureKey)}&featureName=${encodeURIComponent(subscribeConfig.featureName)}&productName=${encodeURIComponent(subscribeConfig.productName)}&description=${encodeURIComponent(subscribeConfig.description)}&successRedirect=${encodeURIComponent(successRedirectUrl)}`
+
+    wx.navigateTo({
+      url: subscribeUrl,
+      fail: () => {
+        wx.redirectTo({
+          url: subscribeUrl
+        })
+      }
     })
   }
 })

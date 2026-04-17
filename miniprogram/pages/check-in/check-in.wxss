@@ -334,6 +334,11 @@
   border-color: rgba(44, 237, 184, 0.22);
 }
 
+.spot-card-focused {
+  border-color: rgba(36, 95, 109, 0.28);
+  box-shadow: 0 0 0 3rpx rgba(47, 128, 125, 0.12), 0 20rpx 46rpx rgba(31, 58, 74, 0.14);
+}
+
 .spot-card-top {
   display: flex;
   align-items: flex-start;

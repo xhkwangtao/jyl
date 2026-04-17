@@ -34,6 +34,23 @@ function navigateToPage(url) {
   })
 }
 
+function normalizeOptionValue(value) {
+  if (value === undefined || value === null) {
+    return ''
+  }
+
+  const rawText = String(value).trim()
+  if (!rawText) {
+    return ''
+  }
+
+  try {
+    return decodeURIComponent(rawText)
+  } catch (error) {
+    return rawText
+  }
+}
+
 Page({
   data: {
     pageTitle: '暗号收集',
@@ -53,6 +70,7 @@ Page({
     visibleCount: 0,
     secretList: [],
     visibleSecretList: [],
+    targetSecretId: '',
     scanTip: '支持识别二维码中携带的点位名称、历史点位 id、暗号名等信息。',
     manualCollectEnabled: ENABLE_MANUAL_SECRET_COLLECTION_FOR_TESTING,
     manualCollectTip: ENABLE_MANUAL_SECRET_COLLECTION_FOR_TESTING
@@ -60,7 +78,10 @@ Page({
       : '正式模式下仅支持扫码收集，学生不能手动标记暗号。'
   },
 
-  onLoad() {
+  onLoad(options = {}) {
+    this.entryMapPointId = normalizeOptionValue(options.mapPointId)
+    this.entrySecretId = normalizeOptionValue(options.secretId)
+    this.entryTargetHintShown = false
     this.refreshPageState()
   },
 
@@ -83,12 +104,47 @@ Page({
     const collectionState = buildSecretCollectionState()
     const currentFilter = this.data.currentFilter || 'all'
     const visibleSecretList = filterSecretList(collectionState.secretList, currentFilter)
+    const targetSecret = this.resolveEntryTargetSecret(collectionState.secretList)
+    const targetSecretId = targetSecret?.id || ''
 
     this.setData({
       ...collectionState,
       visibleSecretList,
+      targetSecretId,
       visibleCount: visibleSecretList.length,
       sectionCaption: buildSectionCaption(currentFilter, collectionState.collectedCount, collectionState.pendingCount)
+    }, () => {
+      this.notifyEntryTarget(targetSecret)
+    })
+  },
+
+  resolveEntryTargetSecret(secretList = []) {
+    if (this.entrySecretId) {
+      const matchedBySecretId = secretList.find((item) => String(item.id) === String(this.entrySecretId))
+
+      if (matchedBySecretId) {
+        return matchedBySecretId
+      }
+    }
+
+    if (this.entryMapPointId) {
+      return secretList.find((item) => String(item.mapPointId || '') === String(this.entryMapPointId)) || null
+    }
+
+    return null
+  },
+
+  notifyEntryTarget(targetSecret) {
+    if (this.entryTargetHintShown || !targetSecret) {
+      return
+    }
+
+    this.entryTargetHintShown = true
+
+    wx.showToast({
+      title: `已定位到 ${targetSecret.name}`,
+      icon: 'none',
+      duration: 1600
     })
   },
 

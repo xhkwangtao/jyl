@@ -83,14 +83,6 @@
       </view>
     </view>
 
-    <view class="chat-entry" bind:tap="openAIChat">
-      <text class="chat-text">{{chatButtonText}}</text>
-      <view class="chat-icon">
-        <image class="arrow-icon" src="/images/icons/question-start.svg" mode="aspectFit" />
-      </view>
-    </view>
-    
-    
     <!-- 关闭按钮 -->
     <view class="close-button" bind:tap="closePlayer">
       <view class="close-icon"></view>

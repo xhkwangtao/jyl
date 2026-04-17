@@ -7,8 +7,38 @@ const DEFAULT_FEATURE_NAME = 'VIP尊享功能'
 const DEFAULT_DESCRIPTION = '已有98%游客选择，剩余名额不多'
 const REMOTE_HERO_IMAGE = 'https://hyg-cdn.flexai.cc/common/xiaoyingdongzuo.png'
 const LOCAL_HERO_IMAGE = '/images/ai-assistant-xiaoying.png'
+const VIP_ACCESS_FEATURE_KEY = 'vip'
+const AI_CHAT_FEATURE_KEYS = new Set([
+  'ai.chat.send-message',
+  'ai.chat.voice-send',
+  'ai.chat.voice-play'
+])
+const MAP_VIP_FEATURE_KEYS = new Set([
+  'map.audio.play',
+  'map.poi.primary-action',
+  'map.route.planning',
+  'map.navigation.start',
+  'map.photo.tutorial',
+  'map.checkin.action',
+  'map.tutorial.photo',
+  'map.checkin.poi',
+  'map.explore.poi',
+  'map.navigate.poi'
+])
 
 const FEATURE_CONFIG = {
+  'ai.chat.send-message': {
+    title: 'AI智能对话',
+    description: '体验AI智能导览对话需要VIP权限'
+  },
+  'ai.chat.voice-send': {
+    title: 'AI语音对话',
+    description: '体验AI语音对话功能需要VIP权限'
+  },
+  'ai.chat.voice-play': {
+    title: 'AI语音播放',
+    description: '播放AI语音回复需要VIP权限'
+  },
   'map.audio.play': {
     title: '景点语音讲解',
     description: '解锁景点语音讲解与沉浸式导览体验'
@@ -52,6 +82,24 @@ function formatAmount(amount) {
   return numeric.toFixed(2)
 }
 
+function grantPaidAccess(featureKey = '') {
+  const normalizedFeatureKey = String(featureKey || '').trim()
+
+  if (!normalizedFeatureKey) {
+    return
+  }
+
+  setFeaturePaid(normalizedFeatureKey, true)
+
+  if (
+    normalizedFeatureKey === VIP_ACCESS_FEATURE_KEY
+    || AI_CHAT_FEATURE_KEYS.has(normalizedFeatureKey)
+    || MAP_VIP_FEATURE_KEYS.has(normalizedFeatureKey)
+  ) {
+    setFeaturePaid(VIP_ACCESS_FEATURE_KEY, true)
+  }
+}
+
 Page({
   data: {
     featureKey: 'vip',
@@ -64,7 +112,8 @@ Page({
     heroImageSrc: REMOTE_HERO_IMAGE,
     agreed: true,
     loading: false,
-    paymentError: ''
+    paymentError: '',
+    successRedirectUrl: ''
   },
 
   onLoad(options = {}) {
@@ -91,7 +140,8 @@ Page({
       amount: Number.isFinite(amount) && amount > 0 ? amount : DEFAULT_PRICE,
       displayAmount: formatAmount(amount),
       displayOriginalPrice: formatAmount(originalPrice > 0 ? originalPrice : DEFAULT_ORIGINAL_PRICE),
-      currency: safeDecode(options.currency) || DEFAULT_CURRENCY
+      currency: safeDecode(options.currency) || DEFAULT_CURRENCY,
+      successRedirectUrl: safeDecode(options.successRedirect)
     })
   },
 
@@ -247,7 +297,7 @@ Page({
     })
 
     setTimeout(() => {
-      setFeaturePaid(this.data.featureKey, true)
+      grantPaidAccess(this.data.featureKey)
 
       this.setData({
         loading: false
@@ -260,22 +310,47 @@ Page({
       })
 
       setTimeout(() => {
-        if (getCurrentPages().length > 1) {
-          wx.navigateBack({
-            delta: 1,
-            fail: () => {
-              wx.redirectTo({
-                url: '/pages/map/map'
-              })
-            }
-          })
-          return
-        }
-
-        wx.redirectTo({
-          url: '/pages/map/map'
-        })
+        this.navigateAfterPayment()
       }, 500)
     }, 280)
+  },
+
+  navigateAfterPayment() {
+    const successRedirectUrl = String(this.data.successRedirectUrl || '').trim()
+
+    if (successRedirectUrl) {
+      wx.redirectTo({
+        url: successRedirectUrl,
+        fail: () => {
+          wx.navigateTo({
+            url: successRedirectUrl,
+            fail: () => {
+              this.navigateToDefaultTarget()
+            }
+          })
+        }
+      })
+      return
+    }
+
+    this.navigateToDefaultTarget()
+  },
+
+  navigateToDefaultTarget() {
+    if (getCurrentPages().length > 1) {
+      wx.navigateBack({
+        delta: 1,
+        fail: () => {
+          wx.redirectTo({
+            url: '/pages/map/map'
+          })
+        }
+      })
+      return
+    }
+
+    wx.redirectTo({
+      url: '/pages/map/map'
+    })
   }
 })

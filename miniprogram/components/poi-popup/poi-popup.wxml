@@ -1,0 +1,96 @@
+<view class="figma-container" wx:if="{{visible && currentPopupData}}">
+  <view class="background-base"></view>
+  <view class="bg-decoration bg-decoration-1"></view>
+  <view class="bg-decoration bg-decoration-2"></view>
+  <view class="bg-decoration bg-decoration-3"></view>
+  <view class="bg-decoration bg-decoration-4"></view>
+  <view class="bg-decoration bg-decoration-5"></view>
+
+  <view class="poi-header">
+    <text class="poi-title">{{currentPopupData.title}}</text>
+    <view class="close-button" bindtap="handleClosePopup">
+      <view class="close-icon">×</view>
+    </view>
+  </view>
+
+  <view class="popup-main">
+    <view class="poi-avatar-container rectangle-container">
+      <image class="poi-avatar rectangle" src="{{currentPopupData.coverImage}}" mode="aspectFill"></image>
+      <view class="cover-mask"></view>
+
+      <view class="play-audio-button" wx:if="{{currentPopupData.hasAudio}}" bindtap="handleAudioAction">
+        <view class="pause-icon-bars" wx:if="{{currentPopupData.audioPlaying}}"></view>
+        <view class="play-icon-triangle" wx:else></view>
+      </view>
+
+      <view class="marker-icon-shell" wx:if="{{currentPopupData.markerIconPath}}">
+        <image class="marker-icon" src="{{currentPopupData.markerIconPath}}" mode="aspectFit"></image>
+      </view>
+
+      <view class="type-badge" wx:if="{{currentPopupData.typeLabel}}">
+        <text class="type-badge-text">{{currentPopupData.typeLabel}}</text>
+      </view>
+    </view>
+
+    <view class="popup-side">
+      <view class="data-container">
+        <view class="data-section data-section-left">
+          <view class="data-value-row">
+            <text class="data-number">{{currentPopupData.primaryMetricValue}}</text>
+            <text class="data-unit" wx:if="{{currentPopupData.primaryMetricUnit}}">{{currentPopupData.primaryMetricUnit}}</text>
+          </view>
+          <text class="data-description">{{currentPopupData.primaryMetricCaption}}</text>
+        </view>
+
+        <view class="data-divider"></view>
+
+        <view class="data-section data-section-right">
+          <view class="data-value-row">
+            <text class="data-number">{{currentPopupData.secondaryMetricValue}}</text>
+            <text class="data-unit" wx:if="{{currentPopupData.secondaryMetricUnit}}">{{currentPopupData.secondaryMetricUnit}}</text>
+          </view>
+          <text class="data-description">{{currentPopupData.secondaryMetricCaption}}</text>
+        </view>
+      </view>
+
+      <view class="popup-copy-block">
+        <view class="chip-row">
+          <text class="popup-chip" wx:if="{{currentPopupData.themeTag}}">{{currentPopupData.themeTag}}</text>
+          <text class="popup-stay" wx:if="{{currentPopupData.stayText}}">{{currentPopupData.stayText}}</text>
+          <text
+            wx:if="{{currentPopupData.showSecretAction && currentPopupData.secretCodeName}}"
+            class="popup-chip popup-chip-secret {{currentPopupData.secretCollected ? 'popup-chip-secret-collected' : ''}}"
+          >
+            {{currentPopupData.secretCodeName}}
+          </text>
+        </view>
+
+        <text class="popup-description" wx:if="{{currentPopupData.description}}">{{currentPopupData.description}}</text>
+        <text class="popup-guide-tip" wx:if="{{currentPopupData.guideTip}}">{{currentPopupData.guideTip}}</text>
+
+        <view
+          wx:if="{{currentPopupData.showSecretAction}}"
+          class="secret-action {{currentPopupData.secretCollected ? 'secret-action-collected' : ''}}"
+          bindtap="handleSecretAction"
+        >
+          <text class="secret-action-text">{{currentPopupData.secretActionText}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="buttons-container {{buttonLayoutClass}}">
+    <view
+      wx:for="{{buttonItems}}"
+      wx:key="action"
+      wx:for-item="button"
+      class="popup-button {{button.fullWidth ? 'full-width' : ''}}"
+      bindtap="handleButtonAction"
+      data-action="{{button.action}}"
+    >
+      <view class="popup-button-bg"></view>
+      <text class="popup-button-text">{{button.text}}</text>
+      <image class="popup-button-arrow" src="/images/icons/arrow-right.svg" mode="aspectFit"></image>
+    </view>
+  </view>
+</view>

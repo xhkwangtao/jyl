@@ -1,11 +1,19 @@
 const auth = require('../../utils/auth')
 const {
+  isFeaturePaid
+} = require('../../utils/audio-access.js')
+const {
   buildSecretCollectionState
 } = require('../../utils/secret-collection')
 const {
   hasLandingPayload,
   buildLandingPageUrl
 } = require('../../utils/landing-redirect')
+
+const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
+const AI_CHAT_PAYMENT_FEATURE_KEY = 'ai.chat.send-message'
+const AI_CHAT_SUBSCRIBE_DESCRIPTION = '开通VIP后即可使用AI聊天与智能问答服务'
+const AI_CHAT_SUCCESS_REDIRECT_URL = '/pages/ai-chat/ai-chat'
 
 Page({
   data: {
@@ -219,6 +227,11 @@ Page({
   },
 
   onAIChatTap() {
+    if (!this.hasAIChatAccess()) {
+      this.redirectToAIChatSubscribe()
+      return
+    }
+
     if (this.data.isLoggingIn) {
       this.pendingAIChatNavigation = true
 
@@ -235,6 +248,11 @@ Page({
   },
 
   navigateToAIChat() {
+    if (!this.hasAIChatAccess()) {
+      this.redirectToAIChatSubscribe()
+      return
+    }
+
     const token = wx.getStorageSync('token')
 
     if (!token) {
@@ -258,6 +276,27 @@ Page({
       fail: () => {
         wx.redirectTo({
           url: '/pages/ai-chat/ai-chat'
+        })
+      }
+    })
+  },
+
+  hasAIChatAccess() {
+    return isFeaturePaid(AI_CHAT_ACCESS_FEATURE_KEY)
+  },
+
+  buildAIChatSubscribeUrl() {
+    return `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(AI_CHAT_PAYMENT_FEATURE_KEY)}&featureName=${encodeURIComponent('AI智能对话')}&productName=${encodeURIComponent('AI聊天权限')}&description=${encodeURIComponent(AI_CHAT_SUBSCRIBE_DESCRIPTION)}&successRedirect=${encodeURIComponent(AI_CHAT_SUCCESS_REDIRECT_URL)}`
+  },
+
+  redirectToAIChatSubscribe() {
+    const subscribeUrl = this.buildAIChatSubscribeUrl()
+
+    wx.navigateTo({
+      url: subscribeUrl,
+      fail: () => {
+        wx.redirectTo({
+          url: subscribeUrl
         })
       }
     })
