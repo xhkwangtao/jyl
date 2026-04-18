@@ -4,21 +4,26 @@ function normalizeSourceCode(value = '') {
   return String(value || '').trim().toLowerCase()
 }
 
+function normalizeSceneValue(context = {}) {
+  const serialNumber = String(context.serialNumber || '').trim()
+  const scene = String(context.scene || '').trim()
+
+  return serialNumber || scene
+}
+
 class LandingService {
   async getRedirectConfig(sourceCode, context = {}) {
     const normalizedSourceCode = normalizeSourceCode(sourceCode)
+    const normalizedSceneValue = normalizeSceneValue(context)
 
-    if (!normalizedSourceCode) {
+    if (!normalizedSourceCode || !normalizedSceneValue) {
       return null
     }
 
     try {
       const data = await request.get(`/flashcard/landing/config/${encodeURIComponent(normalizedSourceCode)}`, {
         s: normalizedSourceCode,
-        scene: context.scene || '',
-        sn: context.serialNumber || '',
-        serialNumber: context.serialNumber || '',
-        sourceCode: normalizedSourceCode
+        scene: normalizedSceneValue
       })
 
       if (!data || typeof data !== 'object') {
