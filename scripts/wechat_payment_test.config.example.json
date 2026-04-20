@@ -1,0 +1,20 @@
+{
+  "mode": "merchant",
+  "api_base_url": "https://api.mch.weixin.qq.com",
+  "mchid": "1900000001",
+  "certificate_serial_no": "7777777777777777777777777777777777777777",
+  "private_key_path": ".local-secrets/apiclient_key.pem",
+  "appid": "wx8888888888888888",
+  "payment": {
+    "notify_url": "https://example.com/wechat/pay/notify",
+    "description": "九眼楼支付测试",
+    "out_trade_no_prefix": "jylpay",
+    "amount": {
+      "total": 100,
+      "currency": "CNY"
+    },
+    "settle_info": {
+      "profit_sharing": true
+    }
+  }
+}

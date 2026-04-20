@@ -18,3 +18,8 @@ docs/tracks/jyl_pdf_assets/icons/summary.txt
 docs/tracks/jyl_pdf_assets/icons/contact_sheet.png
 scripts/wechat_config.json
 scripts/.wechat_token_cache.json
+scripts/wechat_profitsharing_test.config.json
+scripts/.wechat_profitsharing_test.state.json
+scripts/wechat_payment_test.config.json
+scripts/.wechat_payment_test.state.json
+.local-secrets/

@@ -37,6 +37,81 @@
 - 当前测试阶段，收费墙页点击“立即购买”会直接将对应功能标记为已开通，然后返回上一页，方便联调。
 - 正式上线前，需要移除或隐藏地图页这组测试控件，并把收费墙页的模拟开通逻辑替换为真实下单与支付流程。
 
+微信支付分账测试脚本说明：
+
+- 本仓库已提供本地脚本 `scripts/wechat_profitsharing_test.js`，用于微信支付分账联调。
+- 该脚本是本地 Node 脚本，不会放到小程序前端里，也不会把商户私钥放进小程序代码。
+- 示例配置文件为 `scripts/wechat_profitsharing_test.config.example.json`
+- 实际使用时请复制为 `scripts/wechat_profitsharing_test.config.json`
+- 建议将私钥、公钥等敏感文件放入项目根目录 `.local-secrets/`
+- `.local-secrets/`、`scripts/wechat_profitsharing_test.config.json`、`scripts/.wechat_profitsharing_test.state.json` 已加入忽略，不会提交到仓库
+
+推荐使用步骤：
+
+- `cp scripts/wechat_profitsharing_test.config.example.json scripts/wechat_profitsharing_test.config.json`
+- 按实际服务商参数填写配置文件
+- 执行 `node scripts/wechat_profitsharing_test.js query-max-ratio`
+- 执行 `node scripts/wechat_profitsharing_test.js query-amount`
+- 执行 `node scripts/wechat_profitsharing_test.js add-receiver`
+- 执行 `node scripts/wechat_profitsharing_test.js profitsharing`
+- 执行 `node scripts/wechat_profitsharing_test.js query-order`
+
+脚本当前支持的命令：
+
+- `query-max-ratio`：查询特约商户允许服务商分账的最大比例，仅服务商模式适用
+- `query-amount`：查询订单剩余待分金额
+- `add-receiver`：添加分账接收方
+- `profitsharing`：发起分账
+- `query-order`：查询分账结果
+- `unfreeze`：解冻剩余待分金额
+
+常用参数覆盖：
+
+- `--config <path>`：指定配置文件
+- `--transaction-id <value>`：覆盖微信订单号
+- `--out-order-no <value>`：指定商户分账单号
+- `--amount <value>`：覆盖分账金额，单位分
+- `--description <value>`：覆盖描述
+- `--receiver-account <value>`：覆盖接收方账号
+- `--receiver-name <value>`：覆盖接收方名称
+- `--receiver-type <value>`：覆盖接收方类型
+- `--relation-type <value>`：覆盖接收方关系类型
+- `--dry-run`：只打印请求，不实际调用微信支付接口
+
+使用注意：
+
+- 当前脚本支持 `merchant`（普通商户）和 `partner`（普通服务商）两种模式
+- 普通商户模式下不需要填写 `sub_mchid`
+- 服务商模式下需要填写 `sub_mchid`
+- 订单必须本身支持分账，否则后续真实请求会失败
+- 分账请求和解冻请求都是异步处理，真正结果要继续通过 `query-order` 查询
+
+微信支付 Native 下单测试脚本说明：
+
+- 本仓库已提供本地脚本 `scripts/wechat_payment_test.js`，用于先生成一笔真实微信支付订单，再继续做分账测试
+- 示例配置文件为 `scripts/wechat_payment_test.config.example.json`
+- 实际使用时请复制为 `scripts/wechat_payment_test.config.json`
+- `scripts/wechat_payment_test.config.json`、`scripts/.wechat_payment_test.state.json` 已加入忽略，不会提交到仓库
+
+推荐使用步骤：
+
+- `cp scripts/wechat_payment_test.config.example.json scripts/wechat_payment_test.config.json`
+- 执行 `node scripts/wechat_payment_test.js native-prepay`
+- 将返回的 `code_url` 转成二维码，用微信扫一扫完成支付
+- 支付成功后执行 `node scripts/wechat_payment_test.js query-order`
+- 从查单结果中拿到 `transaction_id` 后，再回填到 `scripts/wechat_profitsharing_test.config.json`
+
+脚本当前支持的命令：
+
+- `native-prepay`：生成 Native 支付订单，返回 `code_url`
+- `query-order`：通过商户订单号查询支付订单，拿到 `transaction_id`
+
+使用注意：
+
+- 当前脚本按普通商户模式编写，`mode` 必须为 `merchant`
+- 为了让后续分账可测试，下单时默认会带 `settle_info.profit_sharing=true`
+- `notify_url` 可以先配置成一个临时可访问地址；即使回调逻辑尚未处理，也可以通过主动查单拿到 `transaction_id`
+
 扫码 landing 页说明：
 
 - landing 页路由为 `miniprogram/pages/landing/index`

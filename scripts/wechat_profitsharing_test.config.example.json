@@ -1,0 +1,30 @@
+{
+  "mode": "merchant",
+  "api_base_url": "https://api.mch.weixin.qq.com",
+  "mchid": "1900000001",
+  "sub_mchid": "",
+  "certificate_serial_no": "7777777777777777777777777777777777777777",
+  "private_key_path": ".local-secrets/apiclient_key.pem",
+  "wechatpay_serial": "PUB_KEY_ID_XXXXXXXXXXXXXXXXXXXXXXXX",
+  "wechatpay_public_key_path": ".local-secrets/wechatpay_public_key.pem",
+  "appid": "wx8888888888888888",
+  "sub_appid": "",
+  "transaction_id": "4208450740201411110007820472",
+  "receiver": {
+    "type": "MERCHANT_ID",
+    "account": "1900000110",
+    "name": "示例分账接收方商户",
+    "relation_type": "SERVICE_PROVIDER",
+    "custom_relation": ""
+  },
+  "profitsharing": {
+    "amount": 1,
+    "description": "九眼楼分账测试",
+    "out_order_no_prefix": "jylps",
+    "unfreeze_unsplit": false
+  },
+  "unfreeze": {
+    "description": "九眼楼分账测试解冻",
+    "out_order_no_prefix": "jyluf"
+  }
+}

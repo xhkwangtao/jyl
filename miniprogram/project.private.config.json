@@ -19,5 +19,18 @@
     "checkInvalidKey": true,
     "ignoreDevUnusedFiles": true,
     "bigPackageSizeSupport": false
+  },
+  "condition": {
+    "miniprogram": {
+      "list": [
+        {
+          "name": "pages/landing/index",
+          "pathName": "pages/landing/index",
+          "query": "scene=s%3Dbsp%26scene%3Djqdmkzcpz",
+          "scene": null,
+          "launchMode": "default"
+        }
+      ]
+    }
   }
 }
