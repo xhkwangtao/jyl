@@ -1,4 +1,7 @@
-const { setFeaturePaid } = require('../../../utils/audio-access.js')
+const { setFeaturePaid } = require('../../../../../utils/audio-access.js')
+const {
+  GUIDE_MAP_PAGE
+} = require('../../../../../utils/guide-routes')
 
 const DEFAULT_PRICE = 7.8
 const DEFAULT_ORIGINAL_PRICE = 69
@@ -342,7 +345,7 @@ Page({
         delta: 1,
         fail: () => {
           wx.redirectTo({
-            url: '/pages/map/map'
+            url: GUIDE_MAP_PAGE
           })
         }
       })
@@ -350,7 +353,7 @@ Page({
     }
 
     wx.redirectTo({
-      url: '/pages/map/map'
+      url: GUIDE_MAP_PAGE
     })
   }
 })

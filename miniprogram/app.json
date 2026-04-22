@@ -2,13 +2,20 @@
   "pages": [
     "pages/index/index",
     "pages/landing/index",
-    "pages/map/map",
     "pages/my-page/my-page",
     "pages/study-report/study-report",
-    "pages/payment/subscribe/subscribe",
-    "pages/ai-chat/ai-chat",
-    "pages/scenic-audio-list/scenic-audio-list",
     "pages/check-in/check-in"
+  ],
+  "subpackages": [
+    {
+      "root": "subpackages/guide",
+      "pages": [
+        "pages/map/map",
+        "pages/ai-chat/ai-chat",
+        "pages/scenic-audio-list/scenic-audio-list",
+        "pages/payment/subscribe/subscribe"
+      ]
+    }
   ],
   "window": {
     "backgroundTextStyle": "dark",

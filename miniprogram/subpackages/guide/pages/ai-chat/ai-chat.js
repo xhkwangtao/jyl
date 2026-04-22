@@ -1,7 +1,13 @@
 let messageSeed = 0
 const {
   isFeaturePaid
-} = require('../../utils/audio-access.js')
+} = require('../../../../utils/audio-access.js')
+const {
+  GUIDE_MAP_PAGE,
+  GUIDE_MAP_ROUTE,
+  GUIDE_AI_CHAT_PAGE,
+  GUIDE_SUBSCRIBE_PAGE
+} = require('../../../../utils/guide-routes')
 
 const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
 const AI_CHAT_TEXT_FEATURE_KEY = 'ai.chat.send-message'
@@ -244,7 +250,7 @@ Page({
     const pages = getCurrentPages()
     const previousPage = pages[pages.length - 2]
 
-    if (safeRouteData && previousPage?.route === 'pages/map/map') {
+    if (safeRouteData && previousPage?.route === GUIDE_MAP_ROUTE) {
       const app = getApp()
       const pendingNavigation = {
         routeData: safeRouteData
@@ -267,10 +273,10 @@ Page({
       : ''
 
     wx.navigateTo({
-      url: `/pages/map/map${routeQuery}`,
+      url: `${GUIDE_MAP_PAGE}${routeQuery}`,
       fail: () => {
         wx.redirectTo({
-          url: `/pages/map/map${routeQuery}`
+          url: `${GUIDE_MAP_PAGE}${routeQuery}`
         })
       }
     })
@@ -547,7 +553,7 @@ Page({
       return result
     }, []).join('&')
 
-    return query ? `/pages/ai-chat/ai-chat?${query}` : '/pages/ai-chat/ai-chat'
+    return query ? `${GUIDE_AI_CHAT_PAGE}?${query}` : GUIDE_AI_CHAT_PAGE
   },
 
   navigateToVipPayment(featureKey = AI_CHAT_TEXT_FEATURE_KEY) {
@@ -560,7 +566,7 @@ Page({
       app.globalData.aiChatRouteInfo = this.data.entryRouteInfo
     }
 
-    const subscribeUrl = `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(featureKey)}&featureName=${encodeURIComponent(subscribeConfig.featureName)}&productName=${encodeURIComponent(subscribeConfig.productName)}&description=${encodeURIComponent(subscribeConfig.description)}&successRedirect=${encodeURIComponent(successRedirectUrl)}`
+    const subscribeUrl = `${GUIDE_SUBSCRIBE_PAGE}?feature=${encodeURIComponent(featureKey)}&featureName=${encodeURIComponent(subscribeConfig.featureName)}&productName=${encodeURIComponent(subscribeConfig.productName)}&description=${encodeURIComponent(subscribeConfig.description)}&successRedirect=${encodeURIComponent(successRedirectUrl)}`
 
     wx.navigateTo({
       url: subscribeUrl,

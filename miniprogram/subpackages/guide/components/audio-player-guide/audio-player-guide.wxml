@@ -8,11 +8,16 @@
     
     <!-- 数字人导游头像 -->
     <view class="avatar-container">
-      <image 
-        class="guide-avatar {{animationState}}" 
-        src="{{avatarImages.currentFrame}}" 
-        mode="aspectFit"
-      />
+      <view class="guide-avatar {{animationState}}">
+        <view class="guide-avatar-viewport">
+          <image
+            class="guide-avatar-sprite"
+            src="{{avatarSpritePath}}"
+            mode="scaleToFill"
+            style="{{avatarSpriteStyle}}"
+          />
+        </view>
+      </view>
       <!-- 动画状态指示器 -->
       <view class="animation-indicator {{animationState}}" wx:if="{{animationState !== 'idle'}}">
         <view class="state-indicator-dot"></view>

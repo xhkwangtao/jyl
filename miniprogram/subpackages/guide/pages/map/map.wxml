@@ -101,16 +101,23 @@
       bind:poiTap="onPOITap"
     />
 
-    <view class="navigation-status-card" wx:if="{{navigationActive && navigationInfo}}">
+    <view class="navigation-status-card {{navigationPanelCollapsed ? 'navigation-status-card-collapsed' : ''}}" wx:if="{{navigationActive && navigationInfo}}">
+      <view class="navigation-status-toolbar">
+        <view class="navigation-status-handle"></view>
+        <view class="navigation-status-toggle" bindtap="onToggleNavigationPanel">
+          <text class="navigation-status-toggle-text">{{navigationPanelCollapsed ? '展开详情' : '收起详情'}}</text>
+        </view>
+      </view>
+
       <view class="navigation-status-main">
         <view class="navigation-status-copy">
           <text class="navigation-status-title">{{navigationInfo.title}}</text>
-          <text class="navigation-status-subtitle">{{navigationInfo.subtitle}}</text>
+          <text class="navigation-status-subtitle" wx:if="{{!navigationPanelCollapsed}}">{{navigationInfo.subtitle}}</text>
           <view class="navigation-status-tags">
             <text class="navigation-status-tag navigation-status-tag-{{navigationInfo.statusTone}}">{{navigationInfo.statusText}}</text>
-            <text class="navigation-status-tag navigation-status-tag-muted" wx:if="{{navigationInfo.sourceTagText}}">{{navigationInfo.sourceTagText}}</text>
-            <text class="navigation-status-tag navigation-status-tag-muted">{{navigationInfo.routeGapText}}</text>
-            <text class="navigation-status-tag navigation-status-tag-muted" wx:if="{{navigationInfo.updatedText}}">{{navigationInfo.updatedText}}</text>
+            <text class="navigation-status-tag navigation-status-tag-muted" wx:if="{{!navigationPanelCollapsed && navigationInfo.sourceTagText}}">{{navigationInfo.sourceTagText}}</text>
+            <text class="navigation-status-tag navigation-status-tag-muted" wx:if="{{!navigationPanelCollapsed}}">{{navigationInfo.routeGapText}}</text>
+            <text class="navigation-status-tag navigation-status-tag-muted" wx:if="{{!navigationPanelCollapsed && navigationInfo.updatedText}}">{{navigationInfo.updatedText}}</text>
           </view>
         </view>
         <view class="navigation-status-metrics">
@@ -132,15 +139,15 @@
       </view>
 
       <view class="navigation-status-actions">
-        <view class="navigation-status-button navigation-status-button-secondary {{navigationRecalculating && !navigationInfo.arrived ? 'navigation-status-button-disabled' : ''}}" bindtap="onNavigationSecondaryAction">
+        <view class="navigation-status-button navigation-status-button-secondary {{navigationRecalculating && !navigationInfo.arrived ? 'navigation-status-button-disabled' : ''}}" bindtap="onNavigationSecondaryAction" wx:if="{{!navigationPanelCollapsed}}">
           <text class="navigation-status-button-text">{{navigationInfo.arrived ? '查看景点' : (navigationRecalculating ? '重算中...' : '重新规划')}}</text>
         </view>
-        <view class="navigation-status-button" bindtap="onNavigationPrimaryAction">
+        <view class="navigation-status-button {{navigationPanelCollapsed ? 'navigation-status-button-single' : ''}}" bindtap="onNavigationPrimaryAction">
           <text class="navigation-status-button-text">{{navigationInfo.arrived ? '完成导航' : '退出导航'}}</text>
         </view>
       </view>
 
-      <view class="navigation-status-progress" wx:if="{{navigationInfo.progressText || navigationInfo.audioHintText}}">
+      <view class="navigation-status-progress" wx:if="{{!navigationPanelCollapsed && (navigationInfo.progressText || navigationInfo.audioHintText)}}">
         <view class="navigation-status-progress-head">
           <text class="navigation-status-progress-copy">{{navigationInfo.progressText}}</text>
           <text class="navigation-status-progress-copy navigation-status-progress-copy-right" wx:if="{{navigationInfo.nextGuideText}}">{{navigationInfo.nextGuideText}}</text>
@@ -151,7 +158,7 @@
         <text class="navigation-status-progress-hint" wx:if="{{navigationInfo.audioHintText}}">{{navigationInfo.audioHintText}}</text>
       </view>
 
-      <view class="navigation-status-steps" wx:if="{{navigationInfo.stepItems && navigationInfo.stepItems.length}}">
+      <view class="navigation-status-steps" wx:if="{{!navigationPanelCollapsed && navigationInfo.stepItems && navigationInfo.stepItems.length}}">
         <view class="navigation-status-step" wx:for="{{navigationInfo.stepItems}}" wx:key="key">
           <view class="navigation-status-step-dot navigation-status-step-dot-{{item.state}}"></view>
           <view class="navigation-status-step-copy">
@@ -177,7 +184,7 @@
       <image class="audio-list-icon" src="/images/icons/voice-static.svg" mode="aspectFit"></image>
     </view>
 
-    <view class="audio-access-test-panel" wx:if="{{!showPoiPopup}}">
+    <view class="audio-access-test-panel" wx:if="{{showAudioAccessTestPanel && !showPoiPopup}}">
       <view class="audio-access-test-copy">
         <text class="audio-access-test-title">{{audioAccessPaid ? '讲解已付费' : '讲解未付费'}}</text>
         <text class="audio-access-test-desc">{{audioAccessPaid ? '当前已解锁全部讲解内容' : '当前讲解将按VIP付费逻辑拦截'}}</text>

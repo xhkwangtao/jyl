@@ -4,6 +4,9 @@ const {
 const {
   buildAiOfficerState
 } = require('../../utils/ai-officer')
+const {
+  GUIDE_MAP_PAGE
+} = require('../../utils/guide-routes')
 
 const PAGE_STYLE = 'background: #f6f1e8;'
 const RULE_LIST = [
@@ -164,7 +167,7 @@ Page({
   },
 
   onOpenMapPage() {
-    navigateToPage('/pages/map/map')
+    navigateToPage(GUIDE_MAP_PAGE)
   },
 
   onReportTap() {
@@ -192,6 +195,6 @@ Page({
       return
     }
 
-    navigateToPage(`/pages/map/map?pointId=${mapPointId}`)
+    navigateToPage(`${GUIDE_MAP_PAGE}?pointId=${mapPointId}`)
   }
 })

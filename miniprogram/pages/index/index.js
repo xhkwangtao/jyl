@@ -9,11 +9,17 @@ const {
   hasLandingPayload,
   buildLandingPageUrl
 } = require('../../utils/landing-redirect')
+const {
+  GUIDE_MAP_PAGE,
+  GUIDE_AI_CHAT_PAGE,
+  GUIDE_AUDIO_LIST_PAGE,
+  GUIDE_SUBSCRIBE_PAGE
+} = require('../../utils/guide-routes')
 
 const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
 const AI_CHAT_PAYMENT_FEATURE_KEY = 'ai.chat.send-message'
 const AI_CHAT_SUBSCRIBE_DESCRIPTION = '开通VIP后即可使用AI聊天与智能问答服务'
-const AI_CHAT_SUCCESS_REDIRECT_URL = '/pages/ai-chat/ai-chat'
+const AI_CHAT_SUCCESS_REDIRECT_URL = GUIDE_AI_CHAT_PAGE
 
 Page({
   data: {
@@ -168,10 +174,10 @@ Page({
 
   onExplanationTap() {
     wx.navigateTo({
-      url: '/pages/scenic-audio-list/scenic-audio-list',
+      url: GUIDE_AUDIO_LIST_PAGE,
       fail: () => {
         wx.redirectTo({
-          url: '/pages/scenic-audio-list/scenic-audio-list'
+          url: GUIDE_AUDIO_LIST_PAGE
         })
       }
     })
@@ -206,10 +212,10 @@ Page({
 
   openMapPage() {
     wx.navigateTo({
-      url: '/pages/map/map',
+      url: GUIDE_MAP_PAGE,
       fail: () => {
         wx.redirectTo({
-          url: '/pages/map/map'
+          url: GUIDE_MAP_PAGE
         })
       }
     })
@@ -272,10 +278,10 @@ Page({
 
   doNavigateToAIChat() {
     wx.navigateTo({
-      url: '/pages/ai-chat/ai-chat',
+      url: GUIDE_AI_CHAT_PAGE,
       fail: () => {
         wx.redirectTo({
-          url: '/pages/ai-chat/ai-chat'
+          url: GUIDE_AI_CHAT_PAGE
         })
       }
     })
@@ -286,7 +292,7 @@ Page({
   },
 
   buildAIChatSubscribeUrl() {
-    return `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(AI_CHAT_PAYMENT_FEATURE_KEY)}&featureName=${encodeURIComponent('AI智能对话')}&productName=${encodeURIComponent('AI聊天权限')}&description=${encodeURIComponent(AI_CHAT_SUBSCRIBE_DESCRIPTION)}&successRedirect=${encodeURIComponent(AI_CHAT_SUCCESS_REDIRECT_URL)}`
+    return `${GUIDE_SUBSCRIBE_PAGE}?feature=${encodeURIComponent(AI_CHAT_PAYMENT_FEATURE_KEY)}&featureName=${encodeURIComponent('AI智能对话')}&productName=${encodeURIComponent('AI聊天权限')}&description=${encodeURIComponent(AI_CHAT_SUBSCRIBE_DESCRIPTION)}&successRedirect=${encodeURIComponent(AI_CHAT_SUCCESS_REDIRECT_URL)}`
   },
 
   redirectToAIChatSubscribe() {

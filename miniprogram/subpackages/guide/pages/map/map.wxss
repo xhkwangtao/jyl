@@ -1077,6 +1077,46 @@ poi-manager {
   backdrop-filter: blur(18rpx);
 }
 
+.navigation-status-card-collapsed {
+  padding-bottom: 20rpx;
+}
+
+.navigation-status-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 18rpx;
+}
+
+.navigation-status-handle {
+  width: 72rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: rgba(15, 62, 73, 0.12);
+}
+
+.navigation-status-toggle {
+  height: 52rpx;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
+  background: rgba(15, 62, 73, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navigation-status-toggle:active {
+  transform: scale(0.98);
+}
+
+.navigation-status-toggle-text {
+  color: #0f3e49;
+  font-size: 20rpx;
+  line-height: 1;
+  font-weight: 700;
+}
+
 .navigation-status-main {
   display: flex;
   align-items: flex-start;
@@ -1203,6 +1243,11 @@ poi-manager {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.navigation-status-button-single {
+  flex: none;
+  width: 100%;
 }
 
 .navigation-status-button-secondary {

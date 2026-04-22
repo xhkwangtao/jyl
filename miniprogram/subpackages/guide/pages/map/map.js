@@ -3,31 +3,39 @@ const {
   JYL_ROUTE,
   JYL_ROUTE_MARKER_POINTS,
   JYL_ROUTE_POLYLINES
-} = require('../../config/jyl-map-data.js')
+} = require('../../../../config/jyl-map-data.js')
 const {
   JYL_SECRET_POINTS
-} = require('../../config/jyl-secret-data.js')
+} = require('../../../../config/jyl-secret-data.js')
 const {
   AUDIO_FEATURE_KEY,
   isFeaturePaid,
   setFeaturePaid
-} = require('../../utils/audio-access.js')
+} = require('../../../../utils/audio-access.js')
 const {
   isPointChecked
-} = require('../../utils/checkin')
+} = require('../../../../utils/checkin')
 const {
   resolvePoiSourceCodeToMarkerId
-} = require('../../utils/poi-source-code.js')
+} = require('../../../../utils/poi-source-code.js')
+const {
+  GUIDE_MAP_PAGE,
+  GUIDE_AI_CHAT_PAGE,
+  GUIDE_AUDIO_LIST_PAGE,
+  GUIDE_SUBSCRIBE_PAGE
+} = require('../../../../utils/guide-routes')
 
 const DEFAULT_ENTRY_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => point.type === 'start') || JYL_ROUTE_MARKER_POINTS[0] || null
-const DEFAULT_ENTRY_SCALE = 19
-const DEFAULT_OVERVIEW_SCALE = 13
 const ENABLE_POI = false
 const ALLOWED_ZOOMS = Array.from({ length: 16 }, (_, index) => index + 5)
+const DEFAULT_ENTRY_SCALE = Math.max(...ALLOWED_ZOOMS)
+const DEFAULT_OVERVIEW_SCALE = 13
 const HIGHLIGHT_ROUTE_SPOT_COUNT = 6
 const ROUTE_SEGMENT_CONNECT_MAX_METERS = 120
 const ROUTE_SEGMENT_BRIDGE_MAX_METERS = 60
 const ROUTE_SEGMENT_BRIDGE_MIN_METERS = 2
+const DISPLAY_ROUTE_FRAGMENT_HIDE_MAX_METERS = 12
+const DISPLAY_ROUTE_KEEP_POINT_NEAR_MAX_METERS = 18
 const ORIGINAL_ROUTE_DIM_COLOR = '#245F6D99'
 const ORIGINAL_ROUTE_PRIMARY_WIDTH = 6
 const ORIGINAL_ROUTE_SECONDARY_WIDTH = 4
@@ -50,8 +58,15 @@ const ARRIVED_AUDIO_POI_LIMIT = 6
 const AUTO_AUDIO_TRACK_INTERVAL_MS = 10000
 const AUTO_AUDIO_ACCURACY_THRESHOLD_METERS = 60
 const AUTO_AUDIO_DEFAULT_TRIGGER_RADIUS_METERS = 36
+const ROUTE_POINT_MATCH_MAX_METERS = 12
+const ROUTE_POINT_MATCH_DELTA_METERS = 3
+const ROUTE_DISTANCE_TRIGGER_BUFFER_METERS = 6
 const AUTO_AUDIO_SAME_POI_COOLDOWN_MS = 120000
 const AUTO_AUDIO_CROSS_POI_COOLDOWN_MS = 8000
+const AUTO_NEARBY_SAME_POI_COOLDOWN_MS = 30000
+const AUTO_NEARBY_CROSS_POI_COOLDOWN_MS = 8000
+// Temporary nearby prompt for on-site validation. Remove when no longer needed.
+const AUTO_AUDIO_NEARBY_TOAST_DURATION_MS = 1800
 const AUDIO_PAYWALL_PRICE = 7.8
 const AUDIO_PAYWALL_THROTTLE_MS = 1200
 const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
@@ -68,6 +83,10 @@ const SECRET_POINT_BY_MAP_POINT_ID = JYL_SECRET_POINTS.reduce((accumulator, poin
 
   return accumulator
 }, {})
+const SOURCE_ROUTE_POLYLINES = JYL_ROUTE_POLYLINES.map((polyline, index) => ({
+  ...polyline,
+  sourcePolylineIndex: index
+}))
 
 function navigateToPage(url) {
   wx.navigateTo({
@@ -244,6 +263,33 @@ function formatNavigationUpdatedText(updatedAt) {
   return `${elapsedMinutes} 分钟前更新`
 }
 
+function formatDistanceLabel(distanceMeters, options = {}) {
+  const {
+    fallback = '--'
+  } = options
+
+  if (!Number.isFinite(distanceMeters)) {
+    return fallback
+  }
+
+  const metric = formatDistanceMetric(Math.max(0, distanceMeters))
+  return `${metric.value}${metric.unit}`
+}
+
+function buildEmptyFieldTestDiagnostic(options = {}) {
+  const {
+    routeGapLabel = '离景区路线'
+  } = options
+
+  return {
+    accuracyText: '等待定位',
+    routeGapLabel,
+    routeGapText: '等待定位',
+    nearestPoiName: '等待定位',
+    nearestPoiDistanceText: '等待定位'
+  }
+}
+
 function estimateRouteDurationMetric(distanceMeters, points) {
   const walkMinutes = Math.max(20, Math.round(distanceMeters / 45))
   const stayMinutes = (points || []).reduce((total, point) => {
@@ -339,6 +385,10 @@ function getPolylineEndpoints(polyline) {
   return [polyline.points[0], polyline.points[polyline.points.length - 1]]
 }
 
+function isValidCoordinatePoint(point) {
+  return Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude)
+}
+
 function getMinDistanceBetweenPoints(sourcePoints, targetPoints) {
   if (!Array.isArray(sourcePoints) || !sourcePoints.length || !Array.isArray(targetPoints) || !targetPoints.length) {
     return Number.POSITIVE_INFINITY
@@ -365,6 +415,87 @@ function getMinMainDistance(polyline, mainPolyline) {
 
 function getMinPolylineLinkDistance(leftPolyline, rightPolyline) {
   return getMinDistanceBetweenPoints(getPolylineEndpoints(leftPolyline), getPolylineEndpoints(rightPolyline))
+}
+
+function getPolylineSourceIndex(polyline, fallbackIndex = -1) {
+  return Number.isInteger(polyline?.sourcePolylineIndex) ? polyline.sourcePolylineIndex : fallbackIndex
+}
+
+function collectRouteSourcePathIndexes(polylines) {
+  const seen = new Set()
+
+  return (polylines || []).reduce((accumulator, polyline, index) => {
+    const sourceIndex = getPolylineSourceIndex(polyline, index)
+    if (!Number.isInteger(sourceIndex) || seen.has(sourceIndex)) {
+      return accumulator
+    }
+
+    seen.add(sourceIndex)
+    accumulator.push(sourceIndex)
+    return accumulator
+  }, [])
+}
+
+function resolvePointRoutePathIndexes(point, polylines = SOURCE_ROUTE_POLYLINES) {
+  if (!isValidCoordinatePoint(point) || !Array.isArray(polylines) || !polylines.length) {
+    return []
+  }
+
+  const distanceItems = polylines.map((polyline, index) => ({
+    index: getPolylineSourceIndex(polyline, index),
+    distance: getMinDistanceToPolyline(polyline, point)
+  })).filter((item) => Number.isFinite(item.distance))
+
+  if (!distanceItems.length) {
+    return []
+  }
+
+  distanceItems.sort((left, right) => left.distance - right.distance)
+  const minDistance = distanceItems[0].distance
+  const threshold = minDistance > ROUTE_POINT_MATCH_MAX_METERS
+    ? minDistance
+    : Math.min(ROUTE_POINT_MATCH_MAX_METERS, minDistance + ROUTE_POINT_MATCH_DELTA_METERS)
+
+  return distanceItems
+    .filter((item) => item.distance <= threshold)
+    .map((item) => item.index)
+}
+
+function decoratePointWithRouteMeta(point) {
+  if (!point) {
+    return point
+  }
+
+  return {
+    ...point,
+    routePathIndexes: resolvePointRoutePathIndexes(point)
+  }
+}
+
+function getRouteSourcePathIndexes(route) {
+  if (Array.isArray(route?.sourcePathIndexes) && route.sourcePathIndexes.length) {
+    return route.sourcePathIndexes
+  }
+
+  return collectRouteSourcePathIndexes(route?.polylines || [])
+}
+
+function isPointOnRoute(point, route) {
+  if (!point || !route) {
+    return true
+  }
+
+  const routeSourcePathIndexes = getRouteSourcePathIndexes(route)
+  if (!routeSourcePathIndexes.length) {
+    return true
+  }
+
+  const pointRoutePathIndexes = Array.isArray(point?.routePathIndexes) && point.routePathIndexes.length
+    ? point.routePathIndexes
+    : resolvePointRoutePathIndexes(point)
+  const routeSourcePathIndexSet = new Set(routeSourcePathIndexes)
+
+  return pointRoutePathIndexes.some((index) => routeSourcePathIndexSet.has(index))
 }
 
 function orientPolylinePointsFromAnchor(points, anchorPoint) {
@@ -452,6 +583,67 @@ function buildContinuousRoutePolylines(polylines, startPoint = null) {
   })
 
   return continuousPolylines
+}
+
+function findNearestPointWithDistance(sourcePoint, points) {
+  if (!isValidCoordinatePoint(sourcePoint) || !Array.isArray(points) || !points.length) {
+    return null
+  }
+
+  let nearestPoint = null
+  let nearestDistanceMeters = Number.POSITIVE_INFINITY
+
+  points.forEach((point) => {
+    if (!isValidCoordinatePoint(point)) {
+      return
+    }
+
+    const distanceMeters = haversineMeters(sourcePoint, point)
+    if (distanceMeters < nearestDistanceMeters) {
+      nearestDistanceMeters = distanceMeters
+      nearestPoint = point
+    }
+  })
+
+  if (!nearestPoint || !Number.isFinite(nearestDistanceMeters)) {
+    return null
+  }
+
+  return {
+    point: nearestPoint,
+    distanceMeters: nearestDistanceMeters
+  }
+}
+
+function buildDisplayRoutePolylines(allPolylines, keepAnchorPoints = []) {
+  if (!Array.isArray(allPolylines) || !allPolylines.length) {
+    return []
+  }
+
+  const safeAnchorPoints = (keepAnchorPoints || []).filter((point) => isValidCoordinatePoint(point))
+  const filteredPolylines = allPolylines.filter((polyline, index) => {
+    const polylinePoints = polyline?.points || []
+    if (polylinePoints.length < 2) {
+      return false
+    }
+
+    if (index === 0) {
+      return true
+    }
+
+    const segmentLengthMeters = sumPolylineDistance(polylinePoints)
+    if (segmentLengthMeters > DISPLAY_ROUTE_FRAGMENT_HIDE_MAX_METERS) {
+      return true
+    }
+
+    if (!safeAnchorPoints.length) {
+      return false
+    }
+
+    return getMinDistanceBetweenPoints(polylinePoints, safeAnchorPoints) <= DISPLAY_ROUTE_KEEP_POINT_NEAR_MAX_METERS
+  })
+
+  return filteredPolylines.length ? filteredPolylines : allPolylines
 }
 
 function buildEntranceToMainPolylines(allPolylines, entrancePoint) {
@@ -570,6 +762,7 @@ function buildIntelligentRouteOption(id, name, theme, description, polylines, po
   const distanceMetric = formatDistanceMetric(distanceMeters)
   const durationMetric = estimateRouteDurationMetric(distanceMeters, routePoints)
   const focus = buildRouteFocus(polylines, routePoints)
+  const sourcePathIndexes = collectRouteSourcePathIndexes(polylines)
 
   return {
     id,
@@ -586,7 +779,8 @@ function buildIntelligentRouteOption(id, name, theme, description, polylines, po
     durationUnit: durationMetric.unit,
     pointCount: routePoints.filter((point) => point.type !== 'start').length,
     focusCenter: focus.center,
-    focusScale: focus.scale
+    focusScale: focus.scale,
+    sourcePathIndexes
   }
 }
 
@@ -617,6 +811,45 @@ function flattenRoutePolylinePoints(route) {
   }, [])
 }
 
+function estimateRouteDistanceToPoint(route, point, options = {}) {
+  if (!route || !point) {
+    return Number.POSITIVE_INFINITY
+  }
+
+  const routePoints = Array.isArray(options.routePoints) && options.routePoints.length
+    ? options.routePoints
+    : flattenRoutePolylinePoints(route)
+  if (!routePoints.length) {
+    return Number.POSITIVE_INFINITY
+  }
+
+  const progress = options.progress || estimateNavigationProgress(route, options.userLocation || null)
+  const userLocation = options.userLocation || null
+  const startIndex = typeof progress?.closestIndex === 'number'
+    ? progress.closestIndex
+    : (userLocation ? getClosestPointIndex(routePoints, userLocation) : -1)
+  const endIndex = typeof point?.closestPathIndex === 'number'
+    ? point.closestPathIndex
+    : getClosestPointIndex(routePoints, point)
+
+  if (startIndex < 0 || endIndex < 0) {
+    return Number.POSITIVE_INFINITY
+  }
+
+  const leftIndex = Math.min(startIndex, endIndex)
+  const rightIndex = Math.max(startIndex, endIndex)
+  const routeSlice = routePoints.slice(leftIndex, rightIndex + 1)
+  const alongRouteMeters = routeSlice.length >= 2 ? sumPolylineDistance(routeSlice) : 0
+  const distanceFromUserToRoute = Number.isFinite(progress?.minDistanceToRoute)
+    ? progress.minDistanceToRoute
+    : (userLocation ? getMinDistanceBetweenPoints(routePoints, [userLocation]) : 0)
+  const distanceFromPointToRoute = Number.isFinite(point?.routeDistance)
+    ? point.routeDistance
+    : getMinDistanceBetweenPoints(routePoints, [point])
+
+  return Math.max(0, distanceFromUserToRoute) + alongRouteMeters + Math.max(0, distanceFromPointToRoute)
+}
+
 function estimateNavigationProgress(route, userLocation) {
   if (!route || !userLocation) {
     return null
@@ -630,21 +863,22 @@ function estimateNavigationProgress(route, userLocation) {
   const closestIndex = getClosestPointIndex(routePoints, userLocation)
   const destinationPoint = routePoints[routePoints.length - 1]
   const minDistanceToRoute = getMinDistanceBetweenPoints(routePoints, [userLocation])
-  const distanceToDestinationMeters = destinationPoint
+  const linearDistanceToDestinationMeters = destinationPoint
     ? haversineMeters(userLocation, destinationPoint)
     : 0
   const remainingRouteMeters = closestIndex >= 0
     ? sumPolylineDistance(routePoints.slice(closestIndex))
     : 0
   const remainingDistanceMeters = Math.max(
-    distanceToDestinationMeters,
+    linearDistanceToDestinationMeters,
     minDistanceToRoute + remainingRouteMeters
   )
 
   return {
     closestIndex,
     minDistanceToRoute,
-    distanceToDestinationMeters,
+    distanceToDestinationMeters: remainingDistanceMeters,
+    linearDistanceToDestinationMeters,
     remainingDistanceMeters
   }
 }
@@ -809,6 +1043,10 @@ function buildNavigationGuidePoints(route, targetPoint = null) {
     ...ALL_ROUTE_DISPLAY_POINTS.filter((point) => point.type !== 'start'),
     targetPoint
   ].filter(Boolean)).map((point) => {
+    if (!isPointOnRoute(point, route)) {
+      return null
+    }
+
     const closestPathIndex = getClosestPointIndex(routePoints, point)
     const routeDistance = getMinDistanceBetweenPoints(routePoints, [point])
     const nearRouteThreshold = Math.max(
@@ -829,11 +1067,11 @@ function buildNavigationGuidePoints(route, targetPoint = null) {
 }
 
 function buildDefaultPolylineData() {
-  return JYL_ROUTE_POLYLINES.map((polyline) => clonePolyline(polyline))
+  return DISPLAY_ROUTE_POLYLINES.map((polyline) => clonePolyline(polyline))
 }
 
 function buildPlanningBasePolylines() {
-  return JYL_ROUTE_POLYLINES.map((polyline, index) => ({
+  return DISPLAY_ROUTE_POLYLINES.map((polyline, index) => ({
     points: polyline.points,
     color: ORIGINAL_ROUTE_DIM_COLOR,
     width: index === 0 ? ORIGINAL_ROUTE_PRIMARY_WIDTH : ORIGINAL_ROUTE_SECONDARY_WIDTH
@@ -1244,12 +1482,15 @@ function findPolylinePathIndexes(polylines, startPoint, endPoint) {
 
   if (candidateRoutes.length) {
     candidateRoutes.sort((left, right) => {
-      if (left.routeDistance !== right.routeDistance) {
-        return left.routeDistance - right.routeDistance
-      }
-
+      // Prefer the polyline that actually reaches the target point before
+      // comparing overall route length, otherwise nearby mainline segments can
+      // win over the true branch and create a straight connector shortcut.
       if (left.targetDistance !== right.targetDistance) {
         return left.targetDistance - right.targetDistance
+      }
+
+      if (left.routeDistance !== right.routeDistance) {
+        return left.routeDistance - right.routeDistance
       }
 
       return left.pathIndexes.length - right.pathIndexes.length
@@ -1362,18 +1603,20 @@ function buildPoiNavigationRoute(targetPoint, startPoint) {
     return null
   }
 
-  const polylines = buildRouteToPoiPolylines(JYL_ROUTE_POLYLINES, startPoint, targetPoint)
+  const safeTargetPoint = decoratePointWithRouteMeta(targetPoint)
+  const safeStartPoint = decoratePointWithRouteMeta(startPoint)
+  const polylines = buildRouteToPoiPolylines(SOURCE_ROUTE_POLYLINES, safeStartPoint, safeTargetPoint)
   if (!polylines.length) {
     return null
   }
 
   return buildIntelligentRouteOption(
-    `poi-navigation-${targetPoint.id || targetPoint.markerId || targetPoint.name}`,
-    `前往${targetPoint.name}`,
+    `poi-navigation-${safeTargetPoint.id || safeTargetPoint.markerId || safeTargetPoint.name}`,
+    `前往${safeTargetPoint.name}`,
     'green',
     '从当前位置或检票口前往目标点位。',
     polylines,
-    [targetPoint]
+    [safeTargetPoint]
   )
 }
 
@@ -1472,6 +1715,7 @@ function normalizeMapPageOptions(rawOptions = {}) {
     poiId: normalizeMapPageOptionValue(rawOptions, 'poiId'),
     poiName: normalizeMapPageOptionValue(rawOptions, 'poiName'),
     showAIRoute: normalizeMapPageOptionValue(rawOptions, 'showAIRoute'),
+    showTestTools: normalizeMapPageOptionValue(rawOptions, 'showTestTools'),
     action: normalizeMapPageOptionValue(rawOptions, 'action'),
     routeData: normalizeMapPageOptionValue(rawOptions, 'routeData', { decode: false })
   }
@@ -1589,6 +1833,7 @@ function buildPoiSequenceRoute(routeData) {
       .map((item) => resolveDisplayPointFromValue(item))
       .filter(Boolean)
       .filter((point) => point.type !== 'start')
+      .map((point) => decoratePointWithRouteMeta(point))
   )
 
   if (!resolvedRoutePoints.length) {
@@ -1596,7 +1841,7 @@ function buildPoiSequenceRoute(routeData) {
   }
 
   const polylines = []
-  let currentStartPoint = DEFAULT_ENTRY_POINT || resolvedRoutePoints[0]
+  let currentStartPoint = decoratePointWithRouteMeta(DEFAULT_ENTRY_POINT) || resolvedRoutePoints[0]
 
   resolvedRoutePoints.forEach((point) => {
     const currentStartId = String(currentStartPoint?.id || currentStartPoint?.markerId || '')
@@ -1607,7 +1852,7 @@ function buildPoiSequenceRoute(routeData) {
       return
     }
 
-    const segmentPolylines = buildRouteToPoiPolylines(JYL_ROUTE_POLYLINES, currentStartPoint, point)
+    const segmentPolylines = buildRouteToPoiPolylines(SOURCE_ROUTE_POLYLINES, currentStartPoint, point)
     if (!segmentPolylines.length) {
       return
     }
@@ -1634,7 +1879,7 @@ function buildPoiSequenceRoute(routeData) {
     'green',
     routeDescription,
     polylines,
-    uniquePoints([DEFAULT_ENTRY_POINT, ...resolvedRoutePoints].filter(Boolean))
+    uniquePoints([decoratePointWithRouteMeta(DEFAULT_ENTRY_POINT), ...resolvedRoutePoints].filter(Boolean))
   )
 }
 
@@ -1702,30 +1947,30 @@ function buildRouteAIChatPageUrl(route, customMessage = '') {
     return ''
   }
 
-  return `/pages/ai-chat/ai-chat?context=route_planning&hasRouteInfo=true&routeId=${encodeURIComponent(route.id)}`
+  return `${GUIDE_AI_CHAT_PAGE}?context=route_planning&hasRouteInfo=true&routeId=${encodeURIComponent(route.id)}`
 }
 
 function buildDefaultAIChatPageUrl(message = '') {
   const encodedMessage = encodeURIComponent(message || '我想了解更多关于游览路线的详情。')
-  return `/pages/ai-chat/ai-chat?context=route_planning&message=${encodedMessage}`
+  return `${GUIDE_AI_CHAT_PAGE}?context=route_planning&message=${encodedMessage}`
 }
 
 function buildPoiNavigationPageUrl(point) {
   if (!point) {
-    return '/pages/map/map'
+    return GUIDE_MAP_PAGE
   }
 
   const pointId = point.id || point.markerId || ''
-  return `/pages/map/map?poiId=${encodeURIComponent(pointId)}&action=navigate`
+  return `${GUIDE_MAP_PAGE}?poiId=${encodeURIComponent(pointId)}&action=navigate`
 }
 
 function buildAudioPlaybackPageUrl(point) {
   if (!point) {
-    return '/pages/map/map'
+    return GUIDE_MAP_PAGE
   }
 
   const pointId = point.id || point.markerId || ''
-  return `/pages/map/map?poiId=${encodeURIComponent(pointId)}&action=playaudio`
+  return `${GUIDE_MAP_PAGE}?poiId=${encodeURIComponent(pointId)}&action=playaudio`
 }
 
 function buildCheckInPageUrl(point, secretMeta = null) {
@@ -1804,17 +2049,22 @@ function buildViewportIncludePoints(points) {
   ]
 }
 
-const ALL_ROUTE_DISPLAY_POINTS = JYL_ROUTE_MARKER_POINTS.map(createDisplayPoint)
-const ALL_AUDIO_POI_POINTS = JYL_MARKER_POINTS.map(buildAudioPoi)
+const ALL_ROUTE_DISPLAY_POINTS = JYL_ROUTE_MARKER_POINTS.map((point, index) => (
+  decoratePointWithRouteMeta(createDisplayPoint(point, index))
+))
+const ALL_AUDIO_POI_POINTS = JYL_MARKER_POINTS.map((point) => buildAudioPoi(decoratePointWithRouteMeta(point)))
+const AUTO_NEARBY_POI_POINTS = ALL_ROUTE_DISPLAY_POINTS
+  .filter((point) => point.type !== 'start' && point.type !== 'end')
 const AUTO_AUDIO_POI_POINTS = JYL_MARKER_POINTS
   .filter((point) => point.type === 'scenic')
-  .map((point) => buildAudioPoi(point))
-const ALL_ROUTE_POLYLINE_POINTS = JYL_ROUTE_POLYLINES.flatMap((polyline) => polyline.points)
-const PRIMARY_ROUTE_POLYLINES = buildEntranceToMainPolylines(JYL_ROUTE_POLYLINES, DEFAULT_ENTRY_POINT)
-const FULL_ROUTE_PLAN_POINTS = uniquePoints([DEFAULT_ENTRY_POINT, ...JYL_MARKER_POINTS])
+  .map((point) => buildAudioPoi(decoratePointWithRouteMeta(point)))
+const ALL_ROUTE_POLYLINE_POINTS = SOURCE_ROUTE_POLYLINES.flatMap((polyline) => polyline.points)
+const PRIMARY_ROUTE_POLYLINES = buildEntranceToMainPolylines(SOURCE_ROUTE_POLYLINES, DEFAULT_ENTRY_POINT)
+const DISPLAY_ROUTE_POLYLINES = buildDisplayRoutePolylines(SOURCE_ROUTE_POLYLINES, ALL_ROUTE_DISPLAY_POINTS)
+const FULL_ROUTE_PLAN_POINTS = uniquePoints([DEFAULT_ENTRY_POINT, ...JYL_MARKER_POINTS].map((point) => decoratePointWithRouteMeta(point)))
 const HIGHLIGHT_ROUTE_POINTS = uniquePoints([
-  DEFAULT_ENTRY_POINT,
-  ...pickEvenlySpacedPoints(JYL_MARKER_POINTS, Math.min(HIGHLIGHT_ROUTE_SPOT_COUNT, JYL_MARKER_POINTS.length))
+  decoratePointWithRouteMeta(DEFAULT_ENTRY_POINT),
+  ...pickEvenlySpacedPoints(JYL_MARKER_POINTS, Math.min(HIGHLIGHT_ROUTE_SPOT_COUNT, JYL_MARKER_POINTS.length)).map((point) => decoratePointWithRouteMeta(point))
 ])
 
 const INTELLIGENT_ROUTE_OPTIONS = [
@@ -1831,7 +2081,7 @@ const INTELLIGENT_ROUTE_OPTIONS = [
     '深度探索线',
     'blue',
     '从检票口进入，覆盖全部公开导览点，并保留支线探索。',
-    JYL_ROUTE_POLYLINES,
+    SOURCE_ROUTE_POLYLINES,
     FULL_ROUTE_PLAN_POINTS
   )
 ]
@@ -1856,7 +2106,18 @@ const MAP_INCLUDE_POINTS = [
   }))
 ]
 
+const DEFAULT_OUTSIDE_SCENIC_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => (
+  String(point.id) === 'poi-02'
+    || point.name === '景区大门口左侧牌子'
+    || point.sourceName === '景区大门口左侧牌子'
+)) || DEFAULT_ENTRY_POINT
 const DEFAULT_SCENIC_CENTER = buildCenter(MAP_INCLUDE_POINTS)
+const DEFAULT_OUTSIDE_SCENIC_CENTER = DEFAULT_OUTSIDE_SCENIC_POINT
+  ? {
+    latitude: DEFAULT_OUTSIDE_SCENIC_POINT.latitude,
+    longitude: DEFAULT_OUTSIDE_SCENIC_POINT.longitude
+  }
+  : DEFAULT_SCENIC_CENTER
 const DEFAULT_ENTRY_CENTER = DEFAULT_ENTRY_POINT
   ? {
     latitude: DEFAULT_ENTRY_POINT.latitude,
@@ -2000,8 +2261,8 @@ function buildNearbyAudioPoiList(anchorPoint, options = {}) {
 Page({
   data: {
     navigationBarTotalHeight: 64,
-    longitude: DEFAULT_ENTRY_CENTER.longitude,
-    latitude: DEFAULT_ENTRY_CENTER.latitude,
+    longitude: DEFAULT_OUTSIDE_SCENIC_CENTER.longitude,
+    latitude: DEFAULT_OUTSIDE_SCENIC_CENTER.latitude,
     scale: DEFAULT_ENTRY_SCALE,
     showLocation: true,
     enablePOI: ENABLE_POI,
@@ -2020,6 +2281,7 @@ Page({
     showAudioProgress: true,
     audioPoiList: ALL_AUDIO_POI_POINTS,
     showAudioListDrawer: false,
+    showAudioAccessTestPanel: false,
     audioPlaying: false,
     audioProgress: 0,
     audioCurrentTime: 0,
@@ -2028,6 +2290,7 @@ Page({
     audioAccessPaid: false,
     autoAudioEnabled: true,
     navigationActive: false,
+    navigationPanelCollapsed: false,
     navigationInfo: null,
     navigationDestination: null,
     navigationSource: '',
@@ -2045,12 +2308,24 @@ Page({
   },
 
   onLoad(options = {}) {
+    this.pageVisible = false
     this.locationPermissionPromptShown = false
     this.locationPermissionPrompting = false
+    this.locationUpdateActive = false
+    this.locationUpdateStarting = false
+    this.locationUpdateRequestToken = 0
+    this.locationChangeListenerRegistered = false
+    this.locationChangeHandler = null
+    this.latestUserLocation = null
+    this.latestUserLocationAt = 0
     this.keepScreenOnReasons = new Set()
     this.keepScreenOnEnabled = false
     this.autoAudioState = {
       lastAutoPoiId: '',
+      lastTriggerTime: 0
+    }
+    this.autoNearbyState = {
+      lastPoiId: '',
       lastTriggerTime: 0
     }
     const systemInfo = wx.getSystemInfoSync()
@@ -2068,16 +2343,21 @@ Page({
     this.preNavigationSelectedRoute = null
     const pageOptions = normalizeMapPageOptions(options)
     const hasDirectEntryTarget = Boolean(
-      pageOptions.filter
-        || pageOptions.poi
+      pageOptions.poi
         || pageOptions.poiId
         || pageOptions.poiName
+        || pageOptions.destination
+        || pageOptions.pointName
         || pageOptions.routeData
     )
 
+    this.userAdjustedViewport = false
+    this.hasAppliedInitialUserViewport = false
+    this.hasDirectEntryTarget = hasDirectEntryTarget
     this.pageOptions = pageOptions
     this.setData({
-      navigationBarTotalHeight
+      navigationBarTotalHeight,
+      showAudioAccessTestPanel: normalizeBooleanValue(pageOptions.showTestTools) || pageOptions.action === 'executeAIRouteTest'
     }, () => {
       this.handleEntryRequest(pageOptions)
 
@@ -2098,6 +2378,7 @@ Page({
   },
 
   onShow() {
+    this.pageVisible = true
     this.refreshAudioAccessState()
     this.checkLocationPermission()
     this.checkPendingNavigationRequest()
@@ -2114,6 +2395,7 @@ Page({
   },
 
   onHide() {
+    this.pageVisible = false
     this.stopNavigationTracking()
     this.stopAutoAudioTracking()
     this.locationPermissionPromptShown = false
@@ -2183,7 +2465,7 @@ Page({
     const description = '解锁景点语音讲解需要VIP权限'
     const successRedirect = buildAudioPlaybackPageUrl(point)
 
-    return `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(AUDIO_FEATURE_KEY)}&featureName=${encodeURIComponent('景点语音讲解')}&productName=${encodeURIComponent('景点语音讲解')}&description=${encodeURIComponent(description)}&amount=${AUDIO_PAYWALL_PRICE}&originalPrice=69&successRedirect=${encodeURIComponent(successRedirect)}`
+    return `${GUIDE_SUBSCRIBE_PAGE}?feature=${encodeURIComponent(AUDIO_FEATURE_KEY)}&featureName=${encodeURIComponent('景点语音讲解')}&productName=${encodeURIComponent('景点语音讲解')}&description=${encodeURIComponent(description)}&amount=${AUDIO_PAYWALL_PRICE}&originalPrice=69&successRedirect=${encodeURIComponent(successRedirect)}`
   },
 
   openAudioPaywall(point, options = {}) {
@@ -2242,8 +2524,12 @@ Page({
   },
 
   onUnload() {
+    this.pageVisible = false
     this.stopNavigationTracking()
     this.stopAutoAudioTracking()
+    this.stopContinuousLocationUpdates({
+      releaseListener: true
+    })
     this.locationPermissionPromptShown = false
     this.locationPermissionPrompting = false
     this.resetScreenOnState()
@@ -2313,13 +2599,124 @@ Page({
     }
   },
 
-  onRegionChange(event) {
-    const nextScale = event?.detail?.scale
-    if (typeof nextScale === 'number' && nextScale !== this.data.scale) {
-      this.setData({
-        scale: nextScale
-      })
+  getDefaultMapScale() {
+    return ALLOWED_ZOOMS[ALLOWED_ZOOMS.length - 1] || DEFAULT_ENTRY_SCALE
+  },
+
+  getCurrentViewportState() {
+    return {
+      longitude: typeof this.data.longitude === 'number' ? this.data.longitude : DEFAULT_OUTSIDE_SCENIC_CENTER.longitude,
+      latitude: typeof this.data.latitude === 'number' ? this.data.latitude : DEFAULT_OUTSIDE_SCENIC_CENTER.latitude,
+      scale: typeof this.data.scale === 'number' ? this.data.scale : this.getDefaultMapScale()
     }
+  },
+
+  isViewportAtDefaultCenter() {
+    return this.data.longitude === DEFAULT_OUTSIDE_SCENIC_CENTER.longitude
+      && this.data.latitude === DEFAULT_OUTSIDE_SCENIC_CENTER.latitude
+  },
+
+  syncViewportFromMapContext(options = {}) {
+    const nextScale = typeof options.scale === 'number' ? options.scale : null
+    const applyViewportState = (center = null) => {
+      const nextData = {}
+      const nextLongitude = toFiniteCoordinateValue(center?.longitude)
+      const nextLatitude = toFiniteCoordinateValue(center?.latitude)
+
+      if (nextLongitude !== null && nextLongitude !== this.data.longitude) {
+        nextData.longitude = nextLongitude
+      }
+
+      if (nextLatitude !== null && nextLatitude !== this.data.latitude) {
+        nextData.latitude = nextLatitude
+      }
+
+      if (typeof nextScale === 'number' && nextScale !== this.data.scale) {
+        nextData.scale = nextScale
+      }
+
+      if (Object.keys(nextData).length) {
+        this.setData(nextData)
+      }
+    }
+
+    if (!this.mapCtx || typeof this.mapCtx.getCenterLocation !== 'function') {
+      applyViewportState()
+      return
+    }
+
+    this.mapCtx.getCenterLocation({
+      success: (center = {}) => {
+        applyViewportState(center)
+      },
+      fail: () => {
+        applyViewportState()
+      }
+    })
+  },
+
+  applyInitialUserViewport(userLocation) {
+    if (
+      !userLocation
+      || !this.isLocationInScenicArea(userLocation)
+      || this.hasAppliedInitialUserViewport
+      || this.userAdjustedViewport
+      || !this.isViewportAtDefaultCenter()
+    ) {
+      return
+    }
+
+    const longitude = toFiniteCoordinateValue(userLocation.longitude)
+    const latitude = toFiniteCoordinateValue(userLocation.latitude)
+
+    if (longitude === null || latitude === null) {
+      return
+    }
+
+    this.hasAppliedInitialUserViewport = true
+    this.setData({
+      longitude,
+      latitude,
+      scale: this.getDefaultMapScale()
+    })
+  },
+
+  refreshInitialUserViewport() {
+    if (
+      !this.data.showLocation
+      || this.hasAppliedInitialUserViewport
+      || this.userAdjustedViewport
+      || !this.isViewportAtDefaultCenter()
+    ) {
+      return
+    }
+
+    this.fetchCurrentLocation({
+      preferCache: true
+    })
+      .then((userLocation) => {
+        this.applyInitialUserViewport(userLocation)
+      })
+      .catch(() => {})
+  },
+
+  onRegionChange(event) {
+    const detail = event?.detail || {}
+    const eventType = detail.type || event?.type || ''
+
+    if (eventType !== 'end') {
+      return
+    }
+
+    const causedBy = String(detail.causedBy || '').toLowerCase()
+    if (causedBy && causedBy !== 'update') {
+      this.userAdjustedViewport = true
+      this.hasAppliedInitialUserViewport = true
+    }
+
+    this.syncViewportFromMapContext({
+      scale: detail.scale
+    })
   },
 
   onScaleUpdate(event) {
@@ -2385,11 +2782,23 @@ Page({
     })
   },
 
-  getNavigationVisiblePointIdSet(selectedPointId = null) {
+  getNavigationSourcePoint(navigationSource = this.data.navigationSource) {
+    return navigationSource === 'current' ? null : DEFAULT_ENTRY_POINT
+  },
+
+  getNavigationVisiblePointIdSet(selectedPointId = null, options = {}) {
+    const {
+      navigationSource = this.data.navigationSource
+    } = options
     const pointIds = new Set()
 
     if (selectedPointId !== null && selectedPointId !== undefined) {
       pointIds.add(String(selectedPointId))
+    }
+
+    const sourcePoint = this.getNavigationSourcePoint(navigationSource)
+    if (sourcePoint?.id) {
+      pointIds.add(String(sourcePoint.id))
     }
 
     const targetPoint = this.getNavigationTargetPoint()
@@ -2426,13 +2835,11 @@ Page({
 
   buildVisibleMarkers(filterType, selectedPointId, selectedRoute = this.selectedIntelligentRoute, options = {}) {
     const {
-      navigationMode = this.data.navigationActive
+      visiblePointIds = null
     } = options
 
-    const visiblePointIds = navigationMode
-      ? Array.from(this.getNavigationVisiblePointIdSet(selectedPointId))
-      : null
-
+    // Keep all map point markers visible during navigation. The active route is
+    // already expressed by the polyline and selected marker state.
     return buildMarkers(filterType, selectedPointId, selectedRoute, {
       visiblePointIds
     })
@@ -2448,6 +2855,57 @@ Page({
     }
 
     return estimateNavigationProgress(route, userLocation)
+  },
+
+  getRouteAwarePoiCandidate(points, userLocation, options = {}) {
+    const route = options.route || this.selectedIntelligentRoute
+    if (!route || !userLocation || !Array.isArray(points) || !points.length) {
+      return null
+    }
+
+    const progress = options.progress || this.getNavigationRouteProgress(userLocation, route)
+    if (!progress || !Number.isFinite(progress.minDistanceToRoute) || progress.minDistanceToRoute > NAVIGATION_OFF_ROUTE_MAX_METERS) {
+      return null
+    }
+
+    const routePoints = flattenRoutePolylinePoints(route)
+    if (!routePoints.length) {
+      return null
+    }
+
+    let candidate = null
+    let minRouteDistance = Number.POSITIVE_INFINITY
+
+    points.forEach((point) => {
+      if (!isPointOnRoute(point, route)) {
+        return
+      }
+
+      const triggerRadius = Math.max(16, Number(point?.triggerRadiusM) || AUTO_AUDIO_DEFAULT_TRIGGER_RADIUS_METERS)
+      const closestPathIndex = getClosestPointIndex(routePoints, point)
+      const routeDistance = estimateRouteDistanceToPoint(route, {
+        ...point,
+        closestPathIndex
+      }, {
+        routePoints,
+        progress,
+        userLocation
+      })
+
+      if (routeDistance > triggerRadius + ROUTE_DISTANCE_TRIGGER_BUFFER_METERS || routeDistance >= minRouteDistance) {
+        return
+      }
+
+      minRouteDistance = routeDistance
+      candidate = {
+        ...point,
+        closestPathIndex,
+        routeDistanceMeters: routeDistance,
+        triggerRadius
+      }
+    })
+
+    return candidate
   },
 
   getUpcomingNavigationGuide(progress, userLocation = null) {
@@ -2473,7 +2931,12 @@ Page({
 
     return {
       ...candidate,
-      distanceToGuideMeters: userLocation ? haversineMeters(userLocation, candidate) : Number.NaN
+      distanceToGuideMeters: userLocation
+        ? estimateRouteDistanceToPoint(this.selectedIntelligentRoute, candidate, {
+          progress,
+          userLocation
+        })
+        : Number.NaN
     }
   },
 
@@ -2660,11 +3123,10 @@ Page({
       currentPopupData: this.buildArrivedPopupData(point),
       showAudioPlayer: true,
       navigationAudioMode: 'full',
+      navigationPanelCollapsed: false,
       allMarkers: this.buildVisibleMarkers('all', point.id, this.selectedIntelligentRoute, {
         navigationMode: true
       })
-    }, () => {
-      this.focusPointInViewport(point)
     })
   },
 
@@ -2700,9 +3162,6 @@ Page({
         navigationMode: false
       }),
       polylineData: buildMapPolylines(),
-      longitude: point.longitude,
-      latitude: point.latitude,
-      scale: this.data.scale,
       intelligentRoutePlanningText: '智能线路规划',
       showAudioListDrawer: false,
       showPoiPopup: true,
@@ -2713,6 +3172,7 @@ Page({
       }),
       showIntelligentPlanner: false,
       navigationActive: false,
+      navigationPanelCollapsed: false,
       navigationAudioMode: 'full',
       navigationInfo: null,
       navigationDestination: null,
@@ -2724,7 +3184,6 @@ Page({
       this.ensureAutoAudioTrackingState({
         immediate: true
       })
-      this.focusPointInViewport(point)
       if (showToast) {
         wx.showToast({
           title: `已到达${point.name}`,
@@ -2757,7 +3216,6 @@ Page({
         navigationMode: true
       })
     }, () => {
-      this.focusPointInViewport(point)
       this.updateNavigationInfoState(userLocation, {
         recalculating: false
       })
@@ -2842,18 +3300,293 @@ Page({
     this.setData(nextState)
   },
 
-  fetchCurrentLocation() {
+  buildUserLocationPayload(location = {}) {
+    const latitude = toFiniteCoordinateValue(location?.latitude)
+    const longitude = toFiniteCoordinateValue(location?.longitude)
+
+    if (latitude === null || longitude === null) {
+      return null
+    }
+
+    const accuracy = Number(location?.accuracy)
+
+    return {
+      id: 'current-location',
+      name: '当前位置',
+      latitude,
+      longitude,
+      accuracy: Number.isFinite(accuracy) ? accuracy : 0
+    }
+  },
+
+  cacheUserLocation(userLocation) {
+    if (!userLocation) {
+      return
+    }
+
+    this.latestUserLocation = {
+      ...userLocation
+    }
+    this.latestUserLocationAt = Date.now()
+  },
+
+  shouldKeepContinuousLocationRunning() {
+    return !!this.pageVisible
+      && !!this.data.showLocation
+      && (
+        !!this.data.navigationActive
+        || this.data.autoAudioEnabled !== false
+      )
+  },
+
+  ensureLocationChangeListenerRegistered() {
+    if (this.locationChangeListenerRegistered || typeof wx.onLocationChange !== 'function') {
+      return
+    }
+
+    this.locationChangeHandler = (location) => {
+      if (!this.shouldKeepContinuousLocationRunning()) {
+        return
+      }
+
+      const userLocation = this.buildUserLocationPayload(location)
+      if (!userLocation) {
+        return
+      }
+
+      this.dispatchContinuousLocationUpdate(userLocation)
+    }
+
+    wx.onLocationChange(this.locationChangeHandler)
+    this.locationChangeListenerRegistered = true
+  },
+
+  releaseLocationChangeListener() {
+    if (!this.locationChangeListenerRegistered) {
+      return
+    }
+
+    if (typeof wx.offLocationChange === 'function' && this.locationChangeHandler) {
+      wx.offLocationChange(this.locationChangeHandler)
+    }
+
+    this.locationChangeListenerRegistered = false
+    this.locationChangeHandler = null
+  },
+
+  dispatchContinuousLocationUpdate(userLocation, options = {}) {
+    if (!userLocation) {
+      return
+    }
+
+    this.cacheUserLocation(userLocation)
+
+    if (this.data.navigationActive) {
+      this.handleNavigationLocationUpdate(userLocation, {
+        allowAutoRecalculate: true,
+        ...options
+      })
+      return
+    }
+
+    if (this.shouldKeepAutoAudioTrackingRunning()) {
+      this.handleAutoAudioLocationUpdate(userLocation)
+      return
+    }
+
+    this.setData({
+      userLocation
+    })
+  },
+
+  ensureContinuousLocationUpdateState(options = {}) {
+    if (this.shouldKeepContinuousLocationRunning()) {
+      this.startContinuousLocationUpdates(options)
+      return
+    }
+
+    this.stopContinuousLocationUpdates()
+  },
+
+  startContinuousLocationUpdates(options = {}) {
+    const {
+      immediate = false,
+      onFail = null,
+      onUnavailable = null
+    } = options
+    let requestToken = this.locationUpdateRequestToken
+    const isRequestStale = () => requestToken !== this.locationUpdateRequestToken
+      || !this.shouldKeepContinuousLocationRunning()
+    const notifyUnavailable = (error) => {
+      if (typeof onUnavailable === 'function') {
+        onUnavailable(error)
+      }
+    }
+
+    if (!this.shouldKeepContinuousLocationRunning()) {
+      this.stopContinuousLocationUpdates()
+      return
+    }
+
+    const hydrateImmediateLocation = () => {
+      if (!immediate || isRequestStale()) {
+        return
+      }
+
+      const hasFreshCachedLocation = this.latestUserLocation
+        && Date.now() - Number(this.latestUserLocationAt || 0) <= 3000
+
+      if (hasFreshCachedLocation) {
+        if (!isRequestStale()) {
+          this.dispatchContinuousLocationUpdate(this.latestUserLocation)
+        }
+        return
+      }
+
+      this.fetchCurrentLocation({
+        preferCache: false
+      })
+        .then((userLocation) => {
+          if (isRequestStale()) {
+            return
+          }
+
+          this.dispatchContinuousLocationUpdate(userLocation)
+        })
+        .catch((error) => {
+          if (isRequestStale()) {
+            return
+          }
+
+          if (typeof onFail === 'function') {
+            onFail(error)
+          }
+        })
+    }
+
+    this.ensureLocationChangeListenerRegistered()
+
+    if (this.locationUpdateActive) {
+      hydrateImmediateLocation()
+      return
+    }
+
+    if (this.locationUpdateStarting) {
+      hydrateImmediateLocation()
+      return
+    }
+
+    if (typeof wx.startLocationUpdate !== 'function') {
+      notifyUnavailable(new Error('startLocationUpdate is unavailable'))
+      hydrateImmediateLocation()
+      return
+    }
+
+    this.locationUpdateStarting = true
+    requestToken = this.locationUpdateRequestToken + 1
+    this.locationUpdateRequestToken = requestToken
+
+    wx.startLocationUpdate({
+      success: () => {
+        if (isRequestStale()) {
+          return
+        }
+
+        this.locationUpdateStarting = false
+        this.locationUpdateActive = true
+        hydrateImmediateLocation()
+      },
+      fail: (error) => {
+        if (isRequestStale()) {
+          return
+        }
+
+        this.locationUpdateStarting = false
+        this.locationUpdateActive = false
+        notifyUnavailable(error)
+        if (immediate) {
+          this.fetchCurrentLocation({
+            preferCache: false
+          })
+            .then((userLocation) => {
+              if (isRequestStale()) {
+                return
+              }
+
+              this.dispatchContinuousLocationUpdate(userLocation)
+            })
+            .catch(() => {
+              if (isRequestStale()) {
+                return
+              }
+
+              if (typeof onFail === 'function') {
+                onFail(error)
+              }
+            })
+          return
+        }
+
+        if (typeof onFail === 'function') {
+          onFail(error)
+        }
+      }
+    })
+  },
+
+  stopContinuousLocationUpdates(options = {}) {
+    const {
+      releaseListener = false
+    } = options
+
+    this.locationUpdateRequestToken += 1
+    this.locationUpdateStarting = false
+    this.locationUpdateActive = false
+
+    if (typeof wx.stopLocationUpdate === 'function') {
+      wx.stopLocationUpdate({
+        fail: () => {}
+      })
+    }
+
+    if (releaseListener) {
+      this.releaseLocationChangeListener()
+    }
+  },
+
+  fetchCurrentLocation(options = {}) {
+    const {
+      preferCache = true,
+      maxAgeMs = 3000
+    } = options
+
+    if (
+      preferCache
+      && this.latestUserLocation
+      && Date.now() - Number(this.latestUserLocationAt || 0) <= maxAgeMs
+    ) {
+      return Promise.resolve({
+        ...this.latestUserLocation
+      })
+    }
+
     return new Promise((resolve, reject) => {
       wx.getLocation({
         type: 'gcj02',
         success: ({ latitude, longitude, accuracy = 0 }) => {
-          resolve({
-            id: 'current-location',
-            name: '当前位置',
+          const userLocation = this.buildUserLocationPayload({
             latitude,
             longitude,
             accuracy
           })
+
+          if (!userLocation) {
+            reject(new Error('invalid location payload'))
+            return
+          }
+
+          this.cacheUserLocation(userLocation)
+          resolve(userLocation)
         },
         fail: reject
       })
@@ -2887,15 +3620,16 @@ Page({
       clearInterval(this.autoAudioTrackingTimer)
       this.autoAudioTrackingTimer = null
     }
+
+    this.ensureContinuousLocationUpdateState()
   },
 
-  startAutoAudioTracking(options = {}) {
+  startAutoAudioPollingFallback(options = {}) {
     const {
       immediate = false
     } = options
 
     if (!this.shouldKeepAutoAudioTrackingRunning()) {
-      this.stopAutoAudioTracking()
       return
     }
 
@@ -2909,6 +3643,29 @@ Page({
     if (immediate || !isRunning) {
       this.refreshAutoAudioTracking()
     }
+  },
+
+  startAutoAudioTracking(options = {}) {
+    const {
+      immediate = false
+    } = options
+
+    if (!this.shouldKeepAutoAudioTrackingRunning()) {
+      this.stopAutoAudioTracking()
+      return
+    }
+
+    if (this.autoAudioTrackingTimer) {
+      clearInterval(this.autoAudioTrackingTimer)
+      this.autoAudioTrackingTimer = null
+    }
+
+    this.ensureContinuousLocationUpdateState({
+      immediate,
+      onUnavailable: () => {
+        this.startAutoAudioPollingFallback()
+      }
+    })
   },
 
   refreshAutoAudioTracking() {
@@ -2928,15 +3685,40 @@ Page({
       return
     }
 
+    this.applyInitialUserViewport(userLocation)
     this.setData({
       userLocation
     })
 
+    this.handleAutoNearbySense(userLocation)
     this.handleAutoAudioPlayback(userLocation)
+  },
+
+  showAutoNearbyPoiPrompt(point) {
+    if (!point) {
+      return
+    }
+
+    const poiName = point.name || point.displayName || '当前景点'
+
+    wx.showToast({
+      title: `已靠近${poiName}`,
+      icon: 'none',
+      duration: AUTO_AUDIO_NEARBY_TOAST_DURATION_MS
+    })
   },
 
   findNearestAutoAudioPoi(userLocation) {
     if (!userLocation || !AUTO_AUDIO_POI_POINTS.length) {
+      return null
+    }
+
+    const routeAwareCandidate = this.getRouteAwarePoiCandidate(AUTO_AUDIO_POI_POINTS, userLocation)
+    if (routeAwareCandidate) {
+      return routeAwareCandidate
+    }
+
+    if (this.selectedIntelligentRoute) {
       return null
     }
 
@@ -2957,6 +3739,102 @@ Page({
     })
 
     return candidate
+  },
+
+  findNearestAutoNearbyPoi(userLocation) {
+    if (!userLocation || !AUTO_NEARBY_POI_POINTS.length) {
+      return null
+    }
+
+    const routeAwareCandidate = this.getRouteAwarePoiCandidate(AUTO_NEARBY_POI_POINTS, userLocation)
+    if (routeAwareCandidate) {
+      return routeAwareCandidate
+    }
+
+    if (this.selectedIntelligentRoute) {
+      return null
+    }
+
+    let candidate = null
+    let minDistance = Number.POSITIVE_INFINITY
+
+    AUTO_NEARBY_POI_POINTS.forEach((point) => {
+      const distance = haversineMeters(userLocation, point)
+      const triggerRadius = Math.max(16, Number(point.triggerRadiusM) || AUTO_AUDIO_DEFAULT_TRIGGER_RADIUS_METERS)
+
+      if (distance <= triggerRadius && distance < minDistance) {
+        minDistance = distance
+        candidate = {
+          ...point,
+          triggerRadius
+        }
+      }
+    })
+
+    return candidate
+  },
+
+  handleAutoNearbySense(userLocation) {
+    if (!this.shouldKeepAutoAudioTrackingRunning() || !userLocation) {
+      return
+    }
+
+    if (!this.isLocationInScenicArea(userLocation)) {
+      return
+    }
+
+    if (typeof userLocation.accuracy === 'number' && userLocation.accuracy > AUTO_AUDIO_ACCURACY_THRESHOLD_METERS) {
+      return
+    }
+
+    const nearestPoi = this.findNearestAutoNearbyPoi(userLocation)
+    if (!nearestPoi) {
+      return
+    }
+
+    const poiId = String(nearestPoi.id || nearestPoi.markerId || nearestPoi.name || '')
+    const now = Date.now()
+    const lastPoiId = String(this.autoNearbyState?.lastPoiId || '')
+    const lastTriggerTime = Number(this.autoNearbyState?.lastTriggerTime || 0)
+
+    if (poiId && lastPoiId === poiId && now - lastTriggerTime < AUTO_NEARBY_SAME_POI_COOLDOWN_MS) {
+      return
+    }
+
+    if (lastPoiId && lastPoiId !== poiId && now - lastTriggerTime < AUTO_NEARBY_CROSS_POI_COOLDOWN_MS) {
+      return
+    }
+
+    const currentPopupPointId = String(this.data.currentPopupData?.id || this.data.currentPopupData?.markerId || '')
+    const keepPopupVisible = !!this.data.showPoiPopup
+      && !this.data.showAudioListDrawer
+      && currentPopupPointId === poiId
+    const currentAudioPoiId = String(this.data.currentAudioPoi?.id || this.data.currentAudioPoi?.markerId || '')
+    const nextPopupData = keepPopupVisible
+      ? this.buildPointPopupData(nearestPoi, {
+        arrived: !!this.data.currentPopupData?.arrived,
+        audioPlaying: currentAudioPoiId === poiId && !!this.data.audioPlaying,
+        navigationActive: false
+      })
+      : null
+
+    this.autoNearbyState = {
+      lastPoiId: poiId,
+      lastTriggerTime: now
+    }
+
+    this.showAutoNearbyPoiPrompt(nearestPoi)
+
+    if (!keepPopupVisible) {
+      return
+    }
+
+    this.setData({
+      selectedPointId: nearestPoi.id,
+      allMarkers: this.buildVisibleMarkers(this.data.currentPoiFilter, nearestPoi.id, this.selectedIntelligentRoute),
+      showPoiPopup: keepPopupVisible,
+      currentPopupData: nextPopupData
+    })
   },
 
   handleAutoAudioPlayback(userLocation) {
@@ -3000,24 +3878,20 @@ Page({
       return
     }
 
-    const currentPopupPointId = String(this.data.currentPopupData?.id || this.data.currentPopupData?.markerId || '')
-    const keepPopupVisible = !!this.data.showPoiPopup && currentPopupPointId === poiId
-    const nextPopupData = keepPopupVisible
-      ? this.buildPointPopupData(nearestPoi, {
-        arrived: !!this.data.currentPopupData?.arrived,
-        audioPlaying: true,
-        navigationActive: false
-      })
-      : null
-
     this.autoAudioState = {
       lastAutoPoiId: poiId,
       lastTriggerTime: now
     }
 
     this.startPointAudioPlayback(nearestPoi, {
-      keepPopupVisible,
-      nextPopupData,
+      keepPopupVisible: !!this.data.showPoiPopup && String(this.data.currentPopupData?.id || this.data.currentPopupData?.markerId || '') === poiId,
+      nextPopupData: !!this.data.showPoiPopup && String(this.data.currentPopupData?.id || this.data.currentPopupData?.markerId || '') === poiId
+        ? this.buildPointPopupData(nearestPoi, {
+          arrived: !!this.data.currentPopupData?.arrived,
+          audioPlaying: true,
+          navigationActive: false
+        })
+        : null,
       fallbackPoiName: nearestPoi.name || '景点讲解',
       forcePlay: true,
       accessSource: 'auto',
@@ -3036,17 +3910,40 @@ Page({
 
     this.stopNavigationTracking()
 
-    if (immediate) {
+    this.ensureContinuousLocationUpdateState({
+      immediate,
+      onUnavailable: () => {
+        this.startNavigationPollingFallback()
+      },
+      onFail: () => {
+        this.handleNavigationLocationFailure()
+      }
+    })
+  },
+
+  startNavigationPollingFallback(options = {}) {
+    const {
+      immediate = false
+    } = options
+
+    if (!this.data.navigationActive) {
+      return
+    }
+
+    const isRunning = !!this.navigationTrackingTimer
+    if (!isRunning) {
+      this.navigationTrackingTimer = setInterval(() => {
+        this.refreshNavigationTracking({
+          allowAutoRecalculate: true
+        })
+      }, NAVIGATION_TRACK_INTERVAL_MS)
+    }
+
+    if (immediate || !isRunning) {
       this.refreshNavigationTracking({
         allowAutoRecalculate: true
       })
     }
-
-    this.navigationTrackingTimer = setInterval(() => {
-      this.refreshNavigationTracking({
-        allowAutoRecalculate: true
-      })
-    }, NAVIGATION_TRACK_INTERVAL_MS)
   },
 
   refreshNavigationTracking(options = {}) {
@@ -3078,6 +3975,7 @@ Page({
       return
     }
 
+    this.applyInitialUserViewport(userLocation)
     const {
       allowAutoRecalculate = true
     } = options
@@ -3197,9 +4095,6 @@ Page({
       selectedPointId: point.id,
       currentAudioPoi: buildAudioPoi(point),
       allMarkers: this.buildVisibleMarkers(this.data.currentPoiFilter, point.id, this.selectedIntelligentRoute),
-      longitude: point.longitude,
-      latitude: point.latitude,
-      scale: DEFAULT_ENTRY_SCALE,
       showAudioListDrawer: false,
       showPoiPopup: showPopup,
       currentPopupData: showPopup ? this.buildPointPopupData(point) : null
@@ -3331,13 +4226,15 @@ Page({
       }
 
       this.setData({
+        selectedPointId: point.id,
+        allMarkers: this.buildVisibleMarkers(this.data.currentPoiFilter, point.id, this.selectedIntelligentRoute),
         showAudioPlayer: true,
         showPoiPopup: keepPopupVisible,
         currentPopupData: nextPopupData
       }, () => {
         const audioPlayer = this.selectComponent('#audioPlayerGuide')
         if (!audioPlayer) {
-          navigateToPage(`/pages/scenic-audio-list/scenic-audio-list?poiName=${encodeURIComponent(fallbackPoiName)}`)
+          navigateToPage(`${GUIDE_AUDIO_LIST_PAGE}?poiName=${encodeURIComponent(fallbackPoiName)}`)
           return
         }
 
@@ -3366,6 +4263,8 @@ Page({
     }
 
     this.setData({
+      selectedPointId: point.id,
+      allMarkers: this.buildVisibleMarkers(this.data.currentPoiFilter, point.id, this.selectedIntelligentRoute),
       showAudioPlayer: true,
       audioPlaying: false,
       currentAudioPoi: nextAudioPoi,
@@ -3374,7 +4273,7 @@ Page({
     }, () => {
       const audioPlayer = this.selectComponent('#audioPlayerGuide')
       if (!audioPlayer) {
-        navigateToPage(`/pages/scenic-audio-list/scenic-audio-list?poiName=${encodeURIComponent(fallbackPoiName)}`)
+        navigateToPage(`${GUIDE_AUDIO_LIST_PAGE}?poiName=${encodeURIComponent(fallbackPoiName)}`)
         return
       }
 
@@ -3453,16 +4352,10 @@ Page({
 
   resolveNavigationStartPoint() {
     return new Promise((resolve) => {
-      wx.getLocation({
-        type: 'gcj02',
-        success: ({ latitude, longitude }) => {
-          const userLocation = {
-            id: 'current-location',
-            name: '当前位置',
-            latitude,
-            longitude
-          }
-
+      this.fetchCurrentLocation({
+        maxAgeMs: 5000
+      })
+        .then((userLocation) => {
           if (this.isLocationInScenicArea(userLocation)) {
             resolve({
               startPoint: userLocation,
@@ -3475,14 +4368,13 @@ Page({
             startPoint: DEFAULT_ENTRY_POINT || DEFAULT_ENTRY_CENTER,
             source: 'entry'
           })
-        },
-        fail: () => {
+        })
+        .catch(() => {
           resolve({
             startPoint: DEFAULT_ENTRY_POINT || DEFAULT_ENTRY_CENTER,
             source: 'entry'
           })
-        }
-      })
+        })
     })
   },
 
@@ -3498,7 +4390,16 @@ Page({
     const nextShowLocation = !!hasLocationPermission
 
     if (nextShowLocation === this.data.showLocation) {
-      if (nextShowLocation && this.data.navigationActive && !this.navigationTrackingTimer) {
+      if (nextShowLocation) {
+        this.refreshInitialUserViewport()
+      }
+
+      if (
+        nextShowLocation
+        && this.data.navigationActive
+        && !this.locationUpdateActive
+        && !this.locationUpdateStarting
+      ) {
         this.startNavigationTracking({
           immediate: true
         })
@@ -3513,6 +4414,10 @@ Page({
     this.setData({
       showLocation: nextShowLocation
     }, () => {
+      if (nextShowLocation) {
+        this.refreshInitialUserViewport()
+      }
+
       if (this.data.navigationActive) {
         if (nextShowLocation) {
           this.startNavigationTracking({
@@ -3653,6 +4558,7 @@ Page({
 
     const route = this.resolveRouteFromEntryRequest(request)
     if (route) {
+      this.hasDirectEntryTarget = true
       this.applyPreviewRoute(route, {
         toastTitle: request.toastTitle || `已加载${route.name}`
       })
@@ -3674,6 +4580,7 @@ Page({
     }
 
     if (!point && request.coordinate) {
+      this.hasDirectEntryTarget = true
       const nearestPoint = findNearestDisplayPointByCoordinate(request.coordinate)
 
       if (nearestPoint) {
@@ -3694,7 +4601,7 @@ Page({
       this.setData({
         longitude: request.coordinate.longitude,
         latitude: request.coordinate.latitude,
-        scale: DEFAULT_ENTRY_SCALE,
+        scale: this.data.scale || this.getDefaultMapScale(),
         showPoiPopup: false,
         currentPopupData: null
       })
@@ -3704,6 +4611,8 @@ Page({
     if (!point) {
       return
     }
+
+    this.hasDirectEntryTarget = true
 
     if (shouldAutoPlayAudio) {
       setTimeout(() => {
@@ -3777,9 +4686,6 @@ Page({
         navigationMode: false
       }),
       polylineData: buildMapPolylines(route),
-      longitude: route.focusCenter?.longitude || DEFAULT_SCENIC_CENTER.longitude,
-      latitude: route.focusCenter?.latitude || DEFAULT_SCENIC_CENTER.latitude,
-      scale: route.focusScale || DEFAULT_OVERVIEW_SCALE,
       intelligentRoutePlanningText: route.name,
       showAudioListDrawer: false,
       showPoiPopup: false,
@@ -3791,14 +4697,11 @@ Page({
       navigationSource: '',
       navigationRecalculating: false,
       navigationAutoAudioHint: '',
-      userLocation: null,
+      userLocation: this.data.userLocation || null,
       preNavigationState: null
     }, () => {
       this.ensureAutoAudioTrackingState({
         immediate: true
-      })
-      this.focusRouteInViewport(route, {
-        padding: [140, 56, 320, 56]
       })
     })
 
@@ -3882,18 +4785,17 @@ Page({
       audioPoiList: this.getNavigationAudioPoiList(point),
       showAudioPlayer: true,
       allMarkers: this.buildVisibleMarkers('all', point.id, route, {
-        navigationMode: true
+        navigationMode: true,
+        navigationSource: source
       }),
       polylineData: buildMapPolylines(route),
-      longitude: route.focusCenter?.longitude || point.longitude,
-      latitude: route.focusCenter?.latitude || point.latitude,
-      scale: route.focusScale || DEFAULT_OVERVIEW_SCALE,
       intelligentRoutePlanningText: `前往${point.name}`,
       showAudioListDrawer: false,
       showPoiPopup: false,
       currentPopupData: null,
       showIntelligentPlanner: false,
       navigationActive: true,
+      navigationPanelCollapsed: false,
       navigationAudioMode: 'full',
       navigationInfo,
       navigationSource: source,
@@ -3910,9 +4812,6 @@ Page({
       userLocation: seedLocation || this.data.userLocation || null
     }, () => {
       this.ensureAutoAudioTrackingState()
-      this.focusRouteInViewport(route, {
-        padding: [150, 56, 360, 56]
-      })
       this.startNavigationTracking({
         immediate: !seedLocation
       })
@@ -4028,6 +4927,16 @@ Page({
     this.endNavigation()
   },
 
+  onToggleNavigationPanel() {
+    if (!this.data.navigationActive) {
+      return
+    }
+
+    this.setData({
+      navigationPanelCollapsed: !this.data.navigationPanelCollapsed
+    })
+  },
+
   endNavigation() {
     const preNavigationState = this.data.preNavigationState
 
@@ -4039,6 +4948,7 @@ Page({
       this.setData({
         ...preNavigationState,
         navigationActive: false,
+        navigationPanelCollapsed: false,
         navigationAudioMode: 'full',
         navigationInfo: null,
         navigationDestination: null,
@@ -4067,22 +4977,21 @@ Page({
           navigationMode: false
         }),
         polylineData: buildMapPolylines(),
-        longitude: DEFAULT_ENTRY_CENTER.longitude,
-        latitude: DEFAULT_ENTRY_CENTER.latitude,
-        scale: DEFAULT_ENTRY_SCALE,
+        ...this.getCurrentViewportState(),
         intelligentRoutePlanningText: '智能线路规划',
         showAudioListDrawer: false,
         showPoiPopup: false,
         currentPopupData: null,
         showIntelligentPlanner: false,
         navigationActive: false,
+        navigationPanelCollapsed: false,
         navigationAudioMode: 'full',
         navigationInfo: null,
         navigationDestination: null,
         navigationSource: '',
         navigationRecalculating: false,
         navigationAutoAudioHint: '',
-        userLocation: null,
+        userLocation: this.data.userLocation || null,
         preNavigationState: null
       }, () => {
         this.ensureAutoAudioTrackingState({
@@ -4324,7 +5233,7 @@ Page({
     if (!this.requireMapVipAccess(MAP_ROUTE_PLANNING_FEATURE_KEY, {
       action: 'intelligent_route_planning',
       poiName: '智能路线规划',
-      successRedirect: '/pages/map/map?showAIRoute=1'
+      successRedirect: `${GUIDE_MAP_PAGE}?showAIRoute=1`
     })) {
       return
     }
@@ -4385,7 +5294,7 @@ Page({
   },
 
   buildAIChatSubscribeUrl(targetUrl = '') {
-    return `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(AI_CHAT_PAYMENT_FEATURE_KEY)}&featureName=${encodeURIComponent('AI智能对话')}&productName=${encodeURIComponent('AI聊天权限')}&description=${encodeURIComponent(AI_CHAT_SUBSCRIBE_DESCRIPTION)}${targetUrl ? `&successRedirect=${encodeURIComponent(targetUrl)}` : ''}`
+    return `${GUIDE_SUBSCRIBE_PAGE}?feature=${encodeURIComponent(AI_CHAT_PAYMENT_FEATURE_KEY)}&featureName=${encodeURIComponent('AI智能对话')}&productName=${encodeURIComponent('AI聊天权限')}&description=${encodeURIComponent(AI_CHAT_SUBSCRIBE_DESCRIPTION)}${targetUrl ? `&successRedirect=${encodeURIComponent(targetUrl)}` : ''}`
   },
 
   redirectToAIChatSubscribe(targetUrl = '') {
@@ -4415,7 +5324,7 @@ Page({
     }
     const successRedirect = String(context.successRedirect || '').trim()
 
-    return `/pages/payment/subscribe/subscribe?feature=${encodeURIComponent(featureKey)}&featureName=${encodeURIComponent(meta.featureName)}&productName=${encodeURIComponent(meta.productName)}&description=${encodeURIComponent(meta.description)}${successRedirect ? `&successRedirect=${encodeURIComponent(successRedirect)}` : ''}`
+    return `${GUIDE_SUBSCRIBE_PAGE}?feature=${encodeURIComponent(featureKey)}&featureName=${encodeURIComponent(meta.featureName)}&productName=${encodeURIComponent(meta.productName)}&description=${encodeURIComponent(meta.description)}${successRedirect ? `&successRedirect=${encodeURIComponent(successRedirect)}` : ''}`
   },
 
   requireMapVipAccess(featureKey, context = {}) {

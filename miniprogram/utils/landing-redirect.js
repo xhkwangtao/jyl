@@ -1,6 +1,10 @@
 const {
   resolvePoiSourceCodeToCanonical
 } = require('./poi-source-code.js')
+const {
+  GUIDE_MAP_PAGE,
+  GUIDE_SUBSCRIBE_PAGE
+} = require('./guide-routes')
 
 const STORAGE_KEYS = {
   scene: 'landingScene',
@@ -9,7 +13,7 @@ const STORAGE_KEYS = {
   compatibilitySource: 'sParam'
 }
 
-const VIP_SUBSCRIBE_PATH = '/pages/payment/subscribe/subscribe'
+const VIP_SUBSCRIBE_PATH = GUIDE_SUBSCRIBE_PAGE
 const ROUTE_SOURCE_CODES = new Set(['route-highlight', 'route-deep'])
 const POINT_SOURCE_TYPES = new Set(['bsp'])
 const ROUTE_SOURCE_TYPES = new Set(['route'])
@@ -223,19 +227,19 @@ function buildMapPageUrlFromLanding(options = {}) {
   const canonicalPoiSerialNumber = resolvePoiSourceCodeToCanonical(serialNumber)
 
   if (POINT_SOURCE_TYPES.has(sourceCode) && canonicalPoiSerialNumber) {
-    return buildQuery('/pages/map/map', {
+    return buildQuery(GUIDE_MAP_PAGE, {
       poiId: canonicalPoiSerialNumber
     })
   }
 
   if (ROUTE_SOURCE_TYPES.has(sourceCode) && (ROUTE_SOURCE_CODES.has(serialNumber) || serialNumber.startsWith('route-'))) {
-    return buildQuery('/pages/map/map', {
+    return buildQuery(GUIDE_MAP_PAGE, {
       routeData: buildRouteDataQueryValue(serialNumber)
     })
   }
 
   if (FILTER_SOURCE_TYPES.has(sourceCode) && serialNumber) {
-    return buildQuery('/pages/map/map', {
+    return buildQuery(GUIDE_MAP_PAGE, {
       filter: serialNumber
     })
   }

@@ -1,4 +1,31 @@
-const DEFAULT_AVATAR = '/images/ai-assistant-xiaoying.png'
+const GUIDE_AVATAR_SPRITE = {
+  imagePath: '/subpackages/guide/images/audio-guide/guide-avatar-talking-sprite.png',
+  frameCount: 20,
+  columns: 5,
+  rows: 4,
+  frameInterval: 150,
+  idleFrameIndex: 0
+}
+
+function clampFrameIndex(frameIndex) {
+  const maxIndex = Math.max(0, GUIDE_AVATAR_SPRITE.frameCount - 1)
+  const safeIndex = Number.isFinite(frameIndex) ? Math.round(frameIndex) : GUIDE_AVATAR_SPRITE.idleFrameIndex
+  return Math.min(Math.max(0, safeIndex), maxIndex)
+}
+
+function buildAvatarSpriteStyle(frameIndex) {
+  const safeFrameIndex = clampFrameIndex(frameIndex)
+  const column = safeFrameIndex % GUIDE_AVATAR_SPRITE.columns
+  const row = Math.floor(safeFrameIndex / GUIDE_AVATAR_SPRITE.columns)
+  const translateX = -(column * (100 / GUIDE_AVATAR_SPRITE.columns))
+  const translateY = -(row * (100 / GUIDE_AVATAR_SPRITE.rows))
+
+  return [
+    `width:${GUIDE_AVATAR_SPRITE.columns * 100}%`,
+    `height:${GUIDE_AVATAR_SPRITE.rows * 100}%`,
+    `transform:translate3d(${translateX.toFixed(4)}%, ${translateY.toFixed(4)}%, 0)`
+  ].join(';')
+}
 
 Component({
   properties: {
@@ -29,9 +56,9 @@ Component({
   },
 
   data: {
-    avatarImages: {
-      currentFrame: DEFAULT_AVATAR
-    },
+    avatarSpritePath: GUIDE_AVATAR_SPRITE.imagePath,
+    avatarFrameIndex: GUIDE_AVATAR_SPRITE.idleFrameIndex,
+    avatarSpriteStyle: buildAvatarSpriteStyle(GUIDE_AVATAR_SPRITE.idleFrameIndex),
     animationState: 'idle',
     statusText: '点击地图点位开始导览',
     scoreLabel: '积分：',
@@ -63,6 +90,7 @@ Component({
 
     detached() {
       this.clearProgressTimer()
+      this.clearAvatarTimer()
     }
   },
 
@@ -71,11 +99,11 @@ Component({
       const statusText = point?.name ? `我正在听${point.name}` : '点击地图点位开始导览'
 
       this.clearProgressTimer()
+      this.clearAvatarTimer()
       this.setData({
         statusText,
-        avatarImages: {
-          currentFrame: DEFAULT_AVATAR
-        },
+        avatarFrameIndex: GUIDE_AVATAR_SPRITE.idleFrameIndex,
+        avatarSpriteStyle: buildAvatarSpriteStyle(GUIDE_AVATAR_SPRITE.idleFrameIndex),
         animationState: point ? 'breathing' : 'idle',
         isPlaying: false,
         isMuted: false,
@@ -109,6 +137,7 @@ Component({
         isPlaying: true,
         animationState: 'talking'
       })
+      this.startAvatarTimer()
       this.startProgressTimer()
       this.triggerEvent('audioPlay', {
         poi: this.properties.currentPoi
@@ -185,12 +214,43 @@ Component({
       }
     },
 
+    startAvatarTimer() {
+      this.clearAvatarTimer()
+
+      let nextFrameIndex = (clampFrameIndex(this.data.avatarFrameIndex) + 1) % GUIDE_AVATAR_SPRITE.frameCount
+      this.setAvatarFrame(nextFrameIndex)
+      nextFrameIndex = (nextFrameIndex + 1) % GUIDE_AVATAR_SPRITE.frameCount
+
+      this.avatarTimer = setInterval(() => {
+        this.setAvatarFrame(nextFrameIndex)
+        nextFrameIndex = (nextFrameIndex + 1) % GUIDE_AVATAR_SPRITE.frameCount
+      }, GUIDE_AVATAR_SPRITE.frameInterval)
+    },
+
+    clearAvatarTimer() {
+      if (this.avatarTimer) {
+        clearInterval(this.avatarTimer)
+        this.avatarTimer = null
+      }
+    },
+
+    setAvatarFrame(frameIndex) {
+      const safeFrameIndex = clampFrameIndex(frameIndex)
+      this.setData({
+        avatarFrameIndex: safeFrameIndex,
+        avatarSpriteStyle: buildAvatarSpriteStyle(safeFrameIndex)
+      })
+    },
+
     stopPlayback(triggerStopEvent) {
       this.clearProgressTimer()
+      this.clearAvatarTimer()
 
       this.setData({
         isPlaying: false,
-        animationState: this.properties.currentPoi ? 'breathing' : 'idle'
+        animationState: this.properties.currentPoi ? 'breathing' : 'idle',
+        avatarFrameIndex: GUIDE_AVATAR_SPRITE.idleFrameIndex,
+        avatarSpriteStyle: buildAvatarSpriteStyle(GUIDE_AVATAR_SPRITE.idleFrameIndex)
       })
       this.triggerPlayStateChange()
 

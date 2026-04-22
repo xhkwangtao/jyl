@@ -4,11 +4,14 @@ const {
   getLandingRedirectConfig,
   buildMapPageUrlFromLanding
 } = require('../../utils/landing-redirect')
+const {
+  GUIDE_SUBSCRIBE_PAGE
+} = require('../../utils/guide-routes')
 const landingService = require('../../services/landing-service')
 
 const HOME_PAGE_URL = '/pages/index/index'
 const MY_PAGE_URL = '/pages/my-page/my-page'
-const SUBSCRIBE_PAGE_URL = '/pages/payment/subscribe/subscribe?feature=vip&from=landing_video'
+const SUBSCRIBE_PAGE_URL = `${GUIDE_SUBSCRIBE_PAGE}?feature=vip&from=landing_video`
 const VIDEO_VIEW_COUNT_STORAGE_KEY = 'landing_video_view_count'
 const VIP_FEATURE_KEY = 'vip'
 const DEFAULT_ENTRY_IMAGE_URL = '/images/xiaojiu.png'

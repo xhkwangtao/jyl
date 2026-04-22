@@ -10,6 +10,9 @@ const {
   filterSecretList,
   resolveSecretPointFromScanResult
 } = require('../../utils/secret-collection')
+const {
+  GUIDE_MAP_PAGE
+} = require('../../utils/guide-routes')
 
 function buildSectionCaption(currentFilter, collectedCount, pendingCount) {
   if (currentFilter === 'checked') {
@@ -255,7 +258,7 @@ Page({
       return
     }
 
-    navigateToPage(`/pages/map/map?pointId=${mapPointId}`)
+    navigateToPage(`${GUIDE_MAP_PAGE}?pointId=${mapPointId}`)
   },
 
   onMyPageTap() {
