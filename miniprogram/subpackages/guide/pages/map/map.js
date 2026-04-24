@@ -67,6 +67,12 @@ const AUTO_NEARBY_SAME_POI_COOLDOWN_MS = 30000
 const AUTO_NEARBY_CROSS_POI_COOLDOWN_MS = 8000
 // Temporary nearby prompt for on-site validation. Remove when no longer needed.
 const AUTO_AUDIO_NEARBY_TOAST_DURATION_MS = 1800
+const MAP_SUBKEY = ''
+const MAP_LAYER_STYLE = ''
+const BASE_MAP_MASK_FILL_COLOR = '#FBF8F4F7'
+const BASE_MAP_MASK_STROKE_COLOR = '#F7F1E800'
+const BASE_MAP_MASK_PADDING_FACTOR = 1.2
+const BASE_MAP_MASK_MIN_PADDING = 0.05
 const AUDIO_PAYWALL_PRICE = 7.8
 const AUDIO_PAYWALL_THROTTLE_MS = 1200
 const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
@@ -2049,6 +2055,58 @@ function buildViewportIncludePoints(points) {
   ]
 }
 
+function buildBaseMapMaskPolygons(points) {
+  if (!Array.isArray(points) || !points.length) {
+    return []
+  }
+
+  const bounds = points.reduce((accumulator, point) => ({
+    minLatitude: Math.min(accumulator.minLatitude, point.latitude),
+    maxLatitude: Math.max(accumulator.maxLatitude, point.latitude),
+    minLongitude: Math.min(accumulator.minLongitude, point.longitude),
+    maxLongitude: Math.max(accumulator.maxLongitude, point.longitude)
+  }), {
+    minLatitude: Number.POSITIVE_INFINITY,
+    maxLatitude: Number.NEGATIVE_INFINITY,
+    minLongitude: Number.POSITIVE_INFINITY,
+    maxLongitude: Number.NEGATIVE_INFINITY
+  })
+
+  const latitudePadding = Math.max(
+    (bounds.maxLatitude - bounds.minLatitude) * BASE_MAP_MASK_PADDING_FACTOR,
+    BASE_MAP_MASK_MIN_PADDING
+  )
+  const longitudePadding = Math.max(
+    (bounds.maxLongitude - bounds.minLongitude) * BASE_MAP_MASK_PADDING_FACTOR,
+    BASE_MAP_MASK_MIN_PADDING
+  )
+
+  return [{
+    points: [
+      {
+        latitude: bounds.minLatitude - latitudePadding,
+        longitude: bounds.minLongitude - longitudePadding
+      },
+      {
+        latitude: bounds.minLatitude - latitudePadding,
+        longitude: bounds.maxLongitude + longitudePadding
+      },
+      {
+        latitude: bounds.maxLatitude + latitudePadding,
+        longitude: bounds.maxLongitude + longitudePadding
+      },
+      {
+        latitude: bounds.maxLatitude + latitudePadding,
+        longitude: bounds.minLongitude - longitudePadding
+      }
+    ],
+    fillColor: BASE_MAP_MASK_FILL_COLOR,
+    strokeColor: BASE_MAP_MASK_STROKE_COLOR,
+    strokeWidth: 0,
+    zIndex: 1
+  }]
+}
+
 const ALL_ROUTE_DISPLAY_POINTS = JYL_ROUTE_MARKER_POINTS.map((point, index) => (
   decoratePointWithRouteMeta(createDisplayPoint(point, index))
 ))
@@ -2105,6 +2163,7 @@ const MAP_INCLUDE_POINTS = [
     longitude: point.longitude
   }))
 ]
+const BASE_MAP_MASK_POLYGONS = buildBaseMapMaskPolygons(MAP_INCLUDE_POINTS)
 
 const DEFAULT_OUTSIDE_SCENIC_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => (
   String(point.id) === 'poi-02'
@@ -2261,6 +2320,8 @@ function buildNearbyAudioPoiList(anchorPoint, options = {}) {
 Page({
   data: {
     navigationBarTotalHeight: 64,
+    mapSubkey: MAP_SUBKEY,
+    mapLayerStyle: MAP_LAYER_STYLE,
     longitude: DEFAULT_OUTSIDE_SCENIC_CENTER.longitude,
     latitude: DEFAULT_OUTSIDE_SCENIC_CENTER.latitude,
     scale: DEFAULT_ENTRY_SCALE,
@@ -2271,6 +2332,7 @@ Page({
     allMarkers: buildMarkers('all', null),
     markers: [],
     polylineData: buildMapPolylines(),
+    polygonData: BASE_MAP_MASK_POLYGONS,
     showPoiFilter: true,
     currentPoiFilter: 'all',
     showAudioPlayer: true,
