@@ -84,8 +84,6 @@
     </view>
 
     <map-core
-      subkey="{{mapSubkey}}"
-      layer-style="{{mapLayerStyle}}"
       longitude="{{longitude}}"
       latitude="{{latitude}}"
       scale="{{scale}}"
@@ -93,7 +91,6 @@
       enable-p-o-i="{{enablePOI}}"
       markers="{{allMarkers}}"
       polyline="{{polylineData}}"
-      polygons="{{polygonData}}"
       boundary-limit="{{mapBoundaryLimit}}"
       allowed-zooms="{{allowedZooms}}"
       bind:mapReady="onMapReady"

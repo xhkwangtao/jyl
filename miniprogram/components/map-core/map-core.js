@@ -16,14 +16,6 @@ Component({
       type: Boolean,
       value: false
     },
-    subkey: {
-      type: String,
-      value: ''
-    },
-    layerStyle: {
-      type: String,
-      value: ''
-    },
     enablePOI: {
       type: Boolean,
       value: false
@@ -33,10 +25,6 @@ Component({
       value: []
     },
     polyline: {
-      type: Array,
-      value: []
-    },
-    polygons: {
       type: Array,
       value: []
     },
