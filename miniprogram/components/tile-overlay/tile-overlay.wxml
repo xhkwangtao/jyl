@@ -1,0 +1,5 @@
+<view class="tile-overlay-container">
+  <view class="loading-indicator" wx:if="{{isLoading}}">
+    <text class="loading-text">加载景区底图中...</text>
+  </view>
+</view>

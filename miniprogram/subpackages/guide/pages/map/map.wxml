@@ -84,6 +84,7 @@
     </view>
 
     <map-core
+      id="guideMapCore"
       longitude="{{longitude}}"
       latitude="{{latitude}}"
       scale="{{scale}}"
@@ -99,6 +100,21 @@
       bind:mapTap="onMapTap"
       bind:markerTap="onMarkerTap"
       bind:poiTap="onPOITap"
+    />
+
+    <tile-overlay
+      wx:if="{{showTileOverlay}}"
+      id="tileOverlay"
+      map-ctx="{{mapCtx}}"
+      visible="{{true}}"
+      scale="{{scale}}"
+      bounds="{{tileMapBounds}}"
+      tile-server-config="{{tileServerConfig}}"
+      tile-opacity="{{tileOpacity}}"
+      tile-z-index="{{tileZIndex}}"
+      allowed-zooms="{{tileAllowedZooms}}"
+      bind:tilesLoaded="onGroundTilesLoaded"
+      bind:tilesError="onGroundTilesError"
     />
 
     <view class="navigation-status-card {{navigationPanelCollapsed ? 'navigation-status-card-collapsed' : ''}}" wx:if="{{navigationActive && navigationInfo}}">

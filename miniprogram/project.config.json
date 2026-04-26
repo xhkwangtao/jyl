@@ -14,6 +14,18 @@
       {
         "value": "docs",
         "type": "folder"
+      },
+      {
+        "value": "pkg-guide-tiles-base",
+        "type": "folder"
+      },
+      {
+        "value": "pkg-guide-tiles-z19-a",
+        "type": "folder"
+      },
+      {
+        "value": "pkg-guide-tiles-z19-b",
+        "type": "folder"
       }
     ],
     "include": []

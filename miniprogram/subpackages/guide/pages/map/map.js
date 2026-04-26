@@ -24,6 +24,10 @@ const {
   GUIDE_AUDIO_LIST_PAGE,
   GUIDE_SUBSCRIBE_PAGE
 } = require('../../../../utils/guide-routes')
+const {
+  JYL_CUSTOM_TILE_LAYER_CONFIG,
+  JYL_GROUND_TILE_OVERLAY_CONFIG
+} = require('../../../../config/jyl-custom-tile-layer.js')
 
 const DEFAULT_ENTRY_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => point.type === 'start') || JYL_ROUTE_MARKER_POINTS[0] || null
 const ENABLE_POI = false
@@ -87,6 +91,140 @@ const SOURCE_ROUTE_POLYLINES = JYL_ROUTE_POLYLINES.map((polyline, index) => ({
   ...polyline,
   sourcePolylineIndex: index
 }))
+const CUSTOM_TILE_LAYER_TOAST_TITLE = '当前设备地图内核不支持自定义瓦片'
+
+function normalizeStringValue(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function sanitizeTileLayerVersion(value) {
+  const normalizedValue = normalizeStringValue(value).replace(/[^\w.-]/g, '-')
+  return normalizedValue || 'v1'
+}
+
+function sanitizeTileLayerZoom(value, fallbackValue) {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return fallbackValue
+  }
+
+  return Math.max(3, Math.min(20, Math.round(numericValue)))
+}
+
+function normalizeMiniProgramPackagePath(value) {
+  return normalizeStringValue(value)
+    .replace(/\\/g, '/')
+    .replace(/^\.?\//, '')
+}
+
+function buildMiniProgramPackagePathCandidates(value) {
+  const normalizedPath = normalizeMiniProgramPackagePath(value)
+  if (!normalizedPath) {
+    return []
+  }
+
+  return Array.from(new Set([
+    normalizedPath,
+    `/${normalizedPath}`
+  ]))
+}
+
+function buildTileLayerLocalRootPath(config) {
+  return `${wx.env.USER_DATA_PATH}/${config.localCacheDirName}-${config.version}`
+}
+
+function buildTileLayerLocalZipPath(config) {
+  return `${wx.env.USER_DATA_PATH}/${config.localCacheDirName}-${config.version}.zip`
+}
+
+function buildTileLayerReadyStorageKey(config) {
+  return `jyl-custom-tile-layer-ready:${config.localCacheDirName}:${config.version}`
+}
+
+function buildTileLayerSourceUrlFormat(rootPath, sourceUrlFormat) {
+  return normalizeStringValue(sourceUrlFormat).replace('{root}', rootPath.replace(/\/$/, ''))
+}
+
+function normalizeCustomTileLayerConfig(config = {}) {
+  const normalizedSourceType = normalizeStringValue(config.sourceType).toLowerCase()
+  const sourceType = normalizedSourceType === 'download_zip'
+    ? 'download_zip'
+    : normalizedSourceType === 'package_zip'
+      ? 'package_zip'
+      : 'remote'
+
+  return {
+    enabled: !!config.enabled,
+    sourceType,
+    remoteSourceUrlFormat: normalizeStringValue(config.remoteSourceUrlFormat),
+    downloadZipUrl: normalizeStringValue(config.downloadZipUrl),
+    packageZipPath: normalizeMiniProgramPackagePath(config.packageZipPath),
+    version: sanitizeTileLayerVersion(config.version),
+    minZoom: sanitizeTileLayerZoom(config.minZoom, ALLOWED_ZOOMS[0] || 5),
+    maxZoom: sanitizeTileLayerZoom(config.maxZoom, ALLOWED_ZOOMS[ALLOWED_ZOOMS.length - 1] || 20),
+    localCacheDirName: normalizeStringValue(config.localCacheDirName) || 'jyl-custom-tiles',
+    localSourceUrlFormat: normalizeStringValue(config.localSourceUrlFormat) || '{root}/{z}/{x}/{y}.png',
+    showDebugToast: !!config.showDebugToast
+  }
+}
+
+function normalizeGroundTileOverlayConfig(config = {}) {
+  const allowedZooms = Array.isArray(config.allowedZooms)
+    ? [...new Set(
+      config.allowedZooms
+        .map((zoom) => sanitizeTileLayerZoom(zoom, null))
+        .filter((zoom) => Number.isFinite(zoom))
+    )].sort((left, right) => left - right)
+    : []
+
+  const minZoom = sanitizeTileLayerZoom(config.minZoom, allowedZooms[0] || 16)
+  const maxZoom = sanitizeTileLayerZoom(config.maxZoom, allowedZooms[allowedZooms.length - 1] || 19)
+
+  return {
+    enabled: !!config.enabled,
+    packageRoots: Array.isArray(config.packageRoots)
+      ? config.packageRoots.map((item) => normalizeStringValue(item)).filter(Boolean)
+      : [],
+    zoomBaseUrlMap: config.zoomBaseUrlMap && typeof config.zoomBaseUrlMap === 'object'
+      ? config.zoomBaseUrlMap
+      : null,
+    tileCoverageByZoom: config.tileCoverageByZoom && typeof config.tileCoverageByZoom === 'object'
+      ? config.tileCoverageByZoom
+      : null,
+    urlTemplate: normalizeStringValue(config.urlTemplate),
+    baseUrl: normalizeStringValue(config.baseUrl),
+    coordinateSystem: normalizeStringValue(config.coordinateSystem).toLowerCase() === 'gcj02' ? 'gcj02' : 'wgs84',
+    tileScheme: normalizeStringValue(config.tileScheme).toLowerCase() === 'tms' ? 'tms' : 'xyz',
+    tileFormat: normalizeStringValue(config.tileFormat) || 'png',
+    minZoom: Math.min(minZoom, maxZoom),
+    maxZoom: Math.max(minZoom, maxZoom),
+    allowedZooms: allowedZooms.length ? allowedZooms : [16, 17, 18, 19],
+    opacity: typeof config.opacity === 'number' ? Math.max(0, Math.min(1, config.opacity)) : 0.96,
+    zIndex: Number.isFinite(Number(config.zIndex)) ? Math.round(Number(config.zIndex)) : 1
+  }
+}
+
+function buildGroundTileOverlayServerConfig(config) {
+  if (!config) {
+    return null
+  }
+
+  return {
+    packageRoots: Array.isArray(config.packageRoots) ? config.packageRoots.slice() : [],
+    zoomBaseUrlMap: config.zoomBaseUrlMap || null,
+    tileCoverageByZoom: config.tileCoverageByZoom || null,
+    urlTemplate: config.urlTemplate,
+    baseUrl: config.baseUrl,
+    coordinateSystem: config.coordinateSystem,
+    tileScheme: config.tileScheme,
+    tileFormat: config.tileFormat,
+    minZoom: config.minZoom,
+    maxZoom: config.maxZoom,
+    allowedZooms: config.allowedZooms,
+    opacity: config.opacity,
+    zIndex: config.zIndex
+  }
+}
 
 function navigateToPage(url) {
   wx.navigateTo({
@@ -165,6 +303,51 @@ function buildCenter(points) {
   return {
     latitude: (bounds.minLatitude + bounds.maxLatitude) / 2,
     longitude: (bounds.minLongitude + bounds.maxLongitude) / 2
+  }
+}
+
+function buildBounds(points, options = {}) {
+  if (!Array.isArray(points) || !points.length) {
+    const fallbackLatitude = DEFAULT_ENTRY_POINT?.latitude || 40.491364
+    const fallbackLongitude = DEFAULT_ENTRY_POINT?.longitude || 116.491722
+    return {
+      southwest: {
+        latitude: fallbackLatitude - 0.0012,
+        longitude: fallbackLongitude - 0.0018
+      },
+      northeast: {
+        latitude: fallbackLatitude + 0.0012,
+        longitude: fallbackLongitude + 0.0018
+      }
+    }
+  }
+
+  const {
+    latitudePadding = 0.0008,
+    longitudePadding = 0.0012
+  } = options
+
+  const bounds = points.reduce((acc, point) => ({
+    minLatitude: Math.min(acc.minLatitude, point.latitude),
+    maxLatitude: Math.max(acc.maxLatitude, point.latitude),
+    minLongitude: Math.min(acc.minLongitude, point.longitude),
+    maxLongitude: Math.max(acc.maxLongitude, point.longitude)
+  }), {
+    minLatitude: Number.POSITIVE_INFINITY,
+    maxLatitude: Number.NEGATIVE_INFINITY,
+    minLongitude: Number.POSITIVE_INFINITY,
+    maxLongitude: Number.NEGATIVE_INFINITY
+  })
+
+  return {
+    southwest: {
+      latitude: bounds.minLatitude - latitudePadding,
+      longitude: bounds.minLongitude - longitudePadding
+    },
+    northeast: {
+      latitude: bounds.maxLatitude + latitudePadding,
+      longitude: bounds.maxLongitude + longitudePadding
+    }
   }
 }
 
@@ -2105,6 +2288,10 @@ const MAP_INCLUDE_POINTS = [
     longitude: point.longitude
   }))
 ]
+const DEFAULT_GROUND_TILE_OVERLAY_BOUNDS = buildBounds(MAP_INCLUDE_POINTS, {
+  latitudePadding: 0.001,
+  longitudePadding: 0.0014
+})
 
 const DEFAULT_OUTSIDE_SCENIC_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => (
   String(point.id) === 'poi-02'
@@ -2261,12 +2448,19 @@ function buildNearbyAudioPoiList(anchorPoint, options = {}) {
 Page({
   data: {
     navigationBarTotalHeight: 64,
+    mapCtx: null,
     longitude: DEFAULT_OUTSIDE_SCENIC_CENTER.longitude,
     latitude: DEFAULT_OUTSIDE_SCENIC_CENTER.latitude,
     scale: DEFAULT_ENTRY_SCALE,
     showLocation: true,
     enablePOI: ENABLE_POI,
     allowedZooms: ALLOWED_ZOOMS,
+    showTileOverlay: false,
+    tileMapBounds: DEFAULT_GROUND_TILE_OVERLAY_BOUNDS,
+    tileServerConfig: null,
+    tileOpacity: 0.96,
+    tileZIndex: 1,
+    tileAllowedZooms: [16, 17, 18, 19],
     mapBoundaryLimit: null,
     allMarkers: buildMarkers('all', null),
     markers: [],
@@ -2329,6 +2523,7 @@ Page({
       lastTriggerTime: 0
     }
     const systemInfo = wx.getSystemInfoSync()
+    this.systemInfoForDebug = systemInfo
     const menuButton = typeof wx.getMenuButtonBoundingClientRect === 'function'
       ? wx.getMenuButtonBoundingClientRect()
       : null
@@ -2341,6 +2536,17 @@ Page({
 
     this.selectedIntelligentRoute = null
     this.preNavigationSelectedRoute = null
+    this.customTileLayerConfig = normalizeCustomTileLayerConfig(JYL_CUSTOM_TILE_LAYER_CONFIG)
+    this.groundTileOverlayConfig = normalizeGroundTileOverlayConfig(JYL_GROUND_TILE_OVERLAY_CONFIG)
+    this.customTileLayerId = ''
+    this.customTileLayerVisible = false
+    this.customTileLayerReadyPromise = null
+    this.customTileLayerDebugToastShown = false
+    this.customTileLayerLoadToastShown = false
+    this.groundTilePackagesReady = false
+    this.groundTilePackageLoadPromise = null
+    this.groundTileOverlayLoadToastShown = false
+    this.groundTileOverlayLastErrorToastAt = 0
     const pageOptions = normalizeMapPageOptions(options)
     const hasDirectEntryTarget = Boolean(
       pageOptions.poi
@@ -2355,10 +2561,35 @@ Page({
     this.hasAppliedInitialUserViewport = false
     this.hasDirectEntryTarget = hasDirectEntryTarget
     this.pageOptions = pageOptions
+    const effectiveAllowedZooms = this.getEffectiveAllowedZooms()
+    const defaultMapScale = this.getDefaultMapScale()
     this.setData({
       navigationBarTotalHeight,
+      mapCtx: null,
+      scale: defaultMapScale,
+      allowedZooms: effectiveAllowedZooms,
+      showTileOverlay: false,
+      tileMapBounds: DEFAULT_GROUND_TILE_OVERLAY_BOUNDS,
+      tileServerConfig: buildGroundTileOverlayServerConfig(this.groundTileOverlayConfig),
+      tileOpacity: this.groundTileOverlayConfig?.opacity ?? 0.96,
+      tileZIndex: this.groundTileOverlayConfig?.zIndex ?? 1,
+      tileAllowedZooms: this.groundTileOverlayConfig?.allowedZooms || [16, 17, 18, 19],
       showAudioAccessTestPanel: normalizeBooleanValue(pageOptions.showTestTools) || pageOptions.action === 'executeAIRouteTest'
     }, () => {
+      this.ensureGroundTilePackagesLoaded()
+        .then((ready) => {
+          if (ready) {
+            this.setData({
+              showTileOverlay: true
+            }, () => {
+              this.refreshGroundTileOverlayViewport({
+                immediate: true
+              })
+            })
+          }
+        })
+        .catch(() => {})
+
       this.handleEntryRequest(pageOptions)
 
       if (!hasDirectEntryTarget && pageOptions.action === 'executeAIRouteTest') {
@@ -2382,6 +2613,8 @@ Page({
     this.refreshAudioAccessState()
     this.checkLocationPermission()
     this.checkPendingNavigationRequest()
+    this.ensureCustomTileLayerVisible()
+    this.refreshGroundTileOverlayViewport()
 
     if (this.data.audioPlaying) {
       this.requestKeepScreenOn('audio')
@@ -2398,6 +2631,11 @@ Page({
     this.pageVisible = false
     this.stopNavigationTracking()
     this.stopAutoAudioTracking()
+    this.setCustomTileLayerVisibility(false)
+    if (this.groundTileOverlayRefreshTimer) {
+      clearTimeout(this.groundTileOverlayRefreshTimer)
+      this.groundTileOverlayRefreshTimer = null
+    }
     this.locationPermissionPromptShown = false
     this.locationPermissionPrompting = false
     this.disableKeepScreenOn()
@@ -2527,6 +2765,7 @@ Page({
     this.pageVisible = false
     this.stopNavigationTracking()
     this.stopAutoAudioTracking()
+    this.removeCustomTileLayer()
     this.stopContinuousLocationUpdates({
       releaseListener: true
     })
@@ -2590,7 +2829,39 @@ Page({
   },
 
   onMapReady(event) {
-    this.mapCtx = event.detail
+    const mapComponent = this.selectComponent('#guideMapCore')
+    this.mapCtx = mapComponent && typeof mapComponent.getMapContext === 'function'
+      ? mapComponent.getMapContext()
+      : null
+
+    if (this.data.mapCtx !== this.mapCtx) {
+      this.setData({
+        mapCtx: this.mapCtx
+      })
+    }
+
+    if (this.isGroundTileOverlayEnabled()) {
+      setTimeout(() => {
+        const tileOverlay = this.selectComponent('#tileOverlay')
+        if (!tileOverlay) {
+          return
+        }
+
+        tileOverlay.properties.mapCtx = this.mapCtx
+        tileOverlay.currentScale = this.data.scale
+
+        if (typeof tileOverlay.initTileOverlay === 'function') {
+          tileOverlay.initTileOverlay()
+        }
+      }, 120)
+    }
+
+    this.ensureCustomTileLayerReady()
+      .catch(() => {})
+
+    this.refreshGroundTileOverlayViewport({
+      immediate: true
+    })
 
     if (this.pendingViewportFocus) {
       const pendingViewportFocus = this.pendingViewportFocus
@@ -2599,15 +2870,614 @@ Page({
     }
   },
 
+  isGroundTileOverlayEnabled() {
+    return !!this.groundTileOverlayConfig?.enabled
+  },
+
+  ensureGroundTilePackagesLoaded() {
+    if (!this.isGroundTileOverlayEnabled()) {
+      return Promise.resolve(false)
+    }
+
+    if (this.groundTilePackagesReady) {
+      return Promise.resolve(true)
+    }
+
+    if (this.groundTilePackageLoadPromise) {
+      return this.groundTilePackageLoadPromise
+    }
+
+    const packageRoots = Array.isArray(this.groundTileOverlayConfig?.packageRoots)
+      ? this.groundTileOverlayConfig.packageRoots.filter(Boolean)
+      : []
+
+    if (!packageRoots.length || typeof wx.loadSubpackage !== 'function') {
+      this.groundTilePackagesReady = true
+      return Promise.resolve(true)
+    }
+
+    const loadOnePackage = (packageRoot) => new Promise((resolve, reject) => {
+      wx.loadSubpackage({
+        name: packageRoot,
+        success: () => resolve(true),
+        fail: reject
+      })
+    })
+
+    this.groundTilePackageLoadPromise = packageRoots.reduce(
+      (promise, packageRoot) => promise.then(() => loadOnePackage(packageRoot)),
+      Promise.resolve()
+    )
+      .then(() => {
+        this.groundTilePackagesReady = true
+        return true
+      })
+      .catch((error) => {
+        console.warn('[guide-map] ground tile package load failed', error)
+
+        if (this.pageVisible) {
+          wx.showToast({
+            title: '景区底图资源分包加载失败',
+            icon: 'none',
+            duration: 1800
+          })
+        }
+
+        return false
+      })
+      .finally(() => {
+        this.groundTilePackageLoadPromise = null
+      })
+
+    return this.groundTilePackageLoadPromise
+  },
+
+  refreshGroundTileOverlayViewport(options = {}) {
+    if (!this.isGroundTileOverlayEnabled()) {
+      return
+    }
+
+    const {
+      immediate = false,
+      scale = null
+    } = options
+
+    const run = () => {
+      const tileOverlay = this.selectComponent('#tileOverlay')
+      if (!tileOverlay || !this.mapCtx || typeof this.mapCtx.getRegion !== 'function') {
+        return
+      }
+
+      tileOverlay.properties.mapCtx = this.mapCtx
+      tileOverlay.currentScale = typeof scale === 'number'
+        ? this.clampScaleToAllowedZooms(scale)
+        : this.data.scale
+
+      this.mapCtx.getRegion({
+        success: (regionResult) => {
+          tileOverlay.updateBounds(regionResult)
+        },
+        fail: () => {}
+      })
+    }
+
+    if (immediate) {
+      run()
+      return
+    }
+
+    if (this.groundTileOverlayRefreshTimer) {
+      clearTimeout(this.groundTileOverlayRefreshTimer)
+    }
+
+    this.groundTileOverlayRefreshTimer = setTimeout(() => {
+      this.groundTileOverlayRefreshTimer = null
+      run()
+    }, 140)
+  },
+
+  onGroundTilesLoaded() {
+    if (!this.pageVisible || this.groundTileOverlayLoadToastShown) {
+      return
+    }
+
+    this.groundTileOverlayLoadToastShown = true
+    wx.showToast({
+      title: '景区底图已开始加载',
+      icon: 'none',
+      duration: 1500
+    })
+  },
+
+  onGroundTilesError(event) {
+    if (!this.pageVisible) {
+      return
+    }
+
+    const now = Date.now()
+    if (now - this.groundTileOverlayLastErrorToastAt < 1500) {
+      return
+    }
+
+    const tileCount = Array.isArray(event?.detail?.tiles) ? event.detail.tiles.length : 0
+    const firstFailedTile = tileCount ? event.detail.tiles[0] : null
+    if (firstFailedTile) {
+      console.warn('[guide-map] ground tile overlay failed', {
+        tileCount,
+        tileUrl: firstFailedTile.url || '',
+        runtimeSrc: firstFailedTile.runtimeSrc || '',
+        sourceCandidates: Array.isArray(firstFailedTile.sourceCandidates) ? firstFailedTile.sourceCandidates : [],
+        error: firstFailedTile.error || null
+      })
+    }
+    this.groundTileOverlayLastErrorToastAt = now
+    wx.showToast({
+      title: tileCount ? `底图瓦片加载失败 ${tileCount} 张` : '底图瓦片加载失败',
+      icon: 'none',
+      duration: 1800
+    })
+  },
+
+  isCustomTileLayerEnabled() {
+    return !!this.customTileLayerConfig?.enabled
+  },
+
+  isCustomTileLayerApiSupported() {
+    return !!(
+      this.mapCtx
+      && typeof this.mapCtx.addTileLayer === 'function'
+      && typeof this.mapCtx.removeTileLayer === 'function'
+    )
+  },
+
+  maybeNotifyCustomTileLayerUnsupported() {
+    if (this.customTileLayerDebugToastShown) {
+      return
+    }
+
+    this.customTileLayerDebugToastShown = true
+    const systemInfo = this.systemInfoForDebug || {}
+    console.warn('[guide-map] addTileLayer is not available in current environment', {
+      platform: systemInfo.platform || '',
+      system: systemInfo.system || '',
+      brand: systemInfo.brand || '',
+      model: systemInfo.model || ''
+    })
+
+    if (this.pageVisible && this.customTileLayerConfig?.showDebugToast) {
+      wx.showToast({
+        title: CUSTOM_TILE_LAYER_TOAST_TITLE,
+        icon: 'none',
+        duration: 1800
+      })
+    }
+  },
+
+  maybeNotifyCustomTileLayerLoadResult(success, error = null) {
+    if (!this.pageVisible || !this.customTileLayerConfig?.showDebugToast) {
+      return
+    }
+
+    if (success) {
+      if (this.customTileLayerLoadToastShown) {
+        return
+      }
+
+      this.customTileLayerLoadToastShown = true
+      wx.showToast({
+        title: '景区底图已加载',
+        icon: 'none',
+        duration: 1600
+      })
+      return
+    }
+
+    const errorMessage = normalizeStringValue(error?.errMsg || error?.message || error)
+    wx.showToast({
+      title: errorMessage ? `底图加载失败:${errorMessage.slice(0, 18)}` : '景区底图加载失败',
+      icon: 'none',
+      duration: 2200
+    })
+  },
+
+  ensureCustomTileLayerReady() {
+    if (!this.isCustomTileLayerEnabled() || !this.mapCtx) {
+      return Promise.resolve(false)
+    }
+
+    if (this.customTileLayerId) {
+      return this.setCustomTileLayerVisibility(true)
+        .then(() => true)
+    }
+
+    if (!this.isCustomTileLayerApiSupported()) {
+      this.maybeNotifyCustomTileLayerUnsupported()
+      return Promise.resolve(false)
+    }
+
+    if (this.customTileLayerReadyPromise) {
+      return this.customTileLayerReadyPromise
+    }
+
+    this.customTileLayerReadyPromise = this.resolveCustomTileLayerSourceUrlFormat()
+      .then((sourceUrlFormat) => {
+        if (!sourceUrlFormat) {
+          return false
+        }
+
+        return this.addCustomTileLayer(sourceUrlFormat)
+          .then((result) => {
+            if (result) {
+              this.maybeNotifyCustomTileLayerLoadResult(true)
+            }
+            return result
+          })
+      })
+      .catch((error) => {
+        console.warn('[guide-map] custom tile layer init failed', error)
+        this.maybeNotifyCustomTileLayerLoadResult(false, error)
+        return false
+      })
+      .finally(() => {
+        this.customTileLayerReadyPromise = null
+      })
+
+    return this.customTileLayerReadyPromise
+  },
+
+  resolveCustomTileLayerSourceUrlFormat() {
+    if (!this.isCustomTileLayerEnabled()) {
+      return Promise.resolve('')
+    }
+
+    const config = this.customTileLayerConfig
+    if (config.sourceType === 'download_zip') {
+      return this.ensureDownloadedCustomTileLayerSourceUrlFormat(config)
+    }
+
+    if (config.sourceType === 'package_zip') {
+      return this.ensurePackagedCustomTileLayerSourceUrlFormat(config)
+    }
+
+    return Promise.resolve(config.remoteSourceUrlFormat)
+  },
+
+  addCustomTileLayer(sourceUrlFormat) {
+    if (!this.mapCtx || typeof this.mapCtx.addTileLayer !== 'function') {
+      return Promise.resolve(false)
+    }
+
+    return new Promise((resolve, reject) => {
+      this.mapCtx.addTileLayer({
+        sourceUrlFormat,
+        success: (result = {}) => {
+          this.customTileLayerId = result.layerId || result.id || `jyl-custom-tile-layer-${Date.now()}`
+          this.customTileLayerVisible = true
+          resolve(true)
+        },
+        fail: (error) => {
+          reject(error)
+        }
+      })
+    })
+  },
+
+  setCustomTileLayerVisibility(visible = true) {
+    if (!this.customTileLayerId || !this.mapCtx || typeof this.mapCtx.setTileLayerVisibility !== 'function') {
+      this.customTileLayerVisible = !!visible
+      return Promise.resolve(false)
+    }
+
+    if (this.customTileLayerVisible === !!visible) {
+      return Promise.resolve(true)
+    }
+
+    return new Promise((resolve) => {
+      this.mapCtx.setTileLayerVisibility({
+        layerId: this.customTileLayerId,
+        visible: !!visible,
+        complete: () => {
+          this.customTileLayerVisible = !!visible
+          resolve(true)
+        }
+      })
+    })
+  },
+
+  ensureCustomTileLayerVisible() {
+    if (!this.isCustomTileLayerEnabled()) {
+      return Promise.resolve(false)
+    }
+
+    if (this.customTileLayerId) {
+      return this.setCustomTileLayerVisibility(true)
+    }
+
+    return this.ensureCustomTileLayerReady()
+  },
+
+  removeCustomTileLayer() {
+    const layerId = this.customTileLayerId
+    this.customTileLayerId = ''
+    this.customTileLayerVisible = false
+
+    if (!layerId || !this.mapCtx || typeof this.mapCtx.removeTileLayer !== 'function') {
+      return Promise.resolve(false)
+    }
+
+    return new Promise((resolve) => {
+      this.mapCtx.removeTileLayer({
+        layerId,
+        complete: () => {
+          resolve(true)
+        }
+      })
+    })
+  },
+
+  getMiniProgramFileSystemManager() {
+    if (typeof wx.getFileSystemManager !== 'function') {
+      return null
+    }
+
+    return wx.getFileSystemManager()
+  },
+
+  accessFileSystemPath(path) {
+    const fs = this.getMiniProgramFileSystemManager()
+    if (!fs || !normalizeStringValue(path)) {
+      return Promise.reject(new Error('filesystem unavailable'))
+    }
+
+    return new Promise((resolve, reject) => {
+      fs.access({
+        path,
+        success: () => resolve(path),
+        fail: reject
+      })
+    })
+  },
+
+  removeFileSystemPath(path) {
+    const fs = this.getMiniProgramFileSystemManager()
+    if (!fs || !normalizeStringValue(path)) {
+      return Promise.resolve(false)
+    }
+
+    return new Promise((resolve) => {
+      fs.rmdir({
+        dirPath: path,
+        recursive: true,
+        success: () => resolve(true),
+        fail: () => resolve(false)
+      })
+    })
+  },
+
+  removeFileSystemFile(path) {
+    const fs = this.getMiniProgramFileSystemManager()
+    if (!fs || !normalizeStringValue(path)) {
+      return Promise.resolve(false)
+    }
+
+    return new Promise((resolve) => {
+      fs.unlink({
+        filePath: path,
+        success: () => resolve(true),
+        fail: () => resolve(false)
+      })
+    })
+  },
+
+  ensureFileSystemDirectory(path) {
+    const fs = this.getMiniProgramFileSystemManager()
+    if (!fs || !normalizeStringValue(path)) {
+      return Promise.reject(new Error('filesystem unavailable'))
+    }
+
+    return new Promise((resolve, reject) => {
+      fs.mkdir({
+        dirPath: path,
+        recursive: true,
+        success: () => resolve(path),
+        fail: (error) => {
+          const errorMessage = String(error?.errMsg || '')
+          if (errorMessage.includes('file already exists')) {
+            resolve(path)
+            return
+          }
+
+          reject(error)
+        }
+      })
+    })
+  },
+
+  copyMiniProgramPackageFile(sourcePath, targetPath) {
+    const fs = this.getMiniProgramFileSystemManager()
+    const packagePathCandidates = buildMiniProgramPackagePathCandidates(sourcePath)
+    const localTargetPath = normalizeStringValue(targetPath)
+
+    if (!fs || !packagePathCandidates.length || !localTargetPath) {
+      return Promise.reject(new Error('package file copy path is empty'))
+    }
+
+    return new Promise((resolve, reject) => {
+      const readAndWriteCandidate = (packagePath, copyError, next) => {
+        fs.readFile({
+          filePath: packagePath,
+          success: (readResult = {}) => {
+            fs.writeFile({
+              filePath: localTargetPath,
+              data: readResult.data,
+              success: () => resolve(localTargetPath),
+              fail: reject
+            })
+          },
+          fail: (readError) => next(readError || copyError)
+        })
+      }
+
+      const tryCandidateAt = (index, lastError) => {
+        if (index >= packagePathCandidates.length) {
+          reject(lastError || new Error('package file copy failed'))
+          return
+        }
+
+        const packagePath = packagePathCandidates[index]
+        const continueWithNext = (error) => {
+          tryCandidateAt(index + 1, error)
+        }
+
+        fs.copyFile({
+          srcPath: packagePath,
+          destPath: localTargetPath,
+          success: () => resolve(localTargetPath),
+          fail: (copyError) => readAndWriteCandidate(packagePath, copyError, continueWithNext)
+        })
+      }
+
+      tryCandidateAt(0, null)
+    })
+  },
+
+  downloadMiniProgramFile(url) {
+    const downloadUrl = normalizeStringValue(url)
+    if (!downloadUrl) {
+      return Promise.reject(new Error('download url is empty'))
+    }
+
+    return new Promise((resolve, reject) => {
+      wx.downloadFile({
+        url: downloadUrl,
+        success: (result = {}) => {
+          if (result.statusCode >= 200 && result.statusCode < 300 && result.tempFilePath) {
+            resolve(result.tempFilePath)
+            return
+          }
+
+          reject(result)
+        },
+        fail: reject
+      })
+    })
+  },
+
+  unzipMiniProgramFile(zipFilePath, targetPath) {
+    const fs = this.getMiniProgramFileSystemManager()
+    if (!normalizeStringValue(zipFilePath) || !normalizeStringValue(targetPath)) {
+      return Promise.reject(new Error('unzip path is empty'))
+    }
+
+    if (!fs) {
+      return Promise.reject(new Error('filesystem unavailable'))
+    }
+
+    return new Promise((resolve, reject) => {
+      fs.unzip({
+        zipFilePath,
+        targetPath,
+        success: () => resolve(targetPath),
+        fail: reject
+      })
+    })
+  },
+
+  ensureZipBackedCustomTileLayerSourceUrlFormat(config, prepareZipFilePath) {
+    const localRootPath = buildTileLayerLocalRootPath(config)
+    const localSourceUrlFormat = buildTileLayerSourceUrlFormat(localRootPath, config.localSourceUrlFormat)
+    const readyStorageKey = buildTileLayerReadyStorageKey(config)
+    const cachedReadyPath = wx.getStorageSync(readyStorageKey)
+
+    return (cachedReadyPath === localRootPath
+      ? this.accessFileSystemPath(localRootPath)
+      : Promise.reject(new Error('custom tile layer cache is not ready')))
+      .then(() => localSourceUrlFormat)
+      .catch(() => {
+        return this.removeFileSystemPath(localRootPath)
+          .then(() => this.ensureFileSystemDirectory(localRootPath))
+          .then(() => Promise.resolve(prepareZipFilePath()))
+          .then((zipFilePath) => this.unzipMiniProgramFile(zipFilePath, localRootPath)
+            .then(() => this.removeFileSystemFile(zipFilePath))
+            .then(() => zipFilePath)
+            .catch((error) => {
+              this.removeFileSystemFile(zipFilePath)
+              throw error
+            }))
+          .then(() => {
+            wx.setStorageSync(readyStorageKey, localRootPath)
+            return localSourceUrlFormat
+          })
+      })
+  },
+
+  ensureDownloadedCustomTileLayerSourceUrlFormat(config) {
+    if (!config.downloadZipUrl) {
+      return Promise.reject(new Error('download zip url is empty'))
+    }
+
+    return this.ensureZipBackedCustomTileLayerSourceUrlFormat(
+      config,
+      () => this.downloadMiniProgramFile(config.downloadZipUrl)
+    )
+  },
+
+  ensurePackagedCustomTileLayerSourceUrlFormat(config) {
+    if (!config.packageZipPath) {
+      return Promise.reject(new Error('package zip path is empty'))
+    }
+
+    const localZipPath = buildTileLayerLocalZipPath(config)
+    return this.ensureZipBackedCustomTileLayerSourceUrlFormat(
+      config,
+      () => this.removeFileSystemFile(localZipPath)
+        .then(() => this.copyMiniProgramPackageFile(config.packageZipPath, localZipPath))
+        .then(() => localZipPath)
+    )
+  },
+
+  getEffectiveAllowedZooms() {
+    if (this.isGroundTileOverlayEnabled() && Array.isArray(this.groundTileOverlayConfig?.allowedZooms)) {
+      const overlayZooms = this.groundTileOverlayConfig.allowedZooms.filter((zoom) => Number.isFinite(zoom))
+      if (overlayZooms.length) {
+        return overlayZooms.slice()
+      }
+    }
+
+    if (!this.isCustomTileLayerEnabled()) {
+      return ALLOWED_ZOOMS.slice()
+    }
+
+    const minZoom = Math.min(this.customTileLayerConfig.minZoom, this.customTileLayerConfig.maxZoom)
+    const maxZoom = Math.max(this.customTileLayerConfig.minZoom, this.customTileLayerConfig.maxZoom)
+    const filteredZooms = ALLOWED_ZOOMS.filter((zoom) => zoom >= minZoom && zoom <= maxZoom)
+    return filteredZooms.length ? filteredZooms : ALLOWED_ZOOMS.slice()
+  },
+
+  clampScaleToAllowedZooms(scale) {
+    const numericScale = Number(scale)
+    if (!Number.isFinite(numericScale)) {
+      return this.getDefaultMapScale()
+    }
+
+    const allowedZooms = this.getEffectiveAllowedZooms()
+    const minZoom = allowedZooms[0]
+    const maxZoom = allowedZooms[allowedZooms.length - 1]
+    return Math.max(minZoom, Math.min(maxZoom, Math.round(numericScale)))
+  },
+
   getDefaultMapScale() {
-    return ALLOWED_ZOOMS[ALLOWED_ZOOMS.length - 1] || DEFAULT_ENTRY_SCALE
+    const allowedZooms = this.getEffectiveAllowedZooms()
+    return allowedZooms[allowedZooms.length - 1] || DEFAULT_ENTRY_SCALE
   },
 
   getCurrentViewportState() {
     return {
       longitude: typeof this.data.longitude === 'number' ? this.data.longitude : DEFAULT_OUTSIDE_SCENIC_CENTER.longitude,
       latitude: typeof this.data.latitude === 'number' ? this.data.latitude : DEFAULT_OUTSIDE_SCENIC_CENTER.latitude,
-      scale: typeof this.data.scale === 'number' ? this.data.scale : this.getDefaultMapScale()
+      scale: this.clampScaleToAllowedZooms(
+        typeof this.data.scale === 'number' ? this.data.scale : this.getDefaultMapScale()
+      )
     }
   },
 
@@ -2617,7 +3487,9 @@ Page({
   },
 
   syncViewportFromMapContext(options = {}) {
-    const nextScale = typeof options.scale === 'number' ? options.scale : null
+    const nextScale = typeof options.scale === 'number'
+      ? this.clampScaleToAllowedZooms(options.scale)
+      : null
     const applyViewportState = (center = null) => {
       const nextData = {}
       const nextLongitude = toFiniteCoordinateValue(center?.longitude)
@@ -2717,10 +3589,14 @@ Page({
     this.syncViewportFromMapContext({
       scale: detail.scale
     })
+
+    this.refreshGroundTileOverlayViewport({
+      scale: detail.scale
+    })
   },
 
   onScaleUpdate(event) {
-    const nextScale = event?.detail?.scale
+    const nextScale = this.clampScaleToAllowedZooms(event?.detail?.scale)
     if (typeof nextScale === 'number' && nextScale !== this.data.scale) {
       this.setData({
         scale: nextScale

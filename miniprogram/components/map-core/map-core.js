@@ -41,14 +41,53 @@ Component({
     maxScale: 20
   },
 
+  observers: {
+    allowedZooms(allowedZooms) {
+      this.syncScaleRange(allowedZooms)
+    }
+  },
+
   lifetimes: {
+    attached() {
+      this.syncScaleRange(this.properties.allowedZooms)
+    },
+
     ready() {
       this.mapCtx = wx.createMapContext('map-core', this)
-      this.triggerEvent('mapReady', this.mapCtx)
+      this.triggerEvent('mapReady')
     }
   },
 
   methods: {
+    getMapContext() {
+      if (!this.mapCtx) {
+        this.mapCtx = wx.createMapContext('map-core', this)
+      }
+
+      return this.mapCtx
+    },
+
+    syncScaleRange(allowedZooms) {
+      const numericZooms = Array.isArray(allowedZooms)
+        ? allowedZooms
+          .map((zoom) => Number(zoom))
+          .filter((zoom) => Number.isFinite(zoom))
+          .sort((left, right) => left - right)
+        : []
+
+      const nextMinScale = numericZooms[0] || 5
+      const nextMaxScale = numericZooms[numericZooms.length - 1] || 20
+
+      if (nextMinScale === this.data.minScale && nextMaxScale === this.data.maxScale) {
+        return
+      }
+
+      this.setData({
+        minScale: nextMinScale,
+        maxScale: nextMaxScale
+      })
+    },
+
     onRegionChange(event) {
       const detail = event.detail || {}
       const eventType = detail.type || event.type || ''
