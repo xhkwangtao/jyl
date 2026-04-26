@@ -1050,19 +1050,6 @@ Component({
       let minTileY = Math.floor(this.latitudeToTileY(sourceBounds.northeast.latitude, zoom))
       let maxTileY = Math.ceil(this.latitudeToTileY(sourceBounds.southwest.latitude, zoom))
 
-      const expectedTileCount = (maxTileX - minTileX + 1) * (maxTileY - minTileY + 1)
-      const maxTilesForZoom = zoomConfig.maxTiles
-
-      if (expectedTileCount > maxTilesForZoom) {
-        const centerX = Math.floor((minTileX + maxTileX) / 2)
-        const centerY = Math.floor((minTileY + maxTileY) / 2)
-        const maxRadius = Math.floor(Math.sqrt(maxTilesForZoom) / 2)
-        minTileX = centerX - maxRadius
-        maxTileX = centerX + maxRadius
-        minTileY = centerY - maxRadius
-        maxTileY = centerY + maxRadius
-      }
-
       const tileCoverage = this.getTileCoverage(zoom)
       if (tileCoverage) {
         minTileX = Math.max(minTileX, tileCoverage.minX)
@@ -1085,10 +1072,6 @@ Component({
           const tile = this.createTileObject(x, y, zoom)
           if (tile) {
             tiles.push(tile)
-          }
-
-          if (tiles.length >= maxTilesForZoom) {
-            return tiles
           }
         }
       }

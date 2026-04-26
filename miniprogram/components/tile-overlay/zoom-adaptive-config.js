@@ -1,19 +1,19 @@
 const ZOOM_ADAPTIVE_CONFIG = {
   16: {
-    bufferRatio: 0.12,
-    maxTiles: 16
+    bufferRatio: 0.18,
+    maxTiles: 72
   },
   17: {
-    bufferRatio: 0.14,
-    maxTiles: 20
+    bufferRatio: 0.2,
+    maxTiles: 84
   },
   18: {
-    bufferRatio: 0.16,
-    maxTiles: 24
+    bufferRatio: 0.22,
+    maxTiles: 96
   },
   19: {
-    bufferRatio: 0.18,
-    maxTiles: 24
+    bufferRatio: 0.24,
+    maxTiles: 110
   }
 }
 

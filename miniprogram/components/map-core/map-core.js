@@ -28,6 +28,10 @@ Component({
       type: Array,
       value: []
     },
+    polygons: {
+      type: Array,
+      value: []
+    },
     allowedZooms: {
       type: Array,
       value: []
