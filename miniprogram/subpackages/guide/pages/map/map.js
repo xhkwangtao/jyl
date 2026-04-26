@@ -555,114 +555,6 @@ function buildGroundTileViewportBoundaryLimit(config = null) {
   })
 }
 
-function buildMapRectanglePolygon(southwest, northeast, options = {}) {
-  if (
-    !southwest
-    || !northeast
-    || !Number.isFinite(Number(southwest.latitude))
-    || !Number.isFinite(Number(southwest.longitude))
-    || !Number.isFinite(Number(northeast.latitude))
-    || !Number.isFinite(Number(northeast.longitude))
-    || Number(southwest.latitude) >= Number(northeast.latitude)
-    || Number(southwest.longitude) >= Number(northeast.longitude)
-  ) {
-    return null
-  }
-
-  return {
-    points: [
-      {
-        latitude: Number(northeast.latitude),
-        longitude: Number(southwest.longitude)
-      },
-      {
-        latitude: Number(northeast.latitude),
-        longitude: Number(northeast.longitude)
-      },
-      {
-        latitude: Number(southwest.latitude),
-        longitude: Number(northeast.longitude)
-      },
-      {
-        latitude: Number(southwest.latitude),
-        longitude: Number(southwest.longitude)
-      }
-    ],
-    strokeWidth: 0,
-    strokeColor: options.strokeColor || '#00000000',
-    fillColor: options.fillColor || '#B8BEC8B0'
-  }
-}
-
-function buildGroundTileOutsideMaskPolygons(config = null, options = {}) {
-  const tileCoverageBounds = buildGroundTileCoverageMapBounds(config)
-  if (!isValidBounds(tileCoverageBounds)) {
-    return []
-  }
-
-  const latitudeSpan = Number(tileCoverageBounds.northeast.latitude) - Number(tileCoverageBounds.southwest.latitude)
-  const longitudeSpan = Number(tileCoverageBounds.northeast.longitude) - Number(tileCoverageBounds.southwest.longitude)
-  const outerLatitudePadding = Math.max(latitudeSpan * 8, 0.05)
-  const outerLongitudePadding = Math.max(longitudeSpan * 8, 0.08)
-  const outerBounds = {
-    southwest: {
-      latitude: Number(tileCoverageBounds.southwest.latitude) - outerLatitudePadding,
-      longitude: Number(tileCoverageBounds.southwest.longitude) - outerLongitudePadding
-    },
-    northeast: {
-      latitude: Number(tileCoverageBounds.northeast.latitude) + outerLatitudePadding,
-      longitude: Number(tileCoverageBounds.northeast.longitude) + outerLongitudePadding
-    }
-  }
-
-  return [
-    buildMapRectanglePolygon(
-      {
-        latitude: Number(tileCoverageBounds.northeast.latitude),
-        longitude: Number(outerBounds.southwest.longitude)
-      },
-      {
-        latitude: Number(outerBounds.northeast.latitude),
-        longitude: Number(outerBounds.northeast.longitude)
-      },
-      options
-    ),
-    buildMapRectanglePolygon(
-      {
-        latitude: Number(outerBounds.southwest.latitude),
-        longitude: Number(outerBounds.southwest.longitude)
-      },
-      {
-        latitude: Number(tileCoverageBounds.southwest.latitude),
-        longitude: Number(outerBounds.northeast.longitude)
-      },
-      options
-    ),
-    buildMapRectanglePolygon(
-      {
-        latitude: Number(tileCoverageBounds.southwest.latitude),
-        longitude: Number(outerBounds.southwest.longitude)
-      },
-      {
-        latitude: Number(tileCoverageBounds.northeast.latitude),
-        longitude: Number(tileCoverageBounds.southwest.longitude)
-      },
-      options
-    ),
-    buildMapRectanglePolygon(
-      {
-        latitude: Number(tileCoverageBounds.southwest.latitude),
-        longitude: Number(tileCoverageBounds.northeast.longitude)
-      },
-      {
-        latitude: Number(tileCoverageBounds.northeast.latitude),
-        longitude: Number(outerBounds.northeast.longitude)
-      },
-      options
-    )
-  ].filter(Boolean)
-}
-
 function haversineMeters(a, b) {
   const earthRadius = 6378137
   const latitudeDelta = ((b.latitude - a.latitude) * Math.PI) / 180
@@ -2604,12 +2496,6 @@ const DEFAULT_GROUND_TILE_OVERLAY_BOUNDS = buildBounds(MAP_INCLUDE_POINTS, {
   latitudePadding: 0.001,
   longitudePadding: 0.0014
 })
-const DEFAULT_GROUND_TILE_OUTSIDE_MASK_POLYGONS = buildGroundTileOutsideMaskPolygons(
-  normalizeGroundTileOverlayConfig(JYL_GROUND_TILE_OVERLAY_CONFIG),
-  {
-    fillColor: '#BFC5CEB8'
-  }
-)
 const DEFAULT_MAP_BOUNDARY_LIMIT = buildGroundTileCoverageMapBounds(
   normalizeGroundTileOverlayConfig(JYL_GROUND_TILE_OVERLAY_CONFIG)
 ) || DEFAULT_GROUND_TILE_OVERLAY_BOUNDS
@@ -2786,7 +2672,6 @@ Page({
     allMarkers: buildMarkers('all', null),
     markers: [],
     polylineData: buildMapPolylines(),
-    maskPolygons: DEFAULT_GROUND_TILE_OUTSIDE_MASK_POLYGONS,
     showPoiFilter: true,
     currentPoiFilter: 'all',
     showAudioPlayer: true,
@@ -2896,9 +2781,6 @@ Page({
       tileOpacity: this.groundTileOverlayConfig?.opacity ?? 0.96,
       tileZIndex: this.groundTileOverlayConfig?.zIndex ?? 1,
       tileAllowedZooms: this.groundTileOverlayConfig?.allowedZooms || [16, 17, 18, 19],
-      maskPolygons: buildGroundTileOutsideMaskPolygons(this.groundTileOverlayConfig, {
-        fillColor: '#BFC5CEB8'
-      }),
       mapBoundaryLimit: buildGroundTileCoverageMapBounds(this.groundTileOverlayConfig) || DEFAULT_MAP_BOUNDARY_LIMIT,
       showAudioAccessTestPanel: normalizeBooleanValue(pageOptions.showTestTools) || pageOptions.action === 'executeAIRouteTest'
     }, () => {

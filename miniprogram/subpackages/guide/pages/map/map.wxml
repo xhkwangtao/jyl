@@ -92,7 +92,6 @@
       enable-p-o-i="{{enablePOI}}"
       markers="{{allMarkers}}"
       polyline="{{polylineData}}"
-      polygons="{{maskPolygons}}"
       boundary-limit="{{mapBoundaryLimit}}"
       allowed-zooms="{{allowedZooms}}"
       bind:mapReady="onMapReady"

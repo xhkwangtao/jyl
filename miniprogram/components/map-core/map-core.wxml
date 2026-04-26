@@ -13,7 +13,6 @@
     max-scale="{{maxScale}}"
     markers="{{markers}}"
     polyline="{{polyline}}"
-    polygons="{{polygons}}"
     show-location="{{showLocation}}"
     show-scale="true"
     show-compass="true"

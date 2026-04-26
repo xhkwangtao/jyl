@@ -28,28 +28,28 @@ const JYL_GROUND_TILE_OVERLAY_CONFIG = {
     baseUrl: JYL_REMOTE_TILE_BASE_URL,
     tileCoverageByZoom: {
         16: {
-            minX: 53973,
-            maxX: 53976,
-            minY: 24693,
-            maxY: 24695
+            minX: 53971,
+            maxX: 53979,
+            minY: 24689,
+            maxY: 24698
         },
         17: {
-            minX: 107946,
-            maxX: 107953,
-            minY: 49387,
-            maxY: 49391
+            minX: 107942,
+            maxX: 107959,
+            minY: 49378,
+            maxY: 49396
         },
         18: {
-            minX: 215893,
-            maxX: 215906,
-            minY: 98774,
-            maxY: 98783
+            minX: 215885,
+            maxX: 215918,
+            minY: 98757,
+            maxY: 98793
         },
         19: {
-            minX: 431787,
-            maxX: 431812,
-            minY: 197548,
-            maxY: 197567
+            minX: 431770,
+            maxX: 431836,
+            minY: 197515,
+            maxY: 197587
         }
     },
 
