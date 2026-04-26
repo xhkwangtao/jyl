@@ -387,17 +387,6 @@ function isValidBounds(bounds) {
   )
 }
 
-function buildBoundsCenter(bounds) {
-  if (!isValidBounds(bounds)) {
-    return null
-  }
-
-  return {
-    latitude: (Number(bounds.southwest.latitude) + Number(bounds.northeast.latitude)) / 2,
-    longitude: (Number(bounds.southwest.longitude) + Number(bounds.northeast.longitude)) / 2
-  }
-}
-
 function insetBounds(bounds, options = {}) {
   if (!isValidBounds(bounds)) {
     return null
@@ -566,62 +555,112 @@ function buildGroundTileViewportBoundaryLimit(config = null) {
   })
 }
 
-function resolveClampedViewportCenter(viewportBounds, limitBounds) {
-  if (!isValidBounds(viewportBounds) || !isValidBounds(limitBounds)) {
-    return null
-  }
-
-  const viewportCenter = buildBoundsCenter(viewportBounds)
-  if (!viewportCenter) {
-    return null
-  }
-
-  const viewportLatitudeSpan = Number(viewportBounds.northeast.latitude) - Number(viewportBounds.southwest.latitude)
-  const viewportLongitudeSpan = Number(viewportBounds.northeast.longitude) - Number(viewportBounds.southwest.longitude)
-  const limitLatitudeSpan = Number(limitBounds.northeast.latitude) - Number(limitBounds.southwest.latitude)
-  const limitLongitudeSpan = Number(limitBounds.northeast.longitude) - Number(limitBounds.southwest.longitude)
-
-  let nextLatitude = viewportCenter.latitude
-  let nextLongitude = viewportCenter.longitude
-  let changed = false
-
-  if (viewportLatitudeSpan >= limitLatitudeSpan) {
-    nextLatitude = (Number(limitBounds.southwest.latitude) + Number(limitBounds.northeast.latitude)) / 2
-    changed = true
-  } else if (Number(viewportBounds.southwest.latitude) < Number(limitBounds.southwest.latitude)) {
-    nextLatitude += Number(limitBounds.southwest.latitude) - Number(viewportBounds.southwest.latitude)
-    changed = true
-  } else if (Number(viewportBounds.northeast.latitude) > Number(limitBounds.northeast.latitude)) {
-    nextLatitude += Number(limitBounds.northeast.latitude) - Number(viewportBounds.northeast.latitude)
-    changed = true
-  }
-
-  if (viewportLongitudeSpan >= limitLongitudeSpan) {
-    nextLongitude = (Number(limitBounds.southwest.longitude) + Number(limitBounds.northeast.longitude)) / 2
-    changed = true
-  } else if (Number(viewportBounds.southwest.longitude) < Number(limitBounds.southwest.longitude)) {
-    nextLongitude += Number(limitBounds.southwest.longitude) - Number(viewportBounds.southwest.longitude)
-    changed = true
-  } else if (Number(viewportBounds.northeast.longitude) > Number(limitBounds.northeast.longitude)) {
-    nextLongitude += Number(limitBounds.northeast.longitude) - Number(viewportBounds.northeast.longitude)
-    changed = true
-  }
-
-  if (!changed) {
-    return null
-  }
-
+function buildMapRectanglePolygon(southwest, northeast, options = {}) {
   if (
-    Math.abs(nextLatitude - viewportCenter.latitude) < 0.000001
-    && Math.abs(nextLongitude - viewportCenter.longitude) < 0.000001
+    !southwest
+    || !northeast
+    || !Number.isFinite(Number(southwest.latitude))
+    || !Number.isFinite(Number(southwest.longitude))
+    || !Number.isFinite(Number(northeast.latitude))
+    || !Number.isFinite(Number(northeast.longitude))
+    || Number(southwest.latitude) >= Number(northeast.latitude)
+    || Number(southwest.longitude) >= Number(northeast.longitude)
   ) {
     return null
   }
 
   return {
-    latitude: nextLatitude,
-    longitude: nextLongitude
+    points: [
+      {
+        latitude: Number(northeast.latitude),
+        longitude: Number(southwest.longitude)
+      },
+      {
+        latitude: Number(northeast.latitude),
+        longitude: Number(northeast.longitude)
+      },
+      {
+        latitude: Number(southwest.latitude),
+        longitude: Number(northeast.longitude)
+      },
+      {
+        latitude: Number(southwest.latitude),
+        longitude: Number(southwest.longitude)
+      }
+    ],
+    strokeWidth: 0,
+    strokeColor: options.strokeColor || '#00000000',
+    fillColor: options.fillColor || '#B8BEC8B0'
   }
+}
+
+function buildGroundTileOutsideMaskPolygons(config = null, options = {}) {
+  const tileCoverageBounds = buildGroundTileCoverageMapBounds(config)
+  if (!isValidBounds(tileCoverageBounds)) {
+    return []
+  }
+
+  const latitudeSpan = Number(tileCoverageBounds.northeast.latitude) - Number(tileCoverageBounds.southwest.latitude)
+  const longitudeSpan = Number(tileCoverageBounds.northeast.longitude) - Number(tileCoverageBounds.southwest.longitude)
+  const outerLatitudePadding = Math.max(latitudeSpan * 8, 0.05)
+  const outerLongitudePadding = Math.max(longitudeSpan * 8, 0.08)
+  const outerBounds = {
+    southwest: {
+      latitude: Number(tileCoverageBounds.southwest.latitude) - outerLatitudePadding,
+      longitude: Number(tileCoverageBounds.southwest.longitude) - outerLongitudePadding
+    },
+    northeast: {
+      latitude: Number(tileCoverageBounds.northeast.latitude) + outerLatitudePadding,
+      longitude: Number(tileCoverageBounds.northeast.longitude) + outerLongitudePadding
+    }
+  }
+
+  return [
+    buildMapRectanglePolygon(
+      {
+        latitude: Number(tileCoverageBounds.northeast.latitude),
+        longitude: Number(outerBounds.southwest.longitude)
+      },
+      {
+        latitude: Number(outerBounds.northeast.latitude),
+        longitude: Number(outerBounds.northeast.longitude)
+      },
+      options
+    ),
+    buildMapRectanglePolygon(
+      {
+        latitude: Number(outerBounds.southwest.latitude),
+        longitude: Number(outerBounds.southwest.longitude)
+      },
+      {
+        latitude: Number(tileCoverageBounds.southwest.latitude),
+        longitude: Number(outerBounds.northeast.longitude)
+      },
+      options
+    ),
+    buildMapRectanglePolygon(
+      {
+        latitude: Number(tileCoverageBounds.southwest.latitude),
+        longitude: Number(outerBounds.southwest.longitude)
+      },
+      {
+        latitude: Number(tileCoverageBounds.northeast.latitude),
+        longitude: Number(tileCoverageBounds.southwest.longitude)
+      },
+      options
+    ),
+    buildMapRectanglePolygon(
+      {
+        latitude: Number(tileCoverageBounds.southwest.latitude),
+        longitude: Number(tileCoverageBounds.northeast.longitude)
+      },
+      {
+        latitude: Number(tileCoverageBounds.northeast.latitude),
+        longitude: Number(outerBounds.northeast.longitude)
+      },
+      options
+    )
+  ].filter(Boolean)
 }
 
 function haversineMeters(a, b) {
@@ -2565,7 +2604,13 @@ const DEFAULT_GROUND_TILE_OVERLAY_BOUNDS = buildBounds(MAP_INCLUDE_POINTS, {
   latitudePadding: 0.001,
   longitudePadding: 0.0014
 })
-const DEFAULT_MAP_BOUNDARY_LIMIT = buildGroundTileViewportBoundaryLimit(
+const DEFAULT_GROUND_TILE_OUTSIDE_MASK_POLYGONS = buildGroundTileOutsideMaskPolygons(
+  normalizeGroundTileOverlayConfig(JYL_GROUND_TILE_OVERLAY_CONFIG),
+  {
+    fillColor: '#BFC5CEB8'
+  }
+)
+const DEFAULT_MAP_BOUNDARY_LIMIT = buildGroundTileCoverageMapBounds(
   normalizeGroundTileOverlayConfig(JYL_GROUND_TILE_OVERLAY_CONFIG)
 ) || DEFAULT_GROUND_TILE_OVERLAY_BOUNDS
 
@@ -2741,6 +2786,7 @@ Page({
     allMarkers: buildMarkers('all', null),
     markers: [],
     polylineData: buildMapPolylines(),
+    maskPolygons: DEFAULT_GROUND_TILE_OUTSIDE_MASK_POLYGONS,
     showPoiFilter: true,
     currentPoiFilter: 'all',
     showAudioPlayer: true,
@@ -2823,7 +2869,6 @@ Page({
     this.groundTilePackageLoadPromise = null
     this.groundTileOverlayLoadToastShown = false
     this.groundTileOverlayLastErrorToastAt = 0
-    this.mapBoundaryCorrectionInFlight = false
     const pageOptions = normalizeMapPageOptions(options)
     const hasDirectEntryTarget = Boolean(
       pageOptions.poi
@@ -2851,7 +2896,10 @@ Page({
       tileOpacity: this.groundTileOverlayConfig?.opacity ?? 0.96,
       tileZIndex: this.groundTileOverlayConfig?.zIndex ?? 1,
       tileAllowedZooms: this.groundTileOverlayConfig?.allowedZooms || [16, 17, 18, 19],
-      mapBoundaryLimit: buildGroundTileViewportBoundaryLimit(this.groundTileOverlayConfig) || DEFAULT_MAP_BOUNDARY_LIMIT,
+      maskPolygons: buildGroundTileOutsideMaskPolygons(this.groundTileOverlayConfig, {
+        fillColor: '#BFC5CEB8'
+      }),
+      mapBoundaryLimit: buildGroundTileCoverageMapBounds(this.groundTileOverlayConfig) || DEFAULT_MAP_BOUNDARY_LIMIT,
       showAudioAccessTestPanel: normalizeBooleanValue(pageOptions.showTestTools) || pageOptions.action === 'executeAIRouteTest'
     }, () => {
       this.ensureGroundTilePackagesLoaded()
@@ -3854,54 +3902,6 @@ Page({
     return isValidBounds(this.data.mapBoundaryLimit) ? this.data.mapBoundaryLimit : null
   },
 
-  enforceMapBoundaryLimit(options = {}) {
-    const boundaryLimit = this.getMapBoundaryLimit()
-    if (
-      !boundaryLimit
-      || !this.mapCtx
-      || typeof this.mapCtx.getRegion !== 'function'
-      || this.mapBoundaryCorrectionInFlight
-    ) {
-      return Promise.resolve(false)
-    }
-
-    const nextScale = this.clampScaleToAllowedZooms(
-      typeof options.scale === 'number' ? options.scale : this.data.scale
-    )
-
-    return new Promise((resolve) => {
-      this.mapCtx.getRegion({
-        success: (regionResult) => {
-          const clampedCenter = resolveClampedViewportCenter(regionResult, boundaryLimit)
-          if (!clampedCenter) {
-            resolve(false)
-            return
-          }
-
-          const nextLongitude = toFiniteCoordinateValue(clampedCenter.longitude)
-          const nextLatitude = toFiniteCoordinateValue(clampedCenter.latitude)
-          if (nextLongitude === null || nextLatitude === null) {
-            resolve(false)
-            return
-          }
-
-          this.mapBoundaryCorrectionInFlight = true
-          this.setData({
-            longitude: nextLongitude,
-            latitude: nextLatitude,
-            scale: nextScale
-          }, () => {
-            this.mapBoundaryCorrectionInFlight = false
-            resolve(true)
-          })
-        },
-        fail: () => {
-          resolve(false)
-        }
-      })
-    })
-  },
-
   onRegionChange(event) {
     const detail = event?.detail || {}
     const eventType = detail.type || event?.type || ''
@@ -3916,31 +3916,13 @@ Page({
       this.hasAppliedInitialUserViewport = true
     }
 
-    this.enforceMapBoundaryLimit({
+    this.syncViewportFromMapContext({
       scale: detail.scale
     })
-      .then((wasAdjusted) => {
-        if (wasAdjusted) {
-          return
-        }
 
-        this.syncViewportFromMapContext({
-          scale: detail.scale
-        })
-
-        this.refreshGroundTileOverlayViewport({
-          scale: detail.scale
-        })
-      })
-      .catch(() => {
-        this.syncViewportFromMapContext({
-          scale: detail.scale
-        })
-
-        this.refreshGroundTileOverlayViewport({
-          scale: detail.scale
-        })
-      })
+    this.refreshGroundTileOverlayViewport({
+      scale: detail.scale
+    })
   },
 
   onScaleUpdate(event) {
@@ -3991,11 +3973,30 @@ Page({
       return
     }
 
+    const boundaryLimit = this.getMapBoundaryLimit()
+    const previewOffsetLatitude = 0.00028
+    const previewOffsetLongitude = 0.00042
+    let previewLatitudeDirection = -1
+    let previewLongitudeDirection = 1
+
+    if (boundaryLimit) {
+      const distanceToNorth = Number(boundaryLimit.northeast.latitude) - Number(point.latitude)
+      const distanceToSouth = Number(point.latitude) - Number(boundaryLimit.southwest.latitude)
+      const distanceToEast = Number(boundaryLimit.northeast.longitude) - Number(point.longitude)
+      const distanceToWest = Number(point.longitude) - Number(boundaryLimit.southwest.longitude)
+      previewLatitudeDirection = distanceToNorth <= distanceToSouth ? -1 : 1
+      previewLongitudeDirection = distanceToWest <= distanceToEast ? 1 : -1
+    }
+
     const previewPoints = buildViewportIncludePoints([
       point,
       {
-        latitude: point.latitude + 0.00028,
+        latitude: point.latitude + previewOffsetLatitude * previewLatitudeDirection,
         longitude: point.longitude
+      },
+      {
+        latitude: point.latitude,
+        longitude: point.longitude + previewOffsetLongitude * previewLongitudeDirection
       }
     ])
 
@@ -5308,7 +5309,8 @@ Page({
 
   focusPointById(pointId, options = {}) {
     const {
-      showPopup = true
+      showPopup = true,
+      focusViewport = true
     } = options
     const point = getDisplayPointById(pointId)
     if (!point) {
@@ -5322,6 +5324,10 @@ Page({
       showAudioListDrawer: false,
       showPoiPopup: showPopup,
       currentPopupData: showPopup ? this.buildPointPopupData(point) : null
+    }, () => {
+      if (focusViewport) {
+        this.focusPointInViewport(point)
+      }
     })
   },
 
