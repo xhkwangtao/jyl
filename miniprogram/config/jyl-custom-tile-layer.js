@@ -61,6 +61,12 @@ const JYL_GROUND_TILE_OVERLAY_CONFIG = {
     minZoom: 16,
     maxZoom: 19,
     allowedZooms: [16, 17, 18, 19],
+    boundaryLimitInset: {
+        north: 0.00012,
+        south: 0.00012,
+        east: 0.00012,
+        west: 0.00012
+    },
 
     opacity: 0.96,
     zIndex: 1

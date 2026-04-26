@@ -168,6 +168,27 @@ function normalizeCustomTileLayerConfig(config = {}) {
   }
 }
 
+function normalizeGroundTileBoundaryInset(boundaryLimitInset = null) {
+  const normalizedInset = boundaryLimitInset && typeof boundaryLimitInset === 'object'
+    ? boundaryLimitInset
+    : {}
+
+  const normalizeInsetValue = (value, fallbackValue) => {
+    const numericValue = Number(value)
+    return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : fallbackValue
+  }
+
+  const latitudeInset = normalizeInsetValue(normalizedInset.latitude, 0.00012)
+  const longitudeInset = normalizeInsetValue(normalizedInset.longitude, 0.00012)
+
+  return {
+    north: normalizeInsetValue(normalizedInset.north, latitudeInset),
+    south: normalizeInsetValue(normalizedInset.south, latitudeInset),
+    east: normalizeInsetValue(normalizedInset.east, longitudeInset),
+    west: normalizeInsetValue(normalizedInset.west, longitudeInset)
+  }
+}
+
 function normalizeGroundTileOverlayConfig(config = {}) {
   const allowedZooms = Array.isArray(config.allowedZooms)
     ? [...new Set(
@@ -199,6 +220,7 @@ function normalizeGroundTileOverlayConfig(config = {}) {
     minZoom: Math.min(minZoom, maxZoom),
     maxZoom: Math.max(minZoom, maxZoom),
     allowedZooms: allowedZooms.length ? allowedZooms : [16, 17, 18, 19],
+    boundaryLimitInset: normalizeGroundTileBoundaryInset(config.boundaryLimitInset),
     opacity: typeof config.opacity === 'number' ? Math.max(0, Math.min(1, config.opacity)) : 0.96,
     zIndex: Number.isFinite(Number(config.zIndex)) ? Math.round(Number(config.zIndex)) : 1
   }
@@ -348,6 +370,257 @@ function buildBounds(points, options = {}) {
       latitude: bounds.maxLatitude + latitudePadding,
       longitude: bounds.maxLongitude + longitudePadding
     }
+  }
+}
+
+function isValidBounds(bounds) {
+  return !!(
+    bounds
+    && bounds.southwest
+    && bounds.northeast
+    && Number.isFinite(Number(bounds.southwest.latitude))
+    && Number.isFinite(Number(bounds.southwest.longitude))
+    && Number.isFinite(Number(bounds.northeast.latitude))
+    && Number.isFinite(Number(bounds.northeast.longitude))
+    && Number(bounds.southwest.latitude) < Number(bounds.northeast.latitude)
+    && Number(bounds.southwest.longitude) < Number(bounds.northeast.longitude)
+  )
+}
+
+function buildBoundsCenter(bounds) {
+  if (!isValidBounds(bounds)) {
+    return null
+  }
+
+  return {
+    latitude: (Number(bounds.southwest.latitude) + Number(bounds.northeast.latitude)) / 2,
+    longitude: (Number(bounds.southwest.longitude) + Number(bounds.northeast.longitude)) / 2
+  }
+}
+
+function insetBounds(bounds, options = {}) {
+  if (!isValidBounds(bounds)) {
+    return null
+  }
+
+  const {
+    latitudeInset = 0,
+    longitudeInset = 0,
+    northInset = latitudeInset,
+    southInset = latitudeInset,
+    eastInset = longitudeInset,
+    westInset = longitudeInset
+  } = options
+
+  const nextBounds = {
+    southwest: {
+      latitude: Number(bounds.southwest.latitude) + Math.max(0, Number(southInset) || 0),
+      longitude: Number(bounds.southwest.longitude) + Math.max(0, Number(westInset) || 0)
+    },
+    northeast: {
+      latitude: Number(bounds.northeast.latitude) - Math.max(0, Number(northInset) || 0),
+      longitude: Number(bounds.northeast.longitude) - Math.max(0, Number(eastInset) || 0)
+    }
+  }
+
+  return isValidBounds(nextBounds) ? nextBounds : bounds
+}
+
+function isOutOfChina(longitude, latitude) {
+  return (longitude < 72.004 || longitude > 137.8347) || (latitude < 0.8293 || latitude > 55.8271)
+}
+
+function transformLatitudeOffset(x, y) {
+  let result = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+  result += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0
+  result += (20.0 * Math.sin(y * Math.PI) + 40.0 * Math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0
+  result += (160.0 * Math.sin(y / 12.0 * Math.PI) + 320 * Math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0
+  return result
+}
+
+function transformLongitudeOffset(x, y) {
+  let result = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+  result += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0
+  result += (20.0 * Math.sin(x * Math.PI) + 40.0 * Math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0
+  result += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0
+  return result
+}
+
+function wgs84ToGcj02(longitude, latitude) {
+  const earthAxis = 6378245.0
+  const eccentricity = 0.00669342162296594323
+  if (isOutOfChina(longitude, latitude)) {
+    return { longitude, latitude }
+  }
+
+  const latitudeOffset = transformLatitudeOffset(longitude - 105.0, latitude - 35.0)
+  const longitudeOffset = transformLongitudeOffset(longitude - 105.0, latitude - 35.0)
+  const latitudeRadians = latitude / 180.0 * Math.PI
+  let magic = Math.sin(latitudeRadians)
+  magic = 1 - eccentricity * magic * magic
+  const sqrtMagic = Math.sqrt(magic)
+  const adjustedLatitudeOffset = (latitudeOffset * 180.0) / ((earthAxis * (1 - eccentricity)) / (magic * sqrtMagic) * Math.PI)
+  const adjustedLongitudeOffset = (longitudeOffset * 180.0) / (earthAxis / sqrtMagic * Math.cos(latitudeRadians) * Math.PI)
+
+  return {
+    longitude: longitude + adjustedLongitudeOffset,
+    latitude: latitude + adjustedLatitudeOffset
+  }
+}
+
+function tileToSourceBounds(x, y, z) {
+  const tileCount = Math.pow(2, z)
+  const longitudeMin = x / tileCount * 360 - 180
+  const longitudeMax = (x + 1) / tileCount * 360 - 180
+  const latitudeMin = Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + 1) / tileCount))) * 180 / Math.PI
+  const latitudeMax = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / tileCount))) * 180 / Math.PI
+
+  return {
+    southwest: {
+      latitude: latitudeMin,
+      longitude: longitudeMin
+    },
+    northeast: {
+      latitude: latitudeMax,
+      longitude: longitudeMax
+    }
+  }
+}
+
+function convertTileSourcePointToMap(longitude, latitude, coordinateSystem = 'wgs84') {
+  if (String(coordinateSystem || '').toLowerCase() === 'gcj02') {
+    return { longitude, latitude }
+  }
+
+  return wgs84ToGcj02(longitude, latitude)
+}
+
+function buildGroundTileCoverageMapBounds(config = null) {
+  const tileCoverageByZoom = config?.tileCoverageByZoom
+  if (!tileCoverageByZoom || typeof tileCoverageByZoom !== 'object') {
+    return null
+  }
+
+  const zoomLevels = Object.keys(tileCoverageByZoom)
+    .map((zoomKey) => Number(zoomKey))
+    .filter((zoom) => Number.isFinite(zoom))
+    .sort((left, right) => right - left)
+
+  for (const zoom of zoomLevels) {
+    const coverage = tileCoverageByZoom[zoom]
+    if (!coverage || typeof coverage !== 'object') {
+      continue
+    }
+
+    const minX = Number(coverage.minX)
+    const maxX = Number(coverage.maxX)
+    const minY = Number(coverage.minY)
+    const maxY = Number(coverage.maxY)
+    if (![minX, maxX, minY, maxY].every(Number.isFinite)) {
+      continue
+    }
+
+    const southwestSource = tileToSourceBounds(Math.min(minX, maxX), Math.max(minY, maxY), zoom).southwest
+    const northeastSource = tileToSourceBounds(Math.max(minX, maxX), Math.min(minY, maxY), zoom).northeast
+    const southwest = convertTileSourcePointToMap(
+      southwestSource.longitude,
+      southwestSource.latitude,
+      config.coordinateSystem
+    )
+    const northeast = convertTileSourcePointToMap(
+      northeastSource.longitude,
+      northeastSource.latitude,
+      config.coordinateSystem
+    )
+    const mapBounds = {
+      southwest: {
+        latitude: southwest.latitude,
+        longitude: southwest.longitude
+      },
+      northeast: {
+        latitude: northeast.latitude,
+        longitude: northeast.longitude
+      }
+    }
+
+    if (isValidBounds(mapBounds)) {
+      return mapBounds
+    }
+  }
+
+  return null
+}
+
+function buildGroundTileViewportBoundaryLimit(config = null) {
+  const tileCoverageBounds = buildGroundTileCoverageMapBounds(config)
+  if (!tileCoverageBounds) {
+    return null
+  }
+
+  const boundaryLimitInset = normalizeGroundTileBoundaryInset(config?.boundaryLimitInset)
+  return insetBounds(tileCoverageBounds, {
+    northInset: boundaryLimitInset.north,
+    southInset: boundaryLimitInset.south,
+    eastInset: boundaryLimitInset.east,
+    westInset: boundaryLimitInset.west
+  })
+}
+
+function resolveClampedViewportCenter(viewportBounds, limitBounds) {
+  if (!isValidBounds(viewportBounds) || !isValidBounds(limitBounds)) {
+    return null
+  }
+
+  const viewportCenter = buildBoundsCenter(viewportBounds)
+  if (!viewportCenter) {
+    return null
+  }
+
+  const viewportLatitudeSpan = Number(viewportBounds.northeast.latitude) - Number(viewportBounds.southwest.latitude)
+  const viewportLongitudeSpan = Number(viewportBounds.northeast.longitude) - Number(viewportBounds.southwest.longitude)
+  const limitLatitudeSpan = Number(limitBounds.northeast.latitude) - Number(limitBounds.southwest.latitude)
+  const limitLongitudeSpan = Number(limitBounds.northeast.longitude) - Number(limitBounds.southwest.longitude)
+
+  let nextLatitude = viewportCenter.latitude
+  let nextLongitude = viewportCenter.longitude
+  let changed = false
+
+  if (viewportLatitudeSpan >= limitLatitudeSpan) {
+    nextLatitude = (Number(limitBounds.southwest.latitude) + Number(limitBounds.northeast.latitude)) / 2
+    changed = true
+  } else if (Number(viewportBounds.southwest.latitude) < Number(limitBounds.southwest.latitude)) {
+    nextLatitude += Number(limitBounds.southwest.latitude) - Number(viewportBounds.southwest.latitude)
+    changed = true
+  } else if (Number(viewportBounds.northeast.latitude) > Number(limitBounds.northeast.latitude)) {
+    nextLatitude += Number(limitBounds.northeast.latitude) - Number(viewportBounds.northeast.latitude)
+    changed = true
+  }
+
+  if (viewportLongitudeSpan >= limitLongitudeSpan) {
+    nextLongitude = (Number(limitBounds.southwest.longitude) + Number(limitBounds.northeast.longitude)) / 2
+    changed = true
+  } else if (Number(viewportBounds.southwest.longitude) < Number(limitBounds.southwest.longitude)) {
+    nextLongitude += Number(limitBounds.southwest.longitude) - Number(viewportBounds.southwest.longitude)
+    changed = true
+  } else if (Number(viewportBounds.northeast.longitude) > Number(limitBounds.northeast.longitude)) {
+    nextLongitude += Number(limitBounds.northeast.longitude) - Number(viewportBounds.northeast.longitude)
+    changed = true
+  }
+
+  if (!changed) {
+    return null
+  }
+
+  if (
+    Math.abs(nextLatitude - viewportCenter.latitude) < 0.000001
+    && Math.abs(nextLongitude - viewportCenter.longitude) < 0.000001
+  ) {
+    return null
+  }
+
+  return {
+    latitude: nextLatitude,
+    longitude: nextLongitude
   }
 }
 
@@ -2292,6 +2565,9 @@ const DEFAULT_GROUND_TILE_OVERLAY_BOUNDS = buildBounds(MAP_INCLUDE_POINTS, {
   latitudePadding: 0.001,
   longitudePadding: 0.0014
 })
+const DEFAULT_MAP_BOUNDARY_LIMIT = buildGroundTileViewportBoundaryLimit(
+  normalizeGroundTileOverlayConfig(JYL_GROUND_TILE_OVERLAY_CONFIG)
+) || DEFAULT_GROUND_TILE_OVERLAY_BOUNDS
 
 const DEFAULT_OUTSIDE_SCENIC_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => (
   String(point.id) === 'poi-02'
@@ -2461,7 +2737,7 @@ Page({
     tileOpacity: 0.96,
     tileZIndex: 1,
     tileAllowedZooms: [16, 17, 18, 19],
-    mapBoundaryLimit: null,
+    mapBoundaryLimit: DEFAULT_MAP_BOUNDARY_LIMIT,
     allMarkers: buildMarkers('all', null),
     markers: [],
     polylineData: buildMapPolylines(),
@@ -2547,6 +2823,7 @@ Page({
     this.groundTilePackageLoadPromise = null
     this.groundTileOverlayLoadToastShown = false
     this.groundTileOverlayLastErrorToastAt = 0
+    this.mapBoundaryCorrectionInFlight = false
     const pageOptions = normalizeMapPageOptions(options)
     const hasDirectEntryTarget = Boolean(
       pageOptions.poi
@@ -2574,6 +2851,7 @@ Page({
       tileOpacity: this.groundTileOverlayConfig?.opacity ?? 0.96,
       tileZIndex: this.groundTileOverlayConfig?.zIndex ?? 1,
       tileAllowedZooms: this.groundTileOverlayConfig?.allowedZooms || [16, 17, 18, 19],
+      mapBoundaryLimit: buildGroundTileViewportBoundaryLimit(this.groundTileOverlayConfig) || DEFAULT_MAP_BOUNDARY_LIMIT,
       showAudioAccessTestPanel: normalizeBooleanValue(pageOptions.showTestTools) || pageOptions.action === 'executeAIRouteTest'
     }, () => {
       this.ensureGroundTilePackagesLoaded()
@@ -3572,6 +3850,58 @@ Page({
       .catch(() => {})
   },
 
+  getMapBoundaryLimit() {
+    return isValidBounds(this.data.mapBoundaryLimit) ? this.data.mapBoundaryLimit : null
+  },
+
+  enforceMapBoundaryLimit(options = {}) {
+    const boundaryLimit = this.getMapBoundaryLimit()
+    if (
+      !boundaryLimit
+      || !this.mapCtx
+      || typeof this.mapCtx.getRegion !== 'function'
+      || this.mapBoundaryCorrectionInFlight
+    ) {
+      return Promise.resolve(false)
+    }
+
+    const nextScale = this.clampScaleToAllowedZooms(
+      typeof options.scale === 'number' ? options.scale : this.data.scale
+    )
+
+    return new Promise((resolve) => {
+      this.mapCtx.getRegion({
+        success: (regionResult) => {
+          const clampedCenter = resolveClampedViewportCenter(regionResult, boundaryLimit)
+          if (!clampedCenter) {
+            resolve(false)
+            return
+          }
+
+          const nextLongitude = toFiniteCoordinateValue(clampedCenter.longitude)
+          const nextLatitude = toFiniteCoordinateValue(clampedCenter.latitude)
+          if (nextLongitude === null || nextLatitude === null) {
+            resolve(false)
+            return
+          }
+
+          this.mapBoundaryCorrectionInFlight = true
+          this.setData({
+            longitude: nextLongitude,
+            latitude: nextLatitude,
+            scale: nextScale
+          }, () => {
+            this.mapBoundaryCorrectionInFlight = false
+            resolve(true)
+          })
+        },
+        fail: () => {
+          resolve(false)
+        }
+      })
+    })
+  },
+
   onRegionChange(event) {
     const detail = event?.detail || {}
     const eventType = detail.type || event?.type || ''
@@ -3586,13 +3916,31 @@ Page({
       this.hasAppliedInitialUserViewport = true
     }
 
-    this.syncViewportFromMapContext({
+    this.enforceMapBoundaryLimit({
       scale: detail.scale
     })
+      .then((wasAdjusted) => {
+        if (wasAdjusted) {
+          return
+        }
 
-    this.refreshGroundTileOverlayViewport({
-      scale: detail.scale
-    })
+        this.syncViewportFromMapContext({
+          scale: detail.scale
+        })
+
+        this.refreshGroundTileOverlayViewport({
+          scale: detail.scale
+        })
+      })
+      .catch(() => {
+        this.syncViewportFromMapContext({
+          scale: detail.scale
+        })
+
+        this.refreshGroundTileOverlayViewport({
+          scale: detail.scale
+        })
+      })
   },
 
   onScaleUpdate(event) {
