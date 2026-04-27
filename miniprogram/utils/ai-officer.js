@@ -3,45 +3,31 @@ const SCORE_PER_SECRET = 100
 
 const AI_OFFICER_LEVELS = [
   {
-    id: 'recruit',
-    shortTitle: '新兵',
-    title: '见习守城兵',
-    minPoints: 0,
-    rewardText: '获得入营腰牌'
-  },
-  {
-    id: 'scout',
-    shortTitle: '斥候',
-    title: '边关斥候',
-    minPoints: 300,
-    rewardText: '解锁巡山侦察身份'
-  },
-  {
-    id: 'captain',
-    shortTitle: '校尉',
-    title: '烽火校尉',
-    minPoints: 700,
-    rewardText: '解锁烽火传令资格'
-  },
-  {
     id: 'guard',
-    shortTitle: '守备',
-    title: '关城守备',
-    minPoints: 1100,
-    rewardText: '解锁守城军令身份'
+    shortTitle: '守兵',
+    title: '守兵',
+    minPoints: 0,
+    rewardText: '获得守城身份'
+  },
+  {
+    id: 'baihu',
+    shortTitle: '百户',
+    title: '百户',
+    minPoints: 500,
+    rewardText: '解锁百户官职'
+  },
+  {
+    id: 'qianhu',
+    shortTitle: '千户',
+    title: '千户',
+    minPoints: 1000,
+    rewardText: '解锁千户官职'
   },
   {
     id: 'general',
     shortTitle: '参将',
-    title: '长城参将',
+    title: '参将',
     minPoints: 1500,
-    rewardText: '解锁边关统筹身份'
-  },
-  {
-    id: 'marshal',
-    shortTitle: '将军',
-    title: '九眼楼将军',
-    minPoints: 1900,
     rewardText: '达成最高官职'
   }
 ]
@@ -79,11 +65,11 @@ function getCurrentOfficerLevelIndex(currentPoints) {
 
 function buildOfficerDescription(collectedCount, totalCount, currentLevel, nextLevel) {
   if (collectedCount <= 0) {
-    return '收集第一枚暗号后，小九会从见习守城兵开始晋升。'
+    return '收集第一枚暗号后，小九会从守兵开始晋升。'
   }
 
   if (!nextLevel || collectedCount >= totalCount) {
-    return '全部暗号已收齐，小九已经晋升为九眼楼将军，完成本次边关研学任务。'
+    return '全部暗号已收齐，小九已经晋升为参将，完成本次边关研学任务。'
   }
 
   return `每解锁 1 枚暗号可获得 ${SCORE_PER_SECRET} 军功，当前官职为 ${currentLevel.title}。`

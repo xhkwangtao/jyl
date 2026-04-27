@@ -8,23 +8,6 @@ const {
 const PAGE_STYLE = 'background: #f6f1e8;'
 const UNLOCK_ANIMATION_DURATION_MS = 1800
 const SECRET_REVEALED_STORAGE_KEY = 'jyl_secret_revealed_ids'
-const RULE_LIST = [
-  {
-    indexText: '01',
-    title: '到景点现场扫码',
-    desc: '学生到达布置了二维码的景点后，扫描对应二维码即可记录一枚暗号图案。'
-  },
-  {
-    indexText: '02',
-    title: '收集全部暗号',
-    desc: '每个二维码对应一枚暗号图案，只有把全部图案收齐，研学任务才算完成。'
-  },
-  {
-    indexText: '03',
-    title: '解锁研学报告',
-    desc: '暗号图案全部解锁后，当前设备上的研学报告会进入可查看状态。'
-  }
-]
 
 function getLayoutMetrics() {
   try {
@@ -176,8 +159,7 @@ Page({
     themeSummaryList: [],
     secretList: [],
     collectedSecretList: [],
-    pendingSecretList: [],
-    ruleList: RULE_LIST
+    pendingSecretList: []
   },
 
   onLoad() {
