@@ -1,3 +1,5 @@
+const request = require('../../../../../utils/request')
+const auth = require('../../../../../utils/auth')
 const { setFeaturePaid } = require('../../../../../utils/audio-access.js')
 const {
   GUIDE_MAP_PAGE
@@ -101,6 +103,29 @@ function grantPaidAccess(featureKey = '') {
   ) {
     setFeaturePaid(VIP_ACCESS_FEATURE_KEY, true)
   }
+}
+
+function yuanToCents(value) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return Math.round(DEFAULT_PRICE * 100)
+  }
+
+  return Math.round(numeric * 100)
+}
+
+function requestWxPayment(paymentParams = {}) {
+  return new Promise((resolve, reject) => {
+    wx.requestPayment({
+      timeStamp: String(paymentParams.timeStamp || ''),
+      nonceStr: String(paymentParams.nonceStr || ''),
+      package: String(paymentParams.package || ''),
+      signType: String(paymentParams.signType || 'RSA'),
+      paySign: String(paymentParams.paySign || ''),
+      success: resolve,
+      fail: reject
+    })
+  })
 }
 
 Page({
@@ -280,7 +305,7 @@ Page({
     })
   },
 
-  handlePay() {
+  async handlePay() {
     if (this.data.loading) {
       return
     }
@@ -299,7 +324,27 @@ Page({
       paymentError: ''
     })
 
-    setTimeout(() => {
+    try {
+      const loginResult = await auth.wxLogin()
+      const paymentOrder = await request.request({
+        url: '/client/payments/jsapi-prepay',
+        method: 'POST',
+        data: {
+          login_code: loginResult.code,
+          product_name: this.data.featureName,
+          product_type: this.data.featureKey || 'vip',
+          quantity: 1,
+          unit_amount_cents: yuanToCents(this.data.amount),
+          description: this.data.description,
+          feature_key: this.data.featureKey
+        },
+        timeout: 10000
+      })
+
+      if (!paymentOrder.dry_run) {
+        await requestWxPayment(paymentOrder.payment_params || {})
+      }
+
       grantPaidAccess(this.data.featureKey)
 
       this.setData({
@@ -315,7 +360,19 @@ Page({
       setTimeout(() => {
         this.navigateAfterPayment()
       }, 500)
-    }, 280)
+    } catch (error) {
+      const message = error?.errMsg || error?.message || '支付未完成，请稍后重试'
+      this.setData({
+        loading: false,
+        paymentError: /cancel/i.test(message) ? '支付已取消' : message
+      })
+
+      wx.showToast({
+        title: /cancel/i.test(message) ? '支付已取消' : '支付失败',
+        icon: 'none',
+        duration: 1800
+      })
+    }
   },
 
   navigateAfterPayment() {

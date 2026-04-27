@@ -1,5 +1,6 @@
 let messageSeed = 0
 const aiChatService = require('../../../../services/ai-chat-service')
+const StreamingPcmPlayer = require('../../../../utils/streaming-pcm-player')
 const {
   isFeaturePaid
 } = require('../../../../utils/audio-access.js')
@@ -560,6 +561,7 @@ Page({
 
   onUnload() {
     this.clearActiveStream(true)
+    this.destroyVoiceReplyPlayer()
   },
 
   onLoad(options = {}) {
@@ -704,16 +706,25 @@ Page({
     })
   },
 
-  onPlayAudio() {
+  onPlayAudio(event) {
     if (!this.ensureAIChatAccess(AI_CHAT_VOICE_PLAY_FEATURE_KEY)) {
       return
     }
 
-    wx.showToast({
-      title: '语音播报暂未接入',
-      icon: 'none',
-      duration: 1600
-    })
+    const messageId = event?.detail?.messageId || ''
+    const message = this.data.messageList.find((item) => item.id === messageId)
+    const voiceChunks = Array.isArray(message?.voiceChunks) ? message.voiceChunks : []
+
+    if (!voiceChunks.length) {
+      wx.showToast({
+        title: '当前回复还没有语音',
+        icon: 'none',
+        duration: 1600
+      })
+      return
+    }
+
+    this.playVoiceReplyChunks(voiceChunks)
   },
 
   onOpenRoute(event) {
@@ -844,7 +855,7 @@ Page({
 
     const userMessage = createUserMessage(message)
     const pendingAIMessage = createAIMessage('')
-    const requestMessage = this.buildRequestMessage(message)
+    const requestMessage = mode === 'voice' ? undefined : this.buildRequestMessage(message)
 
     this.setData({
       messageList: this.data.messageList.concat(userMessage, pendingAIMessage),
@@ -873,7 +884,7 @@ Page({
           message: requestMessage,
           audioData,
           audioFormat,
-          outputMode: 'text',
+          outputMode: 'both',
           onEvent: streamHandlers.onEvent,
           onComplete: streamHandlers.onComplete,
           onError: streamHandlers.onError
@@ -888,6 +899,7 @@ Page({
 
     this._activeStream = {
       aiMessageId: pendingAIMessage.id,
+      userMessageId: userMessage.id,
       requestTask,
       finished: false
     }
@@ -986,6 +998,27 @@ Page({
       return
     }
 
+    if (event.type === 'transcription') {
+      const transcript = String(event.text || '').trim()
+      if (!transcript || !this._activeStream?.userMessageId) {
+        return
+      }
+
+      const messageList = this.data.messageList.map((message) => {
+        if (message.id !== this._activeStream.userMessageId) {
+          return message
+        }
+        return {
+          ...message,
+          content: transcript
+        }
+      })
+      this.setData({
+        messageList
+      })
+      return
+    }
+
     if (event.type === 'text') {
       this.appendAIMessageSegment(aiMessageId, {
         type: 'text',
@@ -1031,6 +1064,27 @@ Page({
         isAILoading: false
       })
       this.handlePostMessageRender()
+      return
+    }
+
+    if (event.type === 'audio_chunk') {
+      const audioData = String(event.audioData || '').trim()
+      if (!audioData) {
+        return
+      }
+      this.updateAIMessage(aiMessageId, (message) => ({
+        ...message,
+        voiceChunks: (Array.isArray(message.voiceChunks) ? message.voiceChunks : []).concat({
+          audioData,
+          sampleRate: event.sampleRate || 16000,
+          chunkIndex: event.chunkIndex || 0
+        })
+      }))
+      this.appendVoiceReplyChunk({
+        audioData,
+        sampleRate: event.sampleRate || 16000,
+        chunkIndex: event.chunkIndex || 0
+      })
       return
     }
 
@@ -1113,6 +1167,50 @@ Page({
     if (silent) {
       return
     }
+  },
+
+  ensureVoiceReplyPlayer() {
+    if (this._voiceReplyPlayer) {
+      return this._voiceReplyPlayer
+    }
+    this._voiceReplyPlayer = new StreamingPcmPlayer()
+    return this._voiceReplyPlayer
+  },
+
+  appendVoiceReplyChunk(chunk) {
+    try {
+      this.ensureVoiceReplyPlayer().appendChunk(chunk)
+    } catch (error) {
+      wx.showToast({
+        title: '语音播放失败',
+        icon: 'none',
+        duration: 1600
+      })
+    }
+  },
+
+  playVoiceReplyChunks(chunks) {
+    try {
+      this.ensureVoiceReplyPlayer().replay(chunks)
+    } catch (error) {
+      wx.showToast({
+        title: '语音播放失败',
+        icon: 'none',
+        duration: 1600
+      })
+    }
+  },
+
+  destroyVoiceReplyPlayer() {
+    if (!this._voiceReplyPlayer) {
+      return
+    }
+    try {
+      this._voiceReplyPlayer.stop()
+    } catch (error) {
+      // Ignore cleanup failures during page unload.
+    }
+    this._voiceReplyPlayer = null
   },
 
   handlePostMessageRender() {

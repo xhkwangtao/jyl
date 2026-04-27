@@ -318,6 +318,23 @@ function normalizeSSEPayload(eventName, payload) {
     }]
   }
 
+  if (eventName === 'transcription' || payload.type === 'transcription') {
+    return [{
+      type: 'transcription',
+      text: payload.text || payload.content || ''
+    }]
+  }
+
+  if (eventName === 'audio_chunk' || payload.type === 'audio_chunk') {
+    return [{
+      type: 'audio_chunk',
+      audioData: payload.audio_data || payload.audioData || '',
+      sampleRate: payload.sample_rate || payload.sampleRate || 16000,
+      chunkIndex: payload.chunk_index || payload.chunkIndex || 0,
+      format: payload.format || 'pcm_s16le'
+    }]
+  }
+
   if (eventName === 'text' || payload.type === 'text') {
     return [{
       type: 'text',
@@ -399,15 +416,19 @@ class AIChatService {
     onComplete,
     onError
   }) {
+    const data = {
+      audio_data: audioData,
+      audio_format: audioFormat,
+      session_id: sessionId,
+      output_mode: outputMode
+    }
+    if (message) {
+      data.message = message
+    }
+
     return this.createStream(
       AI_VOICE_CHAT_STREAM_URL,
-      {
-        message,
-        audio_data: audioData,
-        audio_format: audioFormat,
-        session_id: sessionId,
-        output_mode: outputMode
-      },
+      data,
       { onEvent, onComplete, onError }
     )
   }
