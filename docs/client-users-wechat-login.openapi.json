@@ -1,0 +1,352 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "九眼楼小程序普通用户接口",
+    "version": "1.1.0",
+    "description": "普通用户微信登录与认证接口文档。该接口用于小程序端提交 wx.login 返回的 code，后端将 code 转换为 openid，并按 openid 查询或创建普通用户记录。登录成功后返回 JWT，其他小程序模块可通过 Authorization: Bearer <token> 复用普通用户认证。普通用户与后台管理用户分离。"
+  },
+  "servers": [
+    {
+      "url": "https://jyl.flexai.cc/api/v1",
+      "description": "生产环境小程序接口"
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/v1",
+      "description": "本地后端直连"
+    }
+  ],
+  "tags": [
+    {
+      "name": "client-users",
+      "description": "小程序普通用户接口"
+    }
+  ],
+  "paths": {
+    "/client/users/wechat-login": {
+      "post": {
+        "tags": [
+          "client-users"
+        ],
+        "summary": "微信 code 登录或创建普通用户",
+        "description": "小程序端提交 wx.login 返回的 code。后端使用 code 向微信换取 openid。如果 openid 已存在，直接返回已有普通用户；如果不存在，先创建普通用户记录，再将昵称设为“九”加数据库用户 ID，例如“九12”。接口返回普通用户信息和 JWT access_token。",
+        "operationId": "clientWechatLogin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientUserWechatLoginRequest"
+              },
+              "examples": {
+                "default": {
+                  "summary": "提交微信登录 code",
+                  "value": {
+                    "code": "wx-login-code-from-miniprogram"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "openid 不在库中，已创建普通用户并返回用户信息和 JWT。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientUserLoginResponse"
+                },
+                "examples": {
+                  "created": {
+                    "summary": "新建普通用户",
+                    "value": {
+                      "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                      "token_type": "bearer",
+                      "expires_in": 2592000,
+                      "user": {
+                        "id": 12,
+                        "openid": "oExampleOpenId123",
+                        "nickname": "九12",
+                        "status": "active",
+                        "last_login_at": "2026-04-27T13:20:30.000000Z",
+                        "created_at": "2026-04-27T13:20:30.000000Z",
+                        "updated_at": "2026-04-27T13:20:30.000000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "openid 已在库中，直接返回已有普通用户信息和新的 JWT。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientUserLoginResponse"
+                },
+                "examples": {
+                  "existing": {
+                    "summary": "已有普通用户",
+                    "value": {
+                      "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                      "token_type": "bearer",
+                      "expires_in": 2592000,
+                      "user": {
+                        "id": 12,
+                        "openid": "oExampleOpenId123",
+                        "nickname": "九12",
+                        "status": "active",
+                        "last_login_at": "2026-04-27T13:25:30.000000Z",
+                        "created_at": "2026-04-27T13:20:30.000000Z",
+                        "updated_at": "2026-04-27T13:25:30.000000Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误、微信 code 换取 openid 失败、微信小程序配置缺失，或普通用户 JWT secret 缺失。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "wechatConfigMissing": {
+                    "summary": "微信配置缺失",
+                    "value": {
+                      "detail": "微信小程序 app secret 未配置，无法换取 openid。",
+                      "code": "application_error"
+                    }
+                  },
+                  "jwtSecretMissing": {
+                    "summary": "JWT 配置缺失",
+                    "value": {
+                      "detail": "普通用户 JWT secret 未配置。",
+                      "code": "application_error"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求体校验失败，例如 code 为空或字段类型不正确。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/users/me": {
+      "get": {
+        "tags": [
+          "client-users"
+        ],
+        "summary": "获取当前普通用户",
+        "description": "其他小程序模块可使用该接口或同一认证机制识别当前普通用户。调用方需要在请求头中传入登录接口返回的 JWT：Authorization: Bearer <access_token>。",
+        "operationId": "getCurrentClientUser",
+        "security": [
+          {
+            "ClientUserBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JWT 有效，返回当前普通用户信息。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 JWT、JWT 无效、JWT 过期，或 token 中的用户不存在。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                },
+                "examples": {
+                  "missingToken": {
+                    "summary": "缺少认证令牌",
+                    "value": {
+                      "detail": "缺少用户认证令牌。"
+                    }
+                  },
+                  "invalidToken": {
+                    "summary": "认证令牌无效",
+                    "value": {
+                      "detail": "用户认证令牌无效。"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ClientUserBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "普通用户 JWT。登录后由 /client/users/wechat-login 返回，后续接口通过 Authorization: Bearer <access_token> 传入。"
+      }
+    },
+    "schemas": {
+      "ClientUserWechatLoginRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "小程序 wx.login 返回的一次性 code。"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ClientUserLoginResponse": {
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "user"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "普通用户 JWT access token。"
+          },
+          "token_type": {
+            "type": "string",
+            "const": "bearer",
+            "description": "token 类型。"
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "token 有效期，单位为秒。"
+          },
+          "user": {
+            "$ref": "#/components/schemas/ClientUser"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ClientUser": {
+        "type": "object",
+        "required": [
+          "id",
+          "openid",
+          "nickname",
+          "status",
+          "last_login_at",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "普通用户在数据库中的记录 ID。"
+          },
+          "openid": {
+            "type": "string",
+            "description": "微信小程序用户 openid。"
+          },
+          "nickname": {
+            "type": "string",
+            "description": "普通用户昵称。首次创建时按“九”加数据库 ID 生成。"
+          },
+          "status": {
+            "type": "string",
+            "description": "普通用户状态。",
+            "enum": [
+              "active"
+            ]
+          },
+          "last_login_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "最近一次通过该接口登录的时间。"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "普通用户创建时间。"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "普通用户更新时间。"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "detail",
+          "code"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "错误说明。"
+          },
+          "code": {
+            "type": "string",
+            "description": "应用错误码。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "AuthErrorResponse": {
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "认证错误说明。"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}
