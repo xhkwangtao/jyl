@@ -21,6 +21,10 @@ Component({
 
     onPlayAudio(event) {
       this.triggerEvent('playAudio', event.detail || {})
+    },
+
+    onOpenRoute(event) {
+      this.triggerEvent('openRoute', event.detail || {})
     }
   }
 })

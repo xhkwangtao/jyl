@@ -27,6 +27,15 @@ function buildAvatarSpriteStyle(frameIndex) {
   ].join(';')
 }
 
+function getAudioUrl(point) {
+  return String(point?.audioUrl || point?.audioGuideUrl || point?.audioSrc || '').trim()
+}
+
+function getAudioDuration(point, fallbackValue = 180) {
+  const duration = Number(point?.audioDurationSeconds || point?.durationSeconds || point?.duration)
+  return Number.isFinite(duration) && duration > 0 ? Math.round(duration) : fallbackValue
+}
+
 Component({
   properties: {
     visible: {
@@ -85,20 +94,93 @@ Component({
 
   lifetimes: {
     attached() {
+      this.ensureAudioContext()
       this.syncPoint(this.properties.currentPoi)
     },
 
     detached() {
-      this.clearProgressTimer()
+      this.destroyAudioContext()
       this.clearAvatarTimer()
     }
   },
 
   methods: {
+    ensureAudioContext() {
+      if (this.audioContext || typeof wx === 'undefined' || typeof wx.createInnerAudioContext !== 'function') {
+        return this.audioContext || null
+      }
+
+      const audioContext = wx.createInnerAudioContext()
+      audioContext.onPlay(() => {
+        this.markPlaybackStarted()
+      })
+      audioContext.onPause(() => {
+        this.markPlaybackStopped(false)
+        this.triggerEvent('audioPause', {
+          poi: this.properties.currentPoi
+        })
+      })
+      audioContext.onStop(() => {
+        this.markPlaybackStopped(false)
+      })
+      audioContext.onEnded(() => {
+        this.markPlaybackStopped(false, {
+          progress: 100,
+          currentTime: this.data.totalTime
+        })
+        this.triggerEvent('audioEnded', {
+          poi: this.properties.currentPoi
+        })
+      })
+      audioContext.onTimeUpdate(() => {
+        const currentTime = Math.max(0, Math.round(Number(audioContext.currentTime) || 0))
+        const totalTime = Math.max(1, Math.round(Number(audioContext.duration) || this.data.totalTime || 180))
+        const progress = Math.min(100, Math.round((currentTime / totalTime) * 100))
+
+        this.setData({
+          currentTime,
+          totalTime,
+          audioProgress: progress
+        })
+        this.triggerEvent('audioTimeUpdate', {
+          currentTime,
+          totalTime,
+          progress
+        })
+      })
+      audioContext.onError((error) => {
+        this.markPlaybackStopped(false)
+        this.triggerEvent('audioError', {
+          poi: this.properties.currentPoi,
+          error
+        })
+      })
+      this.audioContext = audioContext
+
+      return this.audioContext
+    },
+
+    destroyAudioContext() {
+      if (!this.audioContext) {
+        return
+      }
+
+      if (typeof this.audioContext.stop === 'function') {
+        this.audioContext.stop()
+      }
+      if (typeof this.audioContext.destroy === 'function') {
+        this.audioContext.destroy()
+      }
+      this.audioContext = null
+    },
+
     syncPoint(point) {
       const statusText = point?.name ? `我正在听${point.name}` : '点击地图点位开始导览'
+      const audioDuration = getAudioDuration(point, 180)
 
-      this.clearProgressTimer()
+      if (this.audioContext && typeof this.audioContext.stop === 'function') {
+        this.audioContext.stop()
+      }
       this.clearAvatarTimer()
       this.setData({
         statusText,
@@ -109,7 +191,7 @@ Component({
         isMuted: false,
         audioProgress: 0,
         currentTime: 0,
-        totalTime: 180
+        totalTime: audioDuration
       })
       this.triggerPlayStateChange()
     },
@@ -133,12 +215,36 @@ Component({
         return
       }
 
+      const audioUrl = getAudioUrl(this.properties.currentPoi)
+      if (!audioUrl) {
+        this.triggerEvent('audioError', {
+          poi: this.properties.currentPoi,
+          error: new Error('missing audio url')
+        })
+        return
+      }
+
+      const audioContext = this.ensureAudioContext()
+      if (!audioContext || typeof audioContext.play !== 'function') {
+        this.triggerEvent('audioError', {
+          poi: this.properties.currentPoi,
+          error: new Error('audio context unavailable')
+        })
+        return
+      }
+
+      if (audioContext.src !== audioUrl) {
+        audioContext.src = audioUrl
+      }
+      audioContext.play()
+    },
+
+    markPlaybackStarted() {
       this.setData({
         isPlaying: true,
         animationState: 'talking'
       })
       this.startAvatarTimer()
-      this.startProgressTimer()
       this.triggerEvent('audioPlay', {
         poi: this.properties.currentPoi
       })
@@ -150,10 +256,12 @@ Component({
         return
       }
 
-      this.stopPlayback(false)
-      this.triggerEvent('audioPause', {
-        poi: this.properties.currentPoi
-      })
+      if (this.audioContext && typeof this.audioContext.pause === 'function') {
+        this.audioContext.pause()
+        return
+      }
+
+      this.markPlaybackStopped(false)
     },
 
     getPlayStatus() {
@@ -172,46 +280,13 @@ Component({
     },
 
     setMuted(muted) {
+      if (this.audioContext) {
+        this.audioContext.muted = !!muted
+      }
       this.setData({
         isMuted: !!muted
       })
       this.triggerPlayStateChange()
-    },
-
-    startProgressTimer() {
-      this.clearProgressTimer()
-
-      this.progressTimer = setInterval(() => {
-        const nextTime = Math.min(this.data.currentTime + 1, this.data.totalTime)
-        const audioProgress = this.data.totalTime
-          ? Math.round((nextTime / this.data.totalTime) * 100)
-          : 0
-
-        this.setData({
-          currentTime: nextTime,
-          audioProgress
-        })
-
-        this.triggerEvent('audioTimeUpdate', {
-          currentTime: nextTime,
-          totalTime: this.data.totalTime,
-          progress: audioProgress
-        })
-
-        if (nextTime >= this.data.totalTime) {
-          this.stopPlayback(false)
-          this.triggerEvent('audioEnded', {
-            poi: this.properties.currentPoi
-          })
-        }
-      }, 1000)
-    },
-
-    clearProgressTimer() {
-      if (this.progressTimer) {
-        clearInterval(this.progressTimer)
-        this.progressTimer = null
-      }
     },
 
     startAvatarTimer() {
@@ -242,15 +317,16 @@ Component({
       })
     },
 
-    stopPlayback(triggerStopEvent) {
-      this.clearProgressTimer()
+    markPlaybackStopped(triggerStopEvent, playbackState = {}) {
       this.clearAvatarTimer()
 
       this.setData({
         isPlaying: false,
         animationState: this.properties.currentPoi ? 'breathing' : 'idle',
         avatarFrameIndex: GUIDE_AVATAR_SPRITE.idleFrameIndex,
-        avatarSpriteStyle: buildAvatarSpriteStyle(GUIDE_AVATAR_SPRITE.idleFrameIndex)
+        avatarSpriteStyle: buildAvatarSpriteStyle(GUIDE_AVATAR_SPRITE.idleFrameIndex),
+        ...(typeof playbackState.currentTime === 'number' ? { currentTime: playbackState.currentTime } : {}),
+        ...(typeof playbackState.progress === 'number' ? { audioProgress: playbackState.progress } : {})
       })
       this.triggerPlayStateChange()
 
@@ -259,6 +335,13 @@ Component({
           poi: this.properties.currentPoi
         })
       }
+    },
+
+    stopPlayback(triggerStopEvent) {
+      if (this.audioContext && typeof this.audioContext.stop === 'function') {
+        this.audioContext.stop()
+      }
+      this.markPlaybackStopped(triggerStopEvent)
     },
 
     closePlayer() {

@@ -1,4 +1,5 @@
 let messageSeed = 0
+const aiChatService = require('../../../../services/ai-chat-service')
 const {
   isFeaturePaid
 } = require('../../../../utils/audio-access.js')
@@ -33,24 +34,9 @@ const AI_CHAT_PAYWALL_CONFIG = {
 }
 
 const MOCK_MESSAGES = [
-  {
-    id: 'ai-welcome',
-    type: 'ai',
-    avatar: '/images/xiaoying-avatar.png',
-    content: '你好呀！我是小九，你的贴心 AI 伙伴。\n\n你可以直接问我景点路线、游玩时间、门票服务和历史故事，我会按照 miniapp 的聊天界面风格一步步为你介绍。'
-  },
-  {
-    id: 'user-demo',
-    type: 'user',
-    avatar: '/images/icons/user.svg',
-    content: '第一次来，推荐我先看哪里？'
-  },
-  {
-    id: 'ai-demo',
-    type: 'ai',
-    avatar: '/images/xiaoying-avatar.png',
-    content: '如果你是第一次来，我建议先从关城核心区域进入视线最完整的点位，再根据体力决定是否继续登城。\n\n这样最容易先建立整体空间感，后面的路线也会更顺。'
-  }
+  createAIMessage(
+    '你好呀！我是小九，你的贴心 AI 伙伴。\n\n你可以直接问我景点路线、游玩时间、门票服务和历史故事，我会按当前景区数据尽量给你清楚回答。'
+  )
 ]
 
 function buildMessageId(prefix) {
@@ -68,32 +54,437 @@ function createUserMessage(content) {
 }
 
 function createAIMessage(content) {
+  const safeContent = String(content || '')
   return {
     id: buildMessageId('ai'),
     type: 'ai',
     avatar: '/images/xiaoying-avatar.png',
-    content
+    content: safeContent,
+    segments: safeContent
+      ? [{
+          id: buildMessageId('segment'),
+          type: 'text',
+          content: safeContent
+        }]
+      : []
   }
 }
 
-function buildMockReply(question) {
-  if (question.includes('景点') || question.includes('哪里')) {
-    return '核心推荐可以先看关城主体、城墙步道和视野最好的几个高点。\n\n如果你想更快进入状态，建议先把整体路线看清，再决定是偏历史视角还是偏拍照视角。'
+function cloneSegments(message) {
+  if (!message || !Array.isArray(message.segments)) {
+    if (message && message.content) {
+      return [{
+        id: buildMessageId('segment'),
+        type: 'text',
+        content: message.content
+      }]
+    }
+    return []
   }
 
-  if (question.includes('路线') || question.includes('怎么走')) {
-    return '第一次来更适合先走一条主线，把最重要的点位串起来。\n\n先完整看一遍核心区域，再根据体力选择继续登城或者回到关城周边慢慢逛，会比较顺。'
+  return message.segments.map((segment) => ({
+    ...segment
+  }))
+}
+
+function appendSegmentToAIMessage(message, segment) {
+  const segments = cloneSegments(message)
+
+  if (segment.type === 'text') {
+    const lastSegment = segments[segments.length - 1]
+    if (lastSegment && lastSegment.type === 'text') {
+      lastSegment.content = `${lastSegment.content || ''}${segment.content || ''}`
+    } else {
+      segments.push({
+        id: buildMessageId('segment'),
+        type: 'text',
+        content: segment.content || ''
+      })
+    }
+  } else {
+    segments.push({
+      id: buildMessageId('segment'),
+      ...segment
+    })
   }
 
-  if (question.includes('开放') || question.includes('门票') || question.includes('停车') || question.includes('餐饮')) {
-    return '服务类问题我可以继续按模块帮你拆开，比如开放时间、门票、停车和补给点。\n\n如果你愿意，我下一步可以把这几个信息按“到达前 / 游览中 / 离开前”整理成更清晰的一份。'
+  return {
+    ...message,
+    segments,
+    content: segments
+      .filter((item) => item.type === 'text')
+      .map((item) => item.content || '')
+      .join('')
+  }
+}
+
+function findCompleteJsonObjects(content) {
+  const matches = []
+  const text = String(content || '')
+  let index = 0
+
+  while (index < text.length) {
+    if (text[index] !== '{') {
+      index += 1
+      continue
+    }
+
+    const start = index
+    let depth = 0
+    let inString = false
+    let escaped = false
+
+    for (let cursor = index; cursor < text.length; cursor += 1) {
+      const char = text[cursor]
+
+      if (escaped) {
+        escaped = false
+        continue
+      }
+
+      if (char === '\\' && inString) {
+        escaped = true
+        continue
+      }
+
+      if (char === '"') {
+        inString = !inString
+        continue
+      }
+
+      if (inString) {
+        continue
+      }
+
+      if (char === '{') {
+        depth += 1
+      } else if (char === '}') {
+        depth -= 1
+        if (depth === 0) {
+          matches.push({
+            start,
+            end: cursor + 1,
+            text: text.slice(start, cursor + 1)
+          })
+          index = cursor + 1
+          break
+        }
+      }
+    }
+
+    if (depth !== 0) {
+      index += 1
+    }
   }
 
-  if (question.includes('戚继光') || question.includes('历史')) {
-    return '黄崖关最吸引人的地方之一，就是军事防御体系和历史叙事是叠在一起的。\n\n如果你更偏文化视角，我可以继续把人物、关隘功能和沿线看点拆成一条更适合边走边听的讲法。'
+  return matches
+}
+
+function normalizeImageGroup(rawImageGroup = {}) {
+  const images = Array.isArray(rawImageGroup.images)
+    ? rawImageGroup.images
+      .map((item) => ({
+        url: item?.url || item?.imageUrl || '',
+        caption: item?.caption || item?.description || item?.title || ''
+      }))
+      .filter((item) => item.url)
+    : []
+
+  return {
+    title: rawImageGroup.title || '',
+    description: rawImageGroup.description || '',
+    images
+  }
+}
+
+function normalizeSingleImageGroup(rawImage = {}) {
+  const imageUrl = rawImage.imageUrl || rawImage.url || rawImage.src || ''
+
+  return {
+    title: rawImage.title || '',
+    description: rawImage.description || '',
+    images: imageUrl
+      ? [{
+          url: imageUrl,
+          caption: rawImage.caption || rawImage.description || rawImage.title || ''
+        }]
+      : []
+  }
+}
+
+function normalizeVideoCard(rawVideoCard = {}) {
+  const videoUrl = rawVideoCard.videoUrl || rawVideoCard.url || rawVideoCard.src || ''
+  const coverUrl = rawVideoCard.coverUrl || rawVideoCard.poster || rawVideoCard.imageUrl || ''
+  const preferredDurationText = String(rawVideoCard.durationText || '').trim()
+  const durationValue = String(rawVideoCard.duration || '').trim()
+  const durationText = preferredDurationText || (
+    durationValue
+      ? /[^\d.\s]/.test(durationValue) ? durationValue : `${durationValue}秒`
+      : ''
+  )
+
+  return {
+    title: rawVideoCard.title || rawVideoCard.name || '景区视频',
+    description: rawVideoCard.description || rawVideoCard.caption || '',
+    videoUrl,
+    coverUrl,
+    durationText
+  }
+}
+
+function normalizeEmbeddedMediaComponent(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null
   }
 
-  return '这个问题我可以继续展开讲。\n\n为了保持 UI 复刻干净，目前这里先用静态回答顶住样式层，下一步会把真实输入区和交互也补齐。'
+  if (payload.imageScroll) {
+    return {
+      type: 'image-group',
+      imageGroup: normalizeImageGroup(payload.imageScroll)
+    }
+  }
+
+  if (payload.imageGroup) {
+    return {
+      type: 'image-group',
+      imageGroup: normalizeImageGroup(payload.imageGroup)
+    }
+  }
+
+  if (payload.image_display) {
+    return {
+      type: 'image-group',
+      imageGroup: normalizeSingleImageGroup(payload.image_display)
+    }
+  }
+
+  if (payload.videoCard) {
+    return {
+      type: 'video-card',
+      videoCard: normalizeVideoCard(payload.videoCard)
+    }
+  }
+
+  if (payload.video_display) {
+    return {
+      type: 'video-card',
+      videoCard: normalizeVideoCard(payload.video_display)
+    }
+  }
+
+  if ((payload.component === 'imageScroll' || payload.component === 'image_scroll') && payload.data) {
+    return {
+      type: 'image-group',
+      imageGroup: normalizeImageGroup(payload.data)
+    }
+  }
+
+  if (payload.component === 'imageGroup' && payload.data) {
+    return {
+      type: 'image-group',
+      imageGroup: normalizeImageGroup(payload.data)
+    }
+  }
+
+  if (payload.component === 'image_display' && payload.data) {
+    return {
+      type: 'image-group',
+      imageGroup: normalizeSingleImageGroup(payload.data)
+    }
+  }
+
+  if (payload.component === 'video_display' && payload.data) {
+    return {
+      type: 'video-card',
+      videoCard: normalizeVideoCard(payload.data)
+    }
+  }
+
+  if (payload.type === 'component' && (payload.component === 'image_display' || payload.component === 'imageScroll') && payload.content) {
+    return {
+      type: 'image-group',
+      imageGroup: payload.component === 'imageScroll'
+        ? normalizeImageGroup(payload.content)
+        : normalizeSingleImageGroup(payload.content)
+    }
+  }
+
+  if (payload.type === 'component' && payload.component === 'video_display' && payload.content) {
+    return {
+      type: 'video-card',
+      videoCard: normalizeVideoCard(payload.content)
+    }
+  }
+
+  if (payload.type === 'image_display' && payload.data) {
+    return {
+      type: 'image-group',
+      imageGroup: normalizeSingleImageGroup(payload.data)
+    }
+  }
+
+  if ((payload.type === 'imageScroll' || payload.type === 'image_scroll') && payload.data) {
+    return {
+      type: 'image-group',
+      imageGroup: normalizeImageGroup(payload.data)
+    }
+  }
+
+  if ((payload.type === 'image-group' || payload.type === 'imageGroup') && (payload.imageGroup || payload.data || payload.content)) {
+    return {
+      type: 'image-group',
+      imageGroup: normalizeImageGroup(payload.imageGroup || payload.data || payload.content)
+    }
+  }
+
+  if ((payload.type === 'video-card' || payload.type === 'video_display') && (payload.videoCard || payload.data || payload.content || payload.videoUrl || payload.url)) {
+    return {
+      type: 'video-card',
+      videoCard: normalizeVideoCard(payload.videoCard || payload.data || payload.content || payload)
+    }
+  }
+
+  return null
+}
+
+function buildSegmentsFromEmbeddedMediaComponents(content) {
+  const matches = findCompleteJsonObjects(content)
+  if (!matches.length) {
+    return null
+  }
+
+  const segments = []
+  let cursor = 0
+  let hasMediaComponent = false
+
+  matches.forEach((match) => {
+    let mediaSegment = null
+
+    try {
+      mediaSegment = normalizeEmbeddedMediaComponent(JSON.parse(match.text))
+    } catch (error) {
+      mediaSegment = null
+    }
+
+    if (!mediaSegment) {
+      return
+    }
+
+    if (mediaSegment.type === 'image-group' && (!mediaSegment.imageGroup || !Array.isArray(mediaSegment.imageGroup.images) || !mediaSegment.imageGroup.images.length)) {
+      return
+    }
+
+    if (mediaSegment.type === 'video-card' && (!mediaSegment.videoCard || !mediaSegment.videoCard.videoUrl)) {
+      return
+    }
+
+    const beforeText = String(content || '').slice(cursor, match.start).trim()
+    if (beforeText) {
+      segments.push({
+        id: buildMessageId('segment'),
+        type: 'text',
+        content: beforeText
+      })
+    }
+
+    segments.push({
+      id: buildMessageId('segment'),
+      ...mediaSegment
+    })
+    cursor = match.end
+    hasMediaComponent = true
+  })
+
+  if (!hasMediaComponent) {
+    return null
+  }
+
+  const afterText = String(content || '').slice(cursor).trim()
+  if (afterText) {
+    segments.push({
+      id: buildMessageId('segment'),
+      type: 'text',
+      content: afterText
+    })
+  }
+
+  return segments
+}
+
+function resolveEmbeddedMediaComponents(message) {
+  const segments = cloneSegments(message)
+  const nextSegments = []
+  let changed = false
+
+  segments.forEach((segment) => {
+    if (segment.type !== 'text') {
+      nextSegments.push(segment)
+      return
+    }
+
+    const parsedSegments = buildSegmentsFromEmbeddedMediaComponents(segment.content || '')
+    if (!parsedSegments) {
+      nextSegments.push(segment)
+      return
+    }
+
+    nextSegments.push(...parsedSegments)
+    changed = true
+  })
+
+  if (!changed) {
+    return message
+  }
+
+  return {
+    ...message,
+    segments: nextSegments,
+    content: nextSegments
+      .filter((item) => item.type === 'text')
+      .map((item) => item.content || '')
+      .join('\n\n')
+  }
+}
+
+function hasRenderableSegments(message) {
+  return cloneSegments(message).some((segment) => {
+    if (segment.type === 'text') {
+      return !!segment.content
+    }
+
+    if (segment.type === 'route-card') {
+      return !!segment.routeCard
+    }
+
+    if (segment.type === 'image-group') {
+      return !!(segment.imageGroup && Array.isArray(segment.imageGroup.images) && segment.imageGroup.images.length)
+    }
+
+    if (segment.type === 'video-card') {
+      return !!(segment.videoCard && segment.videoCard.videoUrl)
+    }
+
+    return false
+  })
+}
+
+function buildRouteContextPrompt(routeInfo) {
+  if (!routeInfo) {
+    return ''
+  }
+
+  const pointNames = Array.isArray(routeInfo.pointNames)
+    ? routeInfo.pointNames.filter(Boolean)
+    : []
+  const lines = [
+    `路线名称：${routeInfo.name || '推荐路线'}`,
+    routeInfo.description ? `路线说明：${routeInfo.description}` : '',
+    routeInfo.distanceText ? `路线距离：${routeInfo.distanceText}` : '',
+    routeInfo.durationText ? `预计时长：${routeInfo.durationText}` : '',
+    pointNames.length ? `沿途点位：${pointNames.join('、')}` : ''
+  ].filter(Boolean)
+
+  return lines.join('\n')
 }
 
 function safeDecodeURIComponent(value) {
@@ -168,7 +559,7 @@ Page({
   },
 
   onUnload() {
-    this.clearReplyTimer()
+    this.clearActiveStream(true)
   },
 
   onLoad(options = {}) {
@@ -325,6 +716,21 @@ Page({
     })
   },
 
+  onOpenRoute(event) {
+    const routeData = event?.detail?.routeData || null
+
+    if (!routeData) {
+      wx.showToast({
+        title: '当前没有可预览的路线',
+        icon: 'none',
+        duration: 1600
+      })
+      return
+    }
+
+    this.openMapWithRoute(routeData)
+  },
+
   onQuickQuestionSelect(event) {
     const detail = event.detail || {}
     const question = detail.question ? detail.question.text : ''
@@ -359,18 +765,26 @@ Page({
 
   onVoiceSend(event) {
     const detail = event.detail || {}
-    const message = (detail.message || '帮我介绍一下黄崖关长城有什么特色？').trim()
-
-    if (!message) {
-      return
-    }
+    const audioData = detail.audioData || ''
 
     if (!this.ensureAIChatAccess(AI_CHAT_VOICE_SEND_FEATURE_KEY)) {
       return
     }
 
-    this.sendMessage(message, {
-      skipAccessCheck: true
+    if (audioData) {
+      this.sendMessage('语音输入', {
+        skipAccessCheck: true,
+        mode: 'voice',
+        audioData,
+        audioFormat: detail.audioFormat || 'wav'
+      })
+      return
+    }
+
+    wx.showToast({
+      title: '语音识别暂未接入',
+      icon: 'none',
+      duration: 1600
     })
   },
 
@@ -418,44 +832,69 @@ Page({
 
     const {
       featureKey = AI_CHAT_TEXT_FEATURE_KEY,
-      skipAccessCheck = false
+      skipAccessCheck = false,
+      mode = 'text',
+      audioData = '',
+      audioFormat = 'wav'
     } = options
 
     if (!skipAccessCheck && !this.ensureAIChatAccess(featureKey)) {
       return
     }
 
+    const userMessage = createUserMessage(message)
+    const pendingAIMessage = createAIMessage('')
+    const requestMessage = this.buildRequestMessage(message)
+
     this.setData({
-      messageList: this.data.messageList.concat(createUserMessage(message)),
+      messageList: this.data.messageList.concat(userMessage, pendingAIMessage),
       isGenerating: true,
-      isAILoading: true
+      isAILoading: true,
+      loadingStateText: 'AI正在思考中...'
     })
 
     this.scrollToBottom()
-    this.clearReplyTimer()
+    this.clearActiveStream(true)
 
-    this._replyTimer = setTimeout(() => {
-      this.setData({
-        messageList: this.data.messageList.concat(createAIMessage(buildMockReply(message))),
-        isGenerating: false,
-        isAILoading: false
-      })
-
-      if (this.data.isAtBottom) {
-        this.scrollToBottom()
-      } else {
-        this.setData({
-          hasNewMessage: true,
-          showScrollToBottom: true
-        })
+    const streamHandlers = {
+      onEvent: (event) => {
+        this.handleStreamEvent(pendingAIMessage.id, event)
+      },
+      onComplete: () => {
+        this.finishStream(pendingAIMessage.id)
+      },
+      onError: (error) => {
+        this.handleStreamError(pendingAIMessage.id, error)
       }
+    }
 
-      this._replyTimer = null
-    }, 900)
+    const requestTask = mode === 'voice'
+      ? aiChatService.streamVoiceChat({
+          message: requestMessage,
+          audioData,
+          audioFormat,
+          outputMode: 'text',
+          onEvent: streamHandlers.onEvent,
+          onComplete: streamHandlers.onComplete,
+          onError: streamHandlers.onError
+        })
+      : aiChatService.streamChat({
+          message: requestMessage,
+          scene: this.entryOptions?.context || 'guide',
+          onEvent: streamHandlers.onEvent,
+          onComplete: streamHandlers.onComplete,
+          onError: streamHandlers.onError
+        })
+
+    this._activeStream = {
+      aiMessageId: pendingAIMessage.id,
+      requestTask,
+      finished: false
+    }
   },
 
   cancelGeneration() {
-    this.clearReplyTimer()
+    this.clearActiveStream(true)
     this.setData({
       isGenerating: false,
       isAILoading: false
@@ -504,11 +943,188 @@ Page({
     })
   },
 
-  clearReplyTimer() {
-    if (this._replyTimer) {
-      clearTimeout(this._replyTimer)
-      this._replyTimer = null
+  buildRequestMessage(message) {
+    const routeContext = buildRouteContextPrompt(this.data.entryRouteInfo)
+    if (!routeContext) {
+      return message
     }
+
+    return `${message}\n\n[当前路线参考]\n${routeContext}`
+  },
+
+  updateAIMessage(aiMessageId, updater) {
+    const messageList = this.data.messageList.map((message) => {
+      if (message.id !== aiMessageId) {
+        return message
+      }
+
+      return updater(message)
+    })
+
+    this.setData({
+      messageList
+    })
+  },
+
+  appendAIMessageSegment(aiMessageId, segment) {
+    this.updateAIMessage(aiMessageId, (message) => appendSegmentToAIMessage(message, segment))
+  },
+
+  handleStreamEvent(aiMessageId, event) {
+    if (!event || this._activeStream?.aiMessageId !== aiMessageId) {
+      return
+    }
+
+    if (event.type === 'start') {
+      return
+    }
+
+    if (event.type === 'state') {
+      this.setData({
+        loadingStateText: event.message || 'AI正在思考中...'
+      })
+      return
+    }
+
+    if (event.type === 'text') {
+      this.appendAIMessageSegment(aiMessageId, {
+        type: 'text',
+        content: event.content || ''
+      })
+      this.setData({
+        isAILoading: false
+      })
+      this.handlePostMessageRender()
+      return
+    }
+
+    if (event.type === 'route-card') {
+      this.appendAIMessageSegment(aiMessageId, {
+        type: 'route-card',
+        routeCard: event.routeCard
+      })
+      this.setData({
+        isAILoading: false
+      })
+      this.handlePostMessageRender()
+      return
+    }
+
+    if (event.type === 'image-group') {
+      this.appendAIMessageSegment(aiMessageId, {
+        type: 'image-group',
+        imageGroup: event.imageGroup
+      })
+      this.setData({
+        isAILoading: false
+      })
+      this.handlePostMessageRender()
+      return
+    }
+
+    if (event.type === 'video-card') {
+      this.appendAIMessageSegment(aiMessageId, {
+        type: 'video-card',
+        videoCard: event.videoCard
+      })
+      this.setData({
+        isAILoading: false
+      })
+      this.handlePostMessageRender()
+      return
+    }
+
+    if (event.type === 'error') {
+      this.handleStreamError(aiMessageId, new Error(event.message || 'AI 对话失败'))
+      return
+    }
+
+    if (event.type === 'done') {
+      this.markStreamFinished(aiMessageId)
+    }
+  },
+
+  markStreamFinished(aiMessageId) {
+    if (!this._activeStream || this._activeStream.aiMessageId !== aiMessageId) {
+      return
+    }
+
+    this._activeStream.finished = true
+  },
+
+  handleStreamError(aiMessageId, error) {
+    if (this._activeStream?.aiMessageId !== aiMessageId) {
+      return
+    }
+
+    const currentAIMessage = this.data.messageList.find((item) => item.id === aiMessageId)
+    if (!hasRenderableSegments(currentAIMessage)) {
+      this.appendAIMessageSegment(aiMessageId, {
+        type: 'text',
+        content: error?.message || 'AI 服务暂时不可用，请稍后再试。'
+      })
+    }
+
+    this.clearActiveStream(true)
+    this.setData({
+      isGenerating: false,
+      isAILoading: false,
+      loadingStateText: 'AI正在思考中...'
+    })
+    this.handlePostMessageRender()
+
+    wx.showToast({
+      title: error?.message || 'AI 对话失败',
+      icon: 'none',
+      duration: 1800
+    })
+  },
+
+  finishStream(aiMessageId) {
+    if (this._activeStream?.aiMessageId !== aiMessageId) {
+      return
+    }
+
+    this.updateAIMessage(aiMessageId, (message) => resolveEmbeddedMediaComponents(message))
+
+    const currentAIMessage = this.data.messageList.find((item) => item.id === aiMessageId)
+    if (!hasRenderableSegments(currentAIMessage)) {
+      this.appendAIMessageSegment(aiMessageId, {
+        type: 'text',
+        content: '暂时没有返回可展示的内容。'
+      })
+    }
+
+    this.clearActiveStream(true)
+    this.setData({
+      isGenerating: false,
+      isAILoading: false,
+      loadingStateText: 'AI正在思考中...'
+    })
+    this.handlePostMessageRender()
+  },
+
+  clearActiveStream(silent = false) {
+    if (this._activeStream?.requestTask && typeof this._activeStream.requestTask.abort === 'function') {
+      this._activeStream.requestTask.abort()
+    }
+
+    this._activeStream = null
+    if (silent) {
+      return
+    }
+  },
+
+  handlePostMessageRender() {
+    if (this.data.isAtBottom) {
+      this.scrollToBottom()
+      return
+    }
+
+    this.setData({
+      hasNewMessage: true,
+      showScrollToBottom: true
+    })
   },
 
   measureChatViewport() {

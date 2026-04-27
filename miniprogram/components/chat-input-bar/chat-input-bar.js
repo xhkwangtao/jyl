@@ -157,7 +157,6 @@ Component({
       })
 
       this.triggerEvent('voiceSend', {
-        message: '帮我介绍一下黄崖关长城有什么特色？',
         duration
       })
     },

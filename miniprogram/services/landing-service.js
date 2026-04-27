@@ -1,4 +1,4 @@
-const LANDING_CONFIG_ENDPOINT = 'https://jyl.flexai.cc/api/v1/client/landing-pages/config'
+const request = require('../utils/request')
 
 function normalizeSourceCode(value = '') {
   return String(value || '').trim().toLowerCase()
@@ -40,30 +40,9 @@ class LandingService {
     }
 
     try {
-      const data = await new Promise((resolve, reject) => {
-        wx.request({
-          url: LANDING_CONFIG_ENDPOINT,
-          method: 'GET',
-          timeout: 5000,
-          data: {
-            s: normalizedSourceCode,
-            scene: normalizedSceneValue
-          },
-          header: {
-            Accept: 'application/json'
-          },
-          success: (res) => {
-            if (res.statusCode >= 200 && res.statusCode < 300) {
-              resolve(res.data)
-              return
-            }
-
-            reject(new Error(`landing config request failed: ${res.statusCode}`))
-          },
-          fail: (error) => {
-            reject(new Error(error?.errMsg || 'landing config request failed'))
-          }
-        })
+      const data = await request.get(`/client/landing-pages/config/${encodeURIComponent(normalizedSourceCode)}`, {
+        s: normalizedSourceCode,
+        scene: normalizedSceneValue
       })
       return normalizeLandingConfigPayload(data, normalizedSourceCode)
     } catch (error) {

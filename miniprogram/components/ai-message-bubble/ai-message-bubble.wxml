@@ -3,7 +3,111 @@
 
   <view class="content-wrapper">
     <view class="bubble-container">
-      <text class="message-text">{{message.content}}</text>
+      <block wx:if="{{renderSegments && renderSegments.length}}">
+        <block wx:for="{{renderSegments}}" wx:key="id" wx:for-index="segmentIndex">
+          <rich-text
+            wx:if="{{item.type === 'text'}}"
+            class="message-rich-text"
+            nodes="{{item.richTextNodes}}"
+          ></rich-text>
+
+          <view
+            wx:elif="{{item.type === 'route-card' && item.routeCard}}"
+            class="route-card"
+            data-segment-index="{{segmentIndex}}"
+            bind:tap="onRouteCardTap"
+          >
+            <view class="route-card-head">
+              <text class="route-card-kicker">{{item.routeCard.title || '智能路线规划'}}</text>
+              <text class="route-card-title">{{item.routeCard.name}}</text>
+            </view>
+            <text class="route-card-description" wx:if="{{item.routeCard.description}}">
+              {{item.routeCard.description}}
+            </text>
+            <view class="route-card-metrics">
+              <view class="route-card-metric">
+                <text class="route-card-metric-value">{{item.routeCard.durationText || '--'}}</text>
+                <text class="route-card-metric-label">预计时长</text>
+              </view>
+              <view class="route-card-metric">
+                <text class="route-card-metric-value">{{item.routeCard.distanceText || '--'}}</text>
+                <text class="route-card-metric-label">路线距离</text>
+              </view>
+              <view class="route-card-metric">
+                <text class="route-card-metric-value">{{item.routeCard.pointCount || 0}} 个</text>
+                <text class="route-card-metric-label">途经点位</text>
+              </view>
+            </view>
+            <view class="route-card-tags" wx:if="{{item.routeCard.pointNamesPreview.length}}">
+              <text
+                class="route-card-tag"
+                wx:for="{{item.routeCard.pointNamesPreview}}"
+                wx:key="*this"
+              >{{item}}</text>
+              <text class="route-card-tag" wx:if="{{item.routeCard.remainingPointCount > 0}}">
+                +{{item.routeCard.remainingPointCount}}
+              </text>
+            </view>
+            <view class="route-card-action">
+              <text class="route-card-action-text">去地图看路线</text>
+            </view>
+          </view>
+
+          <view
+            wx:elif="{{item.type === 'image-group' && item.imageGroup && item.imageGroup.images.length}}"
+            class="image-group"
+          >
+            <text class="image-group-title" wx:if="{{item.imageGroup.title}}">{{item.imageGroup.title}}</text>
+            <text class="image-group-description" wx:if="{{item.imageGroup.description}}">
+              {{item.imageGroup.description}}
+            </text>
+            <scroll-view class="image-group-scroll" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+              <view class="image-group-track">
+                <view
+                  class="image-card"
+                  wx:for="{{item.imageGroup.images}}"
+                  wx:key="url"
+                  wx:for-index="imageIndex"
+                  data-segment-index="{{segmentIndex}}"
+                  data-image-index="{{imageIndex}}"
+                  bind:tap="onPreviewImageTap"
+                >
+                  <image class="image-card-media" src="{{item.url}}" mode="aspectFill"></image>
+                  <text class="image-card-caption" wx:if="{{item.caption}}">{{item.caption}}</text>
+                </view>
+              </view>
+            </scroll-view>
+          </view>
+
+          <view
+            wx:elif="{{item.type === 'video-card' && item.videoCard && item.videoCard.videoUrl}}"
+            class="video-card"
+          >
+            <video
+              class="video-card-media"
+              src="{{item.videoCard.videoUrl}}"
+              poster="{{item.videoCard.coverUrl}}"
+              controls="{{true}}"
+              show-center-play-btn="{{true}}"
+              enable-progress-gesture="{{true}}"
+              object-fit="cover"
+            ></video>
+            <view class="video-card-body">
+              <view class="video-card-heading">
+                <text class="video-card-title">{{item.videoCard.title || '景区视频'}}</text>
+                <text class="video-card-duration" wx:if="{{item.videoCard.durationText}}">
+                  {{item.videoCard.durationText}}
+                </text>
+              </view>
+              <text class="video-card-description" wx:if="{{item.videoCard.description}}">
+                {{item.videoCard.description}}
+              </text>
+            </view>
+          </view>
+        </block>
+      </block>
+
+      <text wx:else class="message-text">{{message.content}}</text>
 
       <view class="toolbar">
         <view class="toolbar-left">

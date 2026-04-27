@@ -12,6 +12,7 @@
           message="{{item}}"
           bind:copyText="onCopyText"
           bind:playAudio="onPlayAudio"
+          bind:openRoute="onOpenRoute"
         />
         <user-message-bubble
           wx:elif="{{item.type === 'user'}}"

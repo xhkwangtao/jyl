@@ -73,6 +73,7 @@
         loading-text="{{loadingStateText}}"
         bind:copyText="onCopyText"
         bind:playAudio="onPlayAudio"
+        bind:openRoute="onOpenRoute"
       />
     </scroll-view>
 
