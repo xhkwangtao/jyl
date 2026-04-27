@@ -63,23 +63,6 @@ Page({
     videoPlaying: false,
     videoEnded: false,
     videoViewCount: 0,
-    videoSources: [
-      {
-        url: 'https://hyg-cdn.flexai.cc/xiaoyingshipin/bguachengjieshao.mp4',
-        title: '九眼楼八卦城介绍',
-        description: 'AI助手陪你探索古老长城的历史文化魅力'
-      },
-      {
-        url: 'https://hyg-cdn.flexai.cc/xiaoyingshipin/hungyaguanrenwutiaozhan.mp4',
-        title: '九眼楼任务挑战',
-        description: '跟随AI助手完成有趣的探索任务'
-      },
-      {
-        url: 'https://hyg-cdn.flexai.cc/xiaoyingshipin/xiaoyingjieshao.mp4',
-        title: '九眼楼AI伴游',
-        description: '智能导览 · 个性化旅游 · AI语音助手'
-      }
-    ],
     currentVideo: null,
     source: '',
     serialNumber: '',
@@ -170,18 +153,13 @@ Page({
         return
       }
 
-      this.showVideoOrRedirectToSubscribe()
+      this.showLandingPage()
       return
     }
 
-    this.setData({
-      shouldShowPage: true,
-      shouldShowVideo: false
+    this.showLandingPage({
+      hideLoading: !!serialNumber
     })
-
-    if (serialNumber) {
-      wx.hideLoading()
-    }
   },
 
   tryExecuteLandingConfig(config, landingOptions = {}) {
@@ -273,26 +251,18 @@ Page({
     })
   },
 
-  showVideoOrRedirectToSubscribe() {
-    const isVip = this.isVipActive()
-    const viewCount = this.getVideoViewCount()
-
-    if (!isVip && viewCount >= 3) {
-      this.redirectToSubscribe()
-      return
-    }
-
-    const selectedVideo = this.selectRandomVideo()
-
-    this.incrementVideoViewCount()
+  showLandingPage(options = {}) {
     this.setData({
-      shouldShowPage: false,
-      shouldShowVideo: true,
+      shouldShowPage: true,
+      shouldShowVideo: false,
       videoPlaying: false,
       videoEnded: false,
-      videoViewCount: viewCount + 1,
-      currentVideo: selectedVideo
+      currentVideo: null
     })
+
+    if (options.hideLoading) {
+      wx.hideLoading()
+    }
   },
 
   executeRedirect(redirectUrl) {
@@ -486,21 +456,6 @@ Page({
     this.setData({
       entryImageUrl: DEFAULT_ENTRY_IMAGE_URL
     })
-  },
-
-  selectRandomVideo() {
-    const videos = this.data.videoSources || []
-
-    if (!videos.length) {
-      return {
-        url: '',
-        title: 'AI伴游介绍',
-        description: ''
-      }
-    }
-
-    const randomIndex = Math.floor(Math.random() * videos.length)
-    return videos[randomIndex]
   },
 
   onVideoPlay() {
