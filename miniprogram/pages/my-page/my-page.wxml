@@ -119,7 +119,7 @@
     <view class="section-head">
       <view>
         <text class="section-title">暗号图谱</text>
-        <text class="section-caption">未解锁为灰色，已解锁为黑色。只有 19 枚暗号全部点亮后，才可领取研学报告。</text>
+        <text class="section-caption">未解锁时不显示图谱；新解锁的暗号会先出现锁定提示，点击后才正式解锁展示。只有 19 枚暗号全部点亮后，才可领取研学报告。</text>
       </view>
       <text class="section-right">{{collectedCount}} / {{totalCount}}</text>
     </view>
@@ -135,19 +135,32 @@
       </view>
     </view>
 
-    <view class="secret-wall" wx:if="{{secretList.length}}">
+    <view class="secret-wall" id="secretWall" wx:if="{{secretList.length}}">
       <view
-        class="secret-icon-card {{item.collected ? 'secret-icon-card-active' : 'secret-icon-card-pending'}}"
+        class="secret-icon-card {{item.revealCollected ? 'secret-icon-card-active' : 'secret-icon-card-pending'}} {{item.pendingReveal ? 'secret-icon-card-pending-reveal' : ''}} {{item.justUnlocked ? 'secret-icon-card-unlocking' : ''}}"
         wx:for="{{secretList}}"
         wx:key="id"
-        data-map-id="{{item.mapPointId}}"
+        data-secret-id="{{item.id}}"
+        data-pending-reveal="{{item.pendingReveal}}"
         bindtap="onSecretTap"
       >
-        <view class="secret-icon-shell">
-          <image class="secret-icon-image" src="{{item.iconDisplayPath}}" mode="aspectFit"></image>
+        <view class="secret-icon-shell {{item.revealCollected ? 'secret-icon-shell-active' : 'secret-icon-shell-locked'}}">
+          <block wx:if="{{item.revealCollected}}">
+            <view class="secret-icon-unlock-glow" wx:if="{{item.justUnlocked}}"></view>
+            <view class="secret-icon-unlock-ring" wx:if="{{item.justUnlocked}}"></view>
+            <image class="secret-icon-image" src="{{item.iconDarkPath}}" mode="aspectFit"></image>
+          </block>
+          <block wx:else>
+            <view class="secret-icon-lock {{item.pendingReveal ? 'secret-icon-lock-pending' : ''}}">
+              <view class="secret-icon-lock-arch"></view>
+              <view class="secret-icon-lock-body">
+                <text class="secret-icon-lock-text">?</text>
+              </view>
+            </view>
+          </block>
         </view>
         <text class="secret-icon-name">{{item.secretName}}</text>
-        <text class="secret-icon-caption">{{item.patternLabel}}</text>
+        <text class="secret-icon-caption {{item.revealCollected ? '' : 'secret-icon-caption-locked'}}">{{item.wallCaptionText}}</text>
         <text class="secret-icon-index">{{item.secretIndexText}}</text>
       </view>
     </view>

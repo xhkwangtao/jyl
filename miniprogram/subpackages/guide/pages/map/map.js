@@ -1,7 +1,7 @@
 const {
-  JYL_MARKER_POINTS,
+  JYL_MARKER_POINTS: FALLBACK_JYL_MARKER_POINTS,
   JYL_ROUTE,
-  JYL_ROUTE_MARKER_POINTS,
+  JYL_ROUTE_MARKER_POINTS: FALLBACK_JYL_ROUTE_MARKER_POINTS,
   JYL_ROUTE_POLYLINES
 } = require('../../../../config/jyl-map-data.js')
 const {
@@ -29,11 +29,11 @@ const {
   JYL_GROUND_TILE_OVERLAY_CONFIG
 } = require('../../../../config/jyl-custom-tile-layer.js')
 
-const DEFAULT_ENTRY_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => point.type === 'start') || JYL_ROUTE_MARKER_POINTS[0] || null
 const ENABLE_POI = false
 const ALLOWED_ZOOMS = Array.from({ length: 16 }, (_, index) => index + 5)
 const DEFAULT_ENTRY_SCALE = Math.max(...ALLOWED_ZOOMS)
 const DEFAULT_OVERVIEW_SCALE = 13
+const MAP_RUNTIME_POI_ENDPOINT = 'https://jyl.flexai.cc/api/v1/client/content/map-runtime'
 const HIGHLIGHT_ROUTE_SPOT_COUNT = 6
 const ROUTE_SEGMENT_CONNECT_MAX_METERS = 120
 const ROUTE_SEGMENT_BRIDGE_MAX_METERS = 60
@@ -92,6 +92,27 @@ const SOURCE_ROUTE_POLYLINES = JYL_ROUTE_POLYLINES.map((polyline, index) => ({
   sourcePolylineIndex: index
 }))
 const CUSTOM_TILE_LAYER_TOAST_TITLE = '当前设备地图内核不支持自定义瓦片'
+
+let JYL_MARKER_POINTS = FALLBACK_JYL_MARKER_POINTS.slice()
+let JYL_ROUTE_MARKER_POINTS = FALLBACK_JYL_ROUTE_MARKER_POINTS.slice()
+let DEFAULT_ENTRY_POINT = null
+let ALL_ROUTE_DISPLAY_POINTS = []
+let ALL_AUDIO_POI_POINTS = []
+let AUTO_NEARBY_POI_POINTS = []
+let AUTO_AUDIO_POI_POINTS = []
+let ALL_ROUTE_POLYLINE_POINTS = SOURCE_ROUTE_POLYLINES.flatMap((polyline) => polyline.points)
+let PRIMARY_ROUTE_POLYLINES = []
+let DISPLAY_ROUTE_POLYLINES = []
+let FULL_ROUTE_PLAN_POINTS = []
+let HIGHLIGHT_ROUTE_POINTS = []
+let INTELLIGENT_ROUTE_OPTIONS = []
+let INTELLIGENT_ROUTE_CARD_OPTIONS = []
+let MAP_INCLUDE_POINTS = ALL_ROUTE_POLYLINE_POINTS.slice()
+let DEFAULT_GROUND_TILE_OVERLAY_BOUNDS = null
+let DEFAULT_OUTSIDE_SCENIC_POINT = null
+let DEFAULT_SCENIC_CENTER = null
+let DEFAULT_OUTSIDE_SCENIC_CENTER = null
+let DEFAULT_ENTRY_CENTER = null
 
 function normalizeStringValue(value) {
   return typeof value === 'string' ? value.trim() : ''
@@ -1698,9 +1719,235 @@ function buildAudioPoi(point) {
 
   return {
     ...point,
-    coverImage: point.iconPath || '/images/poi/icons/scenic-spot.png',
+    coverImage: point.coverImage || point.iconPath || '/images/poi/icons/scenic-spot.png',
     subtitle: point.sequenceText || point.themeTag || '导览点',
     displayName: point.name
+  }
+}
+
+function normalizeRuntimeBoolean(value, fallbackValue = false) {
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (value === 1 || value === '1') {
+    return true
+  }
+
+  if (value === 0 || value === '0') {
+    return false
+  }
+
+  return fallbackValue
+}
+
+function normalizeRuntimeNumber(value, fallbackValue = null) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallbackValue
+}
+
+function normalizeRuntimeAssetUrl(value) {
+  const normalizedValue = normalizeStringValue(value)
+  if (!normalizedValue) {
+    return ''
+  }
+
+  if (/^https?:\/\//i.test(normalizedValue) || normalizedValue.startsWith('/')) {
+    return normalizedValue
+  }
+
+  return `/${normalizedValue.replace(/^\/+/, '')}`
+}
+
+function normalizeRuntimePoiType(value, fallbackValue = 'scenic') {
+  const normalizedValue = normalizeStringValue(value).toLowerCase()
+
+  switch (normalizedValue) {
+    case 'start':
+    case 'entrance':
+      return 'start'
+    case 'end':
+      return 'end'
+    case 'junction':
+    case 'crossing':
+      return 'junction'
+    case 'service':
+    case 'facility':
+    case 'restroom':
+      return 'service'
+    case 'guide':
+    case 'info':
+    case 'information':
+    case 'prompt':
+      return 'guide'
+    case 'scenic':
+    case 'relic':
+      return 'scenic'
+    default:
+      return fallbackValue || 'scenic'
+  }
+}
+
+function buildFallbackPoiLookup(points = []) {
+  const lookup = new Map()
+
+  ;(points || []).forEach((point) => {
+    ;[
+      point?.id,
+      point?.key,
+      point?.markerId
+    ].forEach((lookupKey) => {
+      const normalizedKey = normalizeLookupText(lookupKey)
+      if (normalizedKey && !lookup.has(normalizedKey)) {
+        lookup.set(normalizedKey, point)
+      }
+    })
+  })
+
+  return lookup
+}
+
+function compareRuntimePoiOrder(left, right) {
+  const resolveOrderValue = (point) => {
+    if (Number.isFinite(Number(point?.sort))) {
+      return Number(point.sort)
+    }
+
+    if (Number.isFinite(Number(point?.routeIndex))) {
+      return Number(point.routeIndex)
+    }
+
+    if (Number.isFinite(Number(point?.markerId))) {
+      return Number(point.markerId)
+    }
+
+    return Number.MAX_SAFE_INTEGER
+  }
+
+  return resolveOrderValue(left) - resolveOrderValue(right)
+}
+
+function normalizeRuntimePoi(rawPoi, index, fallbackPoiLookup) {
+  if (!rawPoi || typeof rawPoi !== 'object') {
+    return null
+  }
+
+  const runtimeMetadata = rawPoi.runtimeMetadata && typeof rawPoi.runtimeMetadata === 'object'
+    ? rawPoi.runtimeMetadata
+    : {}
+  const stableId = normalizeLookupText(runtimeMetadata.key || rawPoi.key || rawPoi.slug || rawPoi.id)
+  if (!stableId) {
+    return null
+  }
+
+  const fallbackPoi = fallbackPoiLookup.get(stableId) || fallbackPoiLookup.get(normalizeLookupText(rawPoi.slug)) || null
+  const latitude = normalizeRuntimeNumber(runtimeMetadata.latitude ?? rawPoi.latitude, fallbackPoi?.latitude)
+  const longitude = normalizeRuntimeNumber(runtimeMetadata.longitude ?? rawPoi.longitude, fallbackPoi?.longitude)
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null
+  }
+
+  const type = normalizeRuntimePoiType(runtimeMetadata.type || rawPoi.category || fallbackPoi?.type, fallbackPoi?.type || 'scenic')
+  const iconPath = normalizeRuntimeAssetUrl(rawPoi.iconPath || runtimeMetadata.iconPath)
+    || fallbackPoi?.iconPath
+    || '/images/poi/icons/scenic-spot.png'
+  const coverImage = normalizeRuntimeAssetUrl(rawPoi.cover_asset?.file_url)
+    || fallbackPoi?.coverImage
+    || iconPath
+  const audioUrl = normalizeRuntimeAssetUrl(rawPoi.audio_guide?.asset?.file_url)
+
+  return {
+    ...fallbackPoi,
+    id: stableId,
+    markerId: normalizeRuntimeNumber(runtimeMetadata.markerId ?? rawPoi.markerId, fallbackPoi?.markerId || index + 1),
+    key: normalizeStringValue(runtimeMetadata.key || rawPoi.key || rawPoi.slug || stableId) || stableId,
+    sourceName: normalizeStringValue(runtimeMetadata.sourceName || rawPoi.sourceName || rawPoi.name || fallbackPoi?.sourceName || ''),
+    name: normalizeStringValue(rawPoi.name || fallbackPoi?.name || rawPoi.sourceName || stableId) || `点位 ${index + 1}`,
+    type,
+    latitude,
+    longitude,
+    orderText: normalizeStringValue(runtimeMetadata.orderText || rawPoi.orderText || fallbackPoi?.orderText || ''),
+    sequenceText: normalizeStringValue(runtimeMetadata.sequenceText || rawPoi.sequenceText || fallbackPoi?.sequenceText || ''),
+    description: normalizeStringValue(rawPoi.body || rawPoi.summary || fallbackPoi?.description || ''),
+    shortHint: normalizeStringValue(rawPoi.summary || runtimeMetadata.shortHint || fallbackPoi?.shortHint || ''),
+    stayText: normalizeStringValue(rawPoi.stayText || runtimeMetadata.stayText || fallbackPoi?.stayText || ''),
+    sceneLine: normalizeStringValue(rawPoi.sceneLine || runtimeMetadata.sceneLine || fallbackPoi?.sceneLine || ''),
+    guideTip: normalizeStringValue(rawPoi.guideTip || runtimeMetadata.guideTip || fallbackPoi?.guideTip || ''),
+    themeTag: normalizeStringValue(rawPoi.themeTag || runtimeMetadata.themeTag || fallbackPoi?.themeTag || ''),
+    themeTone: normalizeStringValue(rawPoi.themeTone || runtimeMetadata.themeTone || fallbackPoi?.themeTone || ''),
+    triggerRadiusM: normalizeRuntimeNumber(rawPoi.triggerRadiusM ?? runtimeMetadata.triggerRadiusM, fallbackPoi?.triggerRadiusM),
+    visible: normalizeRuntimeBoolean(rawPoi.visible ?? runtimeMetadata.visible, fallbackPoi?.visible !== false),
+    cardVisible: normalizeRuntimeBoolean(rawPoi.cardVisible ?? runtimeMetadata.cardVisible, fallbackPoi?.cardVisible !== false),
+    checkinVisible: normalizeRuntimeBoolean(rawPoi.checkinVisible ?? runtimeMetadata.checkinVisible, fallbackPoi?.checkinVisible !== false),
+    routeIndex: normalizeRuntimeNumber(rawPoi.routeIndex ?? runtimeMetadata.routeIndex, fallbackPoi?.routeIndex),
+    sort: normalizeRuntimeNumber(rawPoi.sort ?? runtimeMetadata.sort, fallbackPoi?.sort ?? index),
+    iconPath,
+    coverImage,
+    summary: normalizeStringValue(rawPoi.summary || ''),
+    body: normalizeStringValue(rawPoi.body || ''),
+    audioGuide: rawPoi.audio_guide || null,
+    audioUrl,
+    audioDurationSeconds: normalizeRuntimeNumber(rawPoi.audio_guide?.duration_seconds, null),
+    galleryAssets: Array.isArray(rawPoi.gallery_assets) ? rawPoi.gallery_assets : [],
+    videoAssets: Array.isArray(rawPoi.video_assets) ? rawPoi.video_assets : []
+  }
+}
+
+function buildRuntimePoiCollections(rawPois = []) {
+  const fallbackPoiLookup = buildFallbackPoiLookup([
+    ...FALLBACK_JYL_ROUTE_MARKER_POINTS,
+    ...FALLBACK_JYL_MARKER_POINTS
+  ])
+  const normalizedPois = (Array.isArray(rawPois) ? rawPois : [])
+    .map((poi, index) => normalizeRuntimePoi(poi, index, fallbackPoiLookup))
+    .filter(Boolean)
+    .sort(compareRuntimePoiOrder)
+
+  if (!normalizedPois.length) {
+    return {
+      routeMarkerPoints: FALLBACK_JYL_ROUTE_MARKER_POINTS.slice(),
+      markerPoints: FALLBACK_JYL_MARKER_POINTS.slice()
+    }
+  }
+
+  return {
+    routeMarkerPoints: normalizedPois.filter((point) => point.visible !== false),
+    markerPoints: normalizedPois.filter((point) => point.visible !== false && point.checkinVisible)
+  }
+}
+
+function formatPoiDataSourceError(error) {
+  const rawMessage = normalizeStringValue(
+    error?.message
+      || error?.errMsg
+      || error?.errorMessage
+      || ''
+  )
+
+  if (!rawMessage) {
+    return '未知错误'
+  }
+
+  return rawMessage.length > 48 ? `${rawMessage.slice(0, 48)}...` : rawMessage
+}
+
+function buildPoiDataSourceState(source = 'local', options = {}) {
+  const detailText = normalizeStringValue(options.detailText)
+
+  if (source === 'remote') {
+    return {
+      poiDataSourceKey: 'remote',
+      poiDataSourceText: '当前点位来源：接口',
+      poiDataSourceTone: 'remote',
+      poiDataSourceDetailText: detailText || '接口请求成功'
+    }
+  }
+
+  return {
+    poiDataSourceKey: 'local',
+    poiDataSourceText: '当前点位来源：本地兜底（接口失败）',
+    poiDataSourceTone: 'local',
+    poiDataSourceDetailText: detailText || '等待接口返回'
   }
 }
 
@@ -1806,7 +2053,7 @@ function buildPoiPopupData(point, options = {}) {
     description: point.description || point.shortHint || point.sceneLine || '该点位可作为现场浏览和导览讲解的停留点。',
     guideTip: point.guideTip || point.sceneLine || '建议在这里短暂停留，结合现场环境完成浏览。',
     markerIconPath: point.markerIconPath || point.iconPath || '/images/poi/icons/scenic-spot.png',
-    coverImage: DEFAULT_POI_POPUP_COVER,
+    coverImage: point.coverImage || DEFAULT_POI_POPUP_COVER,
     primaryMetricValue: primaryMetric.value,
     primaryMetricUnit: primaryMetric.unit,
     primaryMetricCaption: primaryMetric.caption,
@@ -2547,94 +2794,99 @@ function buildViewportIncludePoints(points) {
   ]
 }
 
-const ALL_ROUTE_DISPLAY_POINTS = JYL_ROUTE_MARKER_POINTS.map((point, index) => (
-  decoratePointWithRouteMeta(createDisplayPoint(point, index))
-))
-const ALL_AUDIO_POI_POINTS = JYL_MARKER_POINTS.map((point) => buildAudioPoi(decoratePointWithRouteMeta(point)))
-const AUTO_NEARBY_POI_POINTS = ALL_ROUTE_DISPLAY_POINTS
-  .filter((point) => point.type !== 'start' && point.type !== 'end')
-const AUTO_AUDIO_POI_POINTS = JYL_MARKER_POINTS
-  .filter((point) => point.type === 'scenic')
-  .map((point) => buildAudioPoi(decoratePointWithRouteMeta(point)))
-const ALL_ROUTE_POLYLINE_POINTS = SOURCE_ROUTE_POLYLINES.flatMap((polyline) => polyline.points)
-const PRIMARY_ROUTE_POLYLINES = buildEntranceToMainPolylines(SOURCE_ROUTE_POLYLINES, DEFAULT_ENTRY_POINT)
-const DISPLAY_ROUTE_POLYLINES = buildDisplayRoutePolylines(SOURCE_ROUTE_POLYLINES, ALL_ROUTE_DISPLAY_POINTS)
-const FULL_ROUTE_PLAN_POINTS = uniquePoints([DEFAULT_ENTRY_POINT, ...JYL_MARKER_POINTS].map((point) => decoratePointWithRouteMeta(point)))
-const HIGHLIGHT_ROUTE_POINTS = uniquePoints([
-  decoratePointWithRouteMeta(DEFAULT_ENTRY_POINT),
-  ...pickEvenlySpacedPoints(JYL_MARKER_POINTS, Math.min(HIGHLIGHT_ROUTE_SPOT_COUNT, JYL_MARKER_POINTS.length)).map((point) => decoratePointWithRouteMeta(point))
-])
-
-const INTELLIGENT_ROUTE_OPTIONS = [
-  buildIntelligentRouteOption(
-    'route-highlight',
-    '轻松精华线',
-    'green',
-    '从检票口进入，串联主线核心点位，适合第一次到访。',
-    PRIMARY_ROUTE_POLYLINES,
-    HIGHLIGHT_ROUTE_POINTS
-  ),
-  buildIntelligentRouteOption(
-    'route-deep',
-    '深度探索线',
-    'blue',
-    '从检票口进入，覆盖全部公开导览点，并保留支线探索。',
-    SOURCE_ROUTE_POLYLINES,
-    FULL_ROUTE_PLAN_POINTS
-  )
-]
-
-const INTELLIGENT_ROUTE_CARD_OPTIONS = INTELLIGENT_ROUTE_OPTIONS.map((route) => ({
-  id: route.id,
-  name: route.name,
-  themeClass: route.theme === 'green' ? 'theme-green' : 'theme-blue',
-  description: route.description,
-  durationValue: route.durationValue,
-  durationUnit: route.durationUnit,
-  distanceValue: route.distanceValue,
-  distanceUnit: route.distanceUnit,
-  pointCount: route.pointCount
-}))
-
-const MAP_INCLUDE_POINTS = [
-  ...ALL_ROUTE_POLYLINE_POINTS,
-  ...ALL_ROUTE_DISPLAY_POINTS.map((point) => ({
-    latitude: point.latitude,
-    longitude: point.longitude
+function refreshRuntimePoiDerivedState(routeMarkerPoints = JYL_ROUTE_MARKER_POINTS, markerPoints = JYL_MARKER_POINTS) {
+  JYL_ROUTE_MARKER_POINTS = Array.isArray(routeMarkerPoints) ? routeMarkerPoints.slice() : []
+  JYL_MARKER_POINTS = Array.isArray(markerPoints) ? markerPoints.slice() : []
+  DEFAULT_ENTRY_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => point.type === 'start') || JYL_ROUTE_MARKER_POINTS[0] || null
+  ALL_ROUTE_DISPLAY_POINTS = JYL_ROUTE_MARKER_POINTS.map((point, index) => (
+    decoratePointWithRouteMeta(createDisplayPoint(point, index))
+  ))
+  ALL_AUDIO_POI_POINTS = JYL_MARKER_POINTS.map((point) => buildAudioPoi(decoratePointWithRouteMeta(point)))
+  AUTO_NEARBY_POI_POINTS = ALL_ROUTE_DISPLAY_POINTS
+    .filter((point) => point.type !== 'start' && point.type !== 'end')
+  AUTO_AUDIO_POI_POINTS = JYL_MARKER_POINTS
+    .filter((point) => point.type === 'scenic')
+    .map((point) => buildAudioPoi(decoratePointWithRouteMeta(point)))
+  ALL_ROUTE_POLYLINE_POINTS = SOURCE_ROUTE_POLYLINES.flatMap((polyline) => polyline.points)
+  PRIMARY_ROUTE_POLYLINES = buildEntranceToMainPolylines(SOURCE_ROUTE_POLYLINES, DEFAULT_ENTRY_POINT)
+  DISPLAY_ROUTE_POLYLINES = buildDisplayRoutePolylines(SOURCE_ROUTE_POLYLINES, ALL_ROUTE_DISPLAY_POINTS)
+  FULL_ROUTE_PLAN_POINTS = uniquePoints([DEFAULT_ENTRY_POINT, ...JYL_MARKER_POINTS].map((point) => decoratePointWithRouteMeta(point)))
+  HIGHLIGHT_ROUTE_POINTS = uniquePoints([
+    decoratePointWithRouteMeta(DEFAULT_ENTRY_POINT),
+    ...pickEvenlySpacedPoints(JYL_MARKER_POINTS, Math.min(HIGHLIGHT_ROUTE_SPOT_COUNT, JYL_MARKER_POINTS.length)).map((point) => decoratePointWithRouteMeta(point))
+  ])
+  INTELLIGENT_ROUTE_OPTIONS = [
+    buildIntelligentRouteOption(
+      'route-highlight',
+      '轻松精华线',
+      'green',
+      '从检票口进入，串联主线核心点位，适合第一次到访。',
+      PRIMARY_ROUTE_POLYLINES,
+      HIGHLIGHT_ROUTE_POINTS
+    ),
+    buildIntelligentRouteOption(
+      'route-deep',
+      '深度探索线',
+      'blue',
+      '从检票口进入，覆盖全部公开导览点，并保留支线探索。',
+      SOURCE_ROUTE_POLYLINES,
+      FULL_ROUTE_PLAN_POINTS
+    )
+  ]
+  INTELLIGENT_ROUTE_CARD_OPTIONS = INTELLIGENT_ROUTE_OPTIONS.map((route) => ({
+    id: route.id,
+    name: route.name,
+    themeClass: route.theme === 'green' ? 'theme-green' : 'theme-blue',
+    description: route.description,
+    durationValue: route.durationValue,
+    durationUnit: route.durationUnit,
+    distanceValue: route.distanceValue,
+    distanceUnit: route.distanceUnit,
+    pointCount: route.pointCount
   }))
-]
-const DEFAULT_GROUND_TILE_OVERLAY_BOUNDS = buildBounds(MAP_INCLUDE_POINTS, {
-  latitudePadding: 0.001,
-  longitudePadding: 0.0014
-})
+  MAP_INCLUDE_POINTS = [
+    ...ALL_ROUTE_POLYLINE_POINTS,
+    ...ALL_ROUTE_DISPLAY_POINTS.map((point) => ({
+      latitude: point.latitude,
+      longitude: point.longitude
+    }))
+  ]
+  DEFAULT_GROUND_TILE_OVERLAY_BOUNDS = buildBounds(MAP_INCLUDE_POINTS, {
+    latitudePadding: 0.001,
+    longitudePadding: 0.0014
+  })
+  DEFAULT_OUTSIDE_SCENIC_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => (
+    String(point.id) === 'poi-02'
+      || point.name === '景区大门口左侧牌子'
+      || point.sourceName === '景区大门口左侧牌子'
+  )) || DEFAULT_ENTRY_POINT
+  DEFAULT_SCENIC_CENTER = buildCenter(MAP_INCLUDE_POINTS)
+  DEFAULT_OUTSIDE_SCENIC_CENTER = DEFAULT_OUTSIDE_SCENIC_POINT
+    ? {
+      latitude: DEFAULT_OUTSIDE_SCENIC_POINT.latitude,
+      longitude: DEFAULT_OUTSIDE_SCENIC_POINT.longitude
+    }
+    : DEFAULT_SCENIC_CENTER
+  DEFAULT_ENTRY_CENTER = DEFAULT_ENTRY_POINT
+    ? {
+      latitude: DEFAULT_ENTRY_POINT.latitude,
+      longitude: DEFAULT_ENTRY_POINT.longitude
+    }
+    : DEFAULT_SCENIC_CENTER
+}
+
 const DEFAULT_GROUND_TILE_OUTSIDE_MASK_POLYGONS = buildGroundTileOutsideMaskPolygons(
   normalizeGroundTileOverlayConfig(JYL_GROUND_TILE_OVERLAY_CONFIG),
   {
     fillColor: '#BFC5CE66'
   }
 )
+
+refreshRuntimePoiDerivedState(FALLBACK_JYL_ROUTE_MARKER_POINTS, FALLBACK_JYL_MARKER_POINTS)
+
 const DEFAULT_MAP_BOUNDARY_LIMIT = buildGroundTileCoverageMapBounds(
   normalizeGroundTileOverlayConfig(JYL_GROUND_TILE_OVERLAY_CONFIG)
 ) || DEFAULT_GROUND_TILE_OVERLAY_BOUNDS
-
-const DEFAULT_OUTSIDE_SCENIC_POINT = JYL_ROUTE_MARKER_POINTS.find((point) => (
-  String(point.id) === 'poi-02'
-    || point.name === '景区大门口左侧牌子'
-    || point.sourceName === '景区大门口左侧牌子'
-)) || DEFAULT_ENTRY_POINT
-const DEFAULT_SCENIC_CENTER = buildCenter(MAP_INCLUDE_POINTS)
-const DEFAULT_OUTSIDE_SCENIC_CENTER = DEFAULT_OUTSIDE_SCENIC_POINT
-  ? {
-    latitude: DEFAULT_OUTSIDE_SCENIC_POINT.latitude,
-    longitude: DEFAULT_OUTSIDE_SCENIC_POINT.longitude
-  }
-  : DEFAULT_SCENIC_CENTER
-const DEFAULT_ENTRY_CENTER = DEFAULT_ENTRY_POINT
-  ? {
-    latitude: DEFAULT_ENTRY_POINT.latitude,
-    longitude: DEFAULT_ENTRY_POINT.longitude
-  }
-  : DEFAULT_SCENIC_CENTER
 
 function getDisplayPointById(pointId) {
   const rawPointId = String(pointId || '').trim()
@@ -2821,6 +3073,10 @@ Page({
     plannerRoutes: INTELLIGENT_ROUTE_CARD_OPTIONS,
     showIntelligentPlanner: false,
     selectedIntelligentRouteId: '',
+    poiDataSourceKey: 'local',
+    poiDataSourceText: '当前点位来源：本地兜底（接口失败）',
+    poiDataSourceTone: 'local',
+    poiDataSourceDetailText: '等待接口返回',
     selectedPointId: null,
     showPoiPopup: false,
     currentPopupData: null
@@ -2919,21 +3175,24 @@ Page({
         })
         .catch(() => {})
 
-      this.handleEntryRequest(pageOptions)
+      this.loadRuntimePoiCollections()
+        .finally(() => {
+          this.handleEntryRequest(pageOptions)
 
-      if (!hasDirectEntryTarget && pageOptions.action === 'executeAIRouteTest') {
-        const previewRoute = INTELLIGENT_ROUTE_OPTIONS[0] || null
-        if (previewRoute) {
-          this.applyPreviewRoute(previewRoute, {
-            toastTitle: `已加载${previewRoute.name}`
-          })
-        }
-        return
-      }
+          if (!hasDirectEntryTarget && pageOptions.action === 'executeAIRouteTest') {
+            const previewRoute = INTELLIGENT_ROUTE_OPTIONS[0] || null
+            if (previewRoute) {
+              this.applyPreviewRoute(previewRoute, {
+                toastTitle: `已加载${previewRoute.name}`
+              })
+            }
+            return
+          }
 
-      if (!hasDirectEntryTarget && normalizeBooleanValue(pageOptions.showAIRoute)) {
-        this.onIntelligentRoutePlanning()
-      }
+          if (!hasDirectEntryTarget && normalizeBooleanValue(pageOptions.showAIRoute)) {
+            this.onIntelligentRoutePlanning()
+          }
+        })
     })
   },
 
@@ -3001,6 +3260,99 @@ Page({
         navigationActive
       })
     })
+  },
+
+  fetchRuntimePoiCollections() {
+    return new Promise((resolve, reject) => {
+      wx.request({
+        url: MAP_RUNTIME_POI_ENDPOINT,
+        method: 'GET',
+        timeout: 5000,
+        header: {
+          Accept: 'application/json'
+        },
+        success: (res) => {
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            reject(new Error(`runtime poi request failed: ${res.statusCode}`))
+            return
+          }
+
+          resolve(buildRuntimePoiCollections(res.data?.pois || []))
+        },
+        fail: (error) => {
+          reject(new Error(error?.errMsg || 'runtime poi request failed'))
+        }
+      })
+    })
+  },
+
+  applyRuntimePoiCollections(poiCollections) {
+    if (!poiCollections) {
+      return
+    }
+
+    refreshRuntimePoiDerivedState(
+      poiCollections.routeMarkerPoints,
+      poiCollections.markerPoints
+    )
+
+    const currentFilter = this.data.currentPoiFilter || 'all'
+    const currentSelectedPointId = String(this.data.selectedPointId || '').trim()
+    const selectedPoint = currentSelectedPointId ? getDisplayPointById(currentSelectedPointId) : null
+    const nextSelectedPointId = selectedPoint ? selectedPoint.id : null
+    const selectedRouteId = String(this.selectedIntelligentRoute?.id || this.data.selectedIntelligentRouteId || '').trim()
+    const selectedRoute = selectedRouteId ? getIntelligentRouteById(selectedRouteId) : null
+    const popupPoint = this.data.showPoiPopup
+      ? getDisplayPointById(this.data.currentPopupData?.id || this.data.currentPopupData?.markerId)
+      : null
+    const nextCurrentAudioPoi = selectedPoint
+      ? buildAudioPoi(selectedPoint)
+      : getDefaultAudioPoi(currentFilter)
+
+    this.selectedIntelligentRoute = selectedRoute || null
+
+    this.setData({
+      ...buildPoiDataSourceState('remote', {
+        detailText: '接口请求成功'
+      }),
+      longitude: this.userAdjustedViewport || this.hasAppliedInitialUserViewport || this.hasDirectEntryTarget
+        ? this.data.longitude
+        : (DEFAULT_OUTSIDE_SCENIC_CENTER?.longitude || this.data.longitude),
+      latitude: this.userAdjustedViewport || this.hasAppliedInitialUserViewport || this.hasDirectEntryTarget
+        ? this.data.latitude
+        : (DEFAULT_OUTSIDE_SCENIC_CENTER?.latitude || this.data.latitude),
+      tileMapBounds: DEFAULT_GROUND_TILE_OVERLAY_BOUNDS,
+      selectedPointId: nextSelectedPointId,
+      allMarkers: this.buildVisibleMarkers(currentFilter, nextSelectedPointId, selectedRoute),
+      polylineData: buildMapPolylines(selectedRoute),
+      currentAudioPoi: nextCurrentAudioPoi,
+      audioPoiList: selectedRoute ? buildRouteAudioPoiList(selectedRoute) : ALL_AUDIO_POI_POINTS,
+      plannerRoutes: INTELLIGENT_ROUTE_CARD_OPTIONS,
+      showPoiPopup: !!popupPoint && this.data.showPoiPopup,
+      currentPopupData: popupPoint
+        ? this.buildPointPopupData(popupPoint, {
+          arrived: !!this.data.currentPopupData?.arrived,
+          audioPlaying: !!this.data.audioPlaying
+            && String(this.data.currentAudioPoi?.id || this.data.currentAudioPoi?.markerId || '') === String(popupPoint.id || popupPoint.markerId || ''),
+          navigationActive: !!this.data.navigationActive
+        })
+        : null
+    })
+  },
+
+  loadRuntimePoiCollections() {
+    return this.fetchRuntimePoiCollections()
+      .then((poiCollections) => {
+        this.applyRuntimePoiCollections(poiCollections)
+        return poiCollections
+      })
+      .catch((error) => {
+        console.warn('[guide-map] load runtime poi collections failed', error)
+        this.setData(buildPoiDataSourceState('local', {
+          detailText: formatPoiDataSourceError(error)
+        }))
+        return null
+      })
   },
 
   resolveSecretMetaForPoint(point) {
@@ -6019,7 +6371,7 @@ Page({
       currentPopupData: null,
       showIntelligentPlanner: false,
       navigationActive: true,
-      navigationPanelCollapsed: false,
+      navigationPanelCollapsed: true,
       navigationAudioMode: 'full',
       navigationInfo,
       navigationSource: source,

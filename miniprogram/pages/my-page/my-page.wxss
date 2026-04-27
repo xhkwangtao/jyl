@@ -548,6 +548,8 @@
 }
 
 .secret-icon-card {
+  position: relative;
+  overflow: hidden;
   min-width: 0;
   padding: 22rpx 12rpx 18rpx;
   border-radius: 28rpx;
@@ -561,16 +563,111 @@
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 244, 245, 0.98) 100%);
 }
 
+.secret-icon-card-pending {
+  background: linear-gradient(180deg, rgba(255, 252, 248, 0.92) 0%, rgba(242, 236, 229, 0.98) 100%);
+  border-color: rgba(125, 113, 95, 0.14);
+}
+
+.secret-icon-card-pending-reveal {
+  border-color: rgba(201, 133, 75, 0.24);
+  box-shadow: 0 18rpx 34rpx rgba(201, 133, 75, 0.14);
+}
+
+.secret-icon-card-unlocking {
+  animation: secret-unlock-card 1.8s cubic-bezier(0.2, 0.9, 0.22, 1) both;
+}
+
 .secret-icon-shell {
+  position: relative;
   height: 112rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 26rpx;
+}
+
+.secret-icon-shell-active {
+  background: radial-gradient(circle at 50% 40%, rgba(36, 95, 109, 0.1), rgba(255, 255, 255, 0) 70%);
+}
+
+.secret-icon-shell-locked {
+  background: radial-gradient(circle at 50% 35%, rgba(191, 177, 160, 0.22), rgba(236, 230, 221, 0.98) 72%);
+}
+
+.secret-icon-image {
+  position: relative;
+  z-index: 2;
+  width: 86rpx;
+  height: 86rpx;
+}
+
+.secret-icon-card-unlocking .secret-icon-image {
+  animation: secret-unlock-image 1.8s cubic-bezier(0.2, 0.9, 0.22, 1) both;
+}
+
+.secret-icon-unlock-glow {
+  position: absolute;
+  inset: 12rpx;
+  border-radius: 999rpx;
+  background: radial-gradient(circle, rgba(255, 219, 120, 0.9) 0%, rgba(255, 219, 120, 0.2) 45%, rgba(255, 219, 120, 0) 72%);
+  filter: blur(6rpx);
+  z-index: 1;
+  animation: secret-unlock-glow 1.8s ease-out both;
+}
+
+.secret-icon-unlock-ring {
+  position: absolute;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 999rpx;
+  border: 4rpx solid rgba(255, 214, 107, 0.82);
+  z-index: 1;
+  animation: secret-unlock-ring 1.8s ease-out both;
+}
+
+.secret-icon-lock {
+  position: relative;
+  width: 78rpx;
+  height: 82rpx;
+}
+
+.secret-icon-lock-pending {
+  animation: secret-lock-pending 1.6s ease-in-out infinite;
+}
+
+.secret-icon-lock-arch {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 42rpx;
+  height: 34rpx;
+  border: 6rpx solid rgba(123, 110, 94, 0.72);
+  border-bottom: none;
+  border-radius: 32rpx 32rpx 0 0;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+}
+
+.secret-icon-lock-body {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 78rpx;
+  height: 56rpx;
+  border-radius: 18rpx;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(164, 151, 134, 0.95) 0%, rgba(128, 115, 98, 0.98) 100%);
+  box-shadow: inset 0 4rpx 10rpx rgba(255, 255, 255, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.secret-icon-image {
-  width: 86rpx;
-  height: 86rpx;
+.secret-icon-lock-text {
+  font-size: 30rpx;
+  line-height: 1;
+  font-weight: 700;
+  color: rgba(255, 249, 240, 0.92);
 }
 
 .secret-icon-name {
@@ -596,11 +693,123 @@
   color: #7f8c96;
 }
 
+.secret-icon-caption-locked {
+  color: #a29385;
+}
+
 .secret-icon-index {
   margin-top: 8rpx;
   font-size: 18rpx;
   font-weight: 700;
   color: #9b7a58;
+}
+
+@keyframes secret-unlock-card {
+  0% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 rgba(255, 212, 100, 0);
+  }
+
+  18% {
+    transform: scale(1.06) rotate(-1.5deg);
+    box-shadow: 0 20rpx 44rpx rgba(255, 201, 86, 0.26);
+  }
+
+  36% {
+    transform: scale(0.98) rotate(1deg);
+  }
+
+  58% {
+    transform: scale(1.03);
+    box-shadow: 0 18rpx 42rpx rgba(47, 128, 125, 0.18);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 16rpx 30rpx rgba(31, 58, 74, 0.06);
+  }
+}
+
+@keyframes secret-unlock-image {
+  0% {
+    opacity: 0;
+    transform: scale(0.48) rotate(-16deg);
+    filter: brightness(1.8);
+  }
+
+  28% {
+    opacity: 1;
+    transform: scale(1.14) rotate(8deg);
+    filter: brightness(1.35);
+  }
+
+  55% {
+    transform: scale(0.94) rotate(-4deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+}
+
+@keyframes secret-unlock-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+
+  25% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.48);
+  }
+}
+
+@keyframes secret-unlock-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+
+  22% {
+    opacity: 0.95;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.82);
+  }
+}
+
+@keyframes secret-lock-pending {
+  0% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 0 rgba(201, 133, 75, 0));
+  }
+
+  18% {
+    transform: scale(1.06) rotate(-2deg);
+    filter: drop-shadow(0 8rpx 12rpx rgba(201, 133, 75, 0.22));
+  }
+
+  36% {
+    transform: scale(0.98) rotate(2deg);
+  }
+
+  52% {
+    transform: scale(1.04) rotate(-1deg);
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 0 rgba(201, 133, 75, 0));
+  }
 }
 
 .rule-item {

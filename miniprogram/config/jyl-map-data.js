@@ -31,13 +31,15 @@ function buildPoi(point, index) {
     ? (point.locationRaw || point.locationWgs84 || point.locationGcj02)
     : (point.locationGcj02 || point.locationRaw || point.locationWgs84)
   const [longitude, latitude] = location
+  const isLocalGateLeftSign = point.id === 'poi-02' || point.key === 'poi-02'
+  const localPointName = isLocalGateLeftSign ? '景区大门左侧牌子（本地）' : point.name
 
   return {
     id: point.id,
     markerId: index + 1,
     key: point.key,
     sourceName: point.sourceName,
-    name: point.name,
+    name: localPointName,
     type: point.type,
     latitude,
     longitude,

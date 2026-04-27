@@ -4,11 +4,10 @@ const {
 const {
   buildAiOfficerState
 } = require('../../utils/ai-officer')
-const {
-  GUIDE_MAP_PAGE
-} = require('../../utils/guide-routes')
 
 const PAGE_STYLE = 'background: #f6f1e8;'
+const UNLOCK_ANIMATION_DURATION_MS = 1800
+const SECRET_REVEALED_STORAGE_KEY = 'jyl_secret_revealed_ids'
 const RULE_LIST = [
   {
     indexText: '01',
@@ -41,7 +40,8 @@ function getLayoutMetrics() {
     if (!menuButton || !menuButton.height) {
       return {
         navBarHeight: statusBarHeight + 44,
-        safeAreaBottom
+        safeAreaBottom,
+        windowHeight: systemInfo.windowHeight || systemInfo.screenHeight || 0
       }
     }
 
@@ -50,12 +50,14 @@ function getLayoutMetrics() {
 
     return {
       navBarHeight: statusBarHeight + navContentHeight,
-      safeAreaBottom
+      safeAreaBottom,
+      windowHeight: systemInfo.windowHeight || systemInfo.screenHeight || 0
     }
   } catch (error) {
     return {
       navBarHeight: 84,
-      safeAreaBottom: 0
+      safeAreaBottom: 0,
+      windowHeight: 0
     }
   }
 }
@@ -72,6 +74,69 @@ function navigateToPage(url) {
       wx.redirectTo({
         url
       })
+    }
+  })
+}
+
+function buildSecretCollectionIdSet(secretList = []) {
+  return new Set(
+    (secretList || [])
+      .filter((item) => item?.collected)
+      .map((item) => String(item.id || ''))
+      .filter(Boolean)
+  )
+}
+
+function getRevealedSecretIdSet() {
+  try {
+    const revealedIds = wx.getStorageSync(SECRET_REVEALED_STORAGE_KEY)
+    if (!Array.isArray(revealedIds)) {
+      return new Set()
+    }
+
+    return new Set(
+      revealedIds
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+    )
+  } catch (error) {
+    return new Set()
+  }
+}
+
+function saveRevealedSecretIdSet(revealedIdSet = new Set()) {
+  const revealedIdList = Array.from(revealedIdSet).filter(Boolean)
+
+  try {
+    wx.setStorageSync(SECRET_REVEALED_STORAGE_KEY, revealedIdList)
+  } catch (error) {}
+}
+
+function decorateSecretWallList(secretList = [], options = {}) {
+  const pendingRevealIdSet = options.pendingRevealIdSet instanceof Set
+    ? options.pendingRevealIdSet
+    : new Set()
+  const unlockingIdSet = options.unlockingIdSet instanceof Set
+    ? options.unlockingIdSet
+    : new Set()
+
+  return (secretList || []).map((item) => {
+    const secretId = String(item?.id || '')
+    const collected = !!item?.collected
+    const pendingReveal = collected && pendingRevealIdSet.has(secretId)
+    const justUnlocked = collected && unlockingIdSet.has(secretId)
+    const revealCollected = collected && (!pendingReveal || justUnlocked)
+
+    return {
+      ...item,
+      pendingReveal,
+      justUnlocked,
+      revealCollected,
+      wallCaptionText: revealCollected
+        ? item.patternLabel
+        : pendingReveal
+          ? '点击解锁'
+          : '暗号未解锁'
     }
   })
 }
@@ -116,6 +181,9 @@ Page({
   },
 
   onLoad() {
+    this.pendingUnlockAnimationSecretIdSet = new Set()
+    this.revealedSecretIdSet = getRevealedSecretIdSet()
+    this.unlockAnimationTimer = null
     const { navBarHeight, safeAreaBottom } = getLayoutMetrics()
 
     this.setData({
@@ -130,14 +198,81 @@ Page({
     this.refreshSecretState()
   },
 
+  onUnload() {
+    if (this.unlockAnimationTimer) {
+      clearTimeout(this.unlockAnimationTimer)
+      this.unlockAnimationTimer = null
+    }
+  },
+
   refreshSecretState() {
     const collectionState = buildSecretCollectionState()
+    const currentCollectedSecretIdSet = buildSecretCollectionIdSet(collectionState.secretList)
+    const nextRevealedSecretIdSet = new Set()
+    const nextPendingUnlockAnimationSecretIdSet = new Set()
+
+    currentCollectedSecretIdSet.forEach((secretId) => {
+      if (this.revealedSecretIdSet.has(secretId)) {
+        nextRevealedSecretIdSet.add(secretId)
+        return
+      }
+
+      nextPendingUnlockAnimationSecretIdSet.add(secretId)
+    })
+
+    this.revealedSecretIdSet = nextRevealedSecretIdSet
+    this.pendingUnlockAnimationSecretIdSet = nextPendingUnlockAnimationSecretIdSet
+    saveRevealedSecretIdSet(this.revealedSecretIdSet)
+
+    const nextSecretList = decorateSecretWallList(collectionState.secretList, {
+      pendingRevealIdSet: this.pendingUnlockAnimationSecretIdSet
+    })
+
+    if (this.unlockAnimationTimer) {
+      clearTimeout(this.unlockAnimationTimer)
+      this.unlockAnimationTimer = null
+    }
 
     this.setData({
       userNickname: getUserNickname(),
       ...collectionState,
+      secretList: nextSecretList,
       ...buildAiOfficerState(collectionState.secretList)
     })
+  },
+
+  triggerPendingSecretUnlockAnimationById(secretId) {
+    const normalizedSecretId = String(secretId || '').trim()
+    if (!normalizedSecretId || !this.pendingUnlockAnimationSecretIdSet.has(normalizedSecretId)) {
+      return false
+    }
+
+    this.pendingUnlockAnimationSecretIdSet.delete(normalizedSecretId)
+    this.revealedSecretIdSet.add(normalizedSecretId)
+    saveRevealedSecretIdSet(this.revealedSecretIdSet)
+    const unlockingIdSet = new Set([normalizedSecretId])
+
+    this.setData({
+      secretList: decorateSecretWallList(this.data.secretList, {
+        pendingRevealIdSet: this.pendingUnlockAnimationSecretIdSet,
+        unlockingIdSet
+      })
+    })
+
+    if (this.unlockAnimationTimer) {
+      clearTimeout(this.unlockAnimationTimer)
+    }
+
+    this.unlockAnimationTimer = setTimeout(() => {
+      this.unlockAnimationTimer = null
+      this.setData({
+        secretList: decorateSecretWallList(this.data.secretList, {
+          pendingRevealIdSet: this.pendingUnlockAnimationSecretIdSet
+        })
+      })
+    }, UNLOCK_ANIMATION_DURATION_MS)
+
+    return true
   },
 
   onBackTap() {
@@ -167,7 +302,7 @@ Page({
   },
 
   onOpenMapPage() {
-    navigateToPage(GUIDE_MAP_PAGE)
+    navigateToPage('/subpackages/guide/pages/map/map')
   },
 
   onReportTap() {
@@ -184,17 +319,11 @@ Page({
   },
 
   onSecretTap(event) {
-    const mapPointId = event.currentTarget?.dataset?.mapId
+    const secretId = event.currentTarget?.dataset?.secretId
+    const pendingReveal = event.currentTarget?.dataset?.pendingReveal
 
-    if (!mapPointId) {
-      wx.showToast({
-        title: '该暗号点暂未接入地图定位',
-        icon: 'none',
-        duration: 1600
-      })
+    if (pendingReveal && this.triggerPendingSecretUnlockAnimationById(secretId)) {
       return
     }
-
-    navigateToPage(`${GUIDE_MAP_PAGE}?pointId=${mapPointId}`)
   }
 })

@@ -72,6 +72,15 @@
       />
     </view>
 
+    <view
+      class="poi-data-source-badge poi-data-source-badge-{{poiDataSourceTone}}"
+      style="top: {{navigationBarTotalHeight + 10}}px;"
+    >
+      <text class="poi-data-source-badge-label">临时调试</text>
+      <text class="poi-data-source-badge-text">{{poiDataSourceText}}</text>
+      <text class="poi-data-source-badge-detail" wx:if="{{poiDataSourceDetailText}}">{{poiDataSourceDetailText}}</text>
+    </view>
+
     <view class="popup-overlay {{showPoiPopup ? '' : 'hide'}}" wx:if="{{showPoiPopup && currentPopupData}}">
       <view class="popup-container" catchtap="noop">
         <poi-popup
