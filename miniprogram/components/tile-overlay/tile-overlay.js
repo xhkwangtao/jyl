@@ -5,6 +5,12 @@ const TILE_SOURCE_PREPARE_CONCURRENCY = 6
 const TILE_OVERLAY_MAX_CONCURRENT_LOADS = 4
 const TILE_OVERLAY_RETRY_LIMIT = 2
 const TILE_OVERLAY_RETRY_DELAY_MS = 120
+const TILE_PREFETCH_CONCURRENCY = 2
+const TILE_PREFETCH_DELAY_MS = 180
+const TILE_PREFETCH_ZOOM_OFFSETS = [1, -1]
+const TILE_PREFETCH_MAX_TILES_PER_ZOOM = 18
+const TILE_RETENTION_BUFFER_MULTIPLIER = 2
+const TILE_RETENTION_MAX_BUFFER_RATIO = 0.45
 
 const DEFAULT_TILE_CONFIG = {
   packageRoots: [],
@@ -151,8 +157,12 @@ Component({
       this._tileSourceReadyPromises = new Map()
       this._tileImageInfoPathCache = new Map()
       this._tileImageInfoPromises = new Map()
+      this._prefetchedTileSourceUrls = new Set()
+      this._tileSourcePrefetchPromises = new Map()
       this._lastVisibleTileSignature = ''
       this._tileUpdateRequestId = 0
+      this._tilePrefetchRequestId = 0
+      this._pendingTilePrefetchRequestId = 0
       this._loadingRequestId = 0
       this._overlayIdSeed = 1
       this._isTileUpdateInFlight = false
@@ -174,10 +184,16 @@ Component({
       this._tileSourceReadyPromises.clear()
       this._tileImageInfoPathCache.clear()
       this._tileImageInfoPromises.clear()
+      this._prefetchedTileSourceUrls.clear()
+      this._tileSourcePrefetchPromises.clear()
       this._lastVisibleTileSignature = ''
       if (this.updateTimer) {
         clearTimeout(this.updateTimer)
         this.updateTimer = null
+      }
+      if (this.prefetchTimer) {
+        clearTimeout(this.prefetchTimer)
+        this.prefetchTimer = null
       }
     }
   },
@@ -323,6 +339,31 @@ Component({
       return tileCoverageByZoom[z]
     },
 
+    hasRemoteTileSource() {
+      const config = this.getResolvedTileConfig()
+
+      if (isRemoteTileUrl(config.baseUrl) || isRemoteTileUrl(config.urlTemplate)) {
+        return true
+      }
+
+      const zoomBaseUrlMap = config.zoomBaseUrlMap
+      if (!zoomBaseUrlMap || typeof zoomBaseUrlMap !== 'object') {
+        return false
+      }
+
+      return Object.values(zoomBaseUrlMap).some((rule) => {
+        if (typeof rule === 'string') {
+          return isRemoteTileUrl(rule)
+        }
+
+        if (!Array.isArray(rule)) {
+          return false
+        }
+
+        return rule.some((item) => isRemoteTileUrl(item?.baseUrl))
+      })
+    },
+
     initTileOverlay() {
       const mapCtx = this.properties.mapCtx
       if (!mapCtx || this.isInitializing) {
@@ -377,6 +418,15 @@ Component({
       }
 
       this.currentScale = newScale
+      const currentBounds = this.getCurrentBounds()
+      if (!currentBounds) {
+        return
+      }
+
+      const previewTiles = this.calculateTilesForZoom(this.getZoomLevel(), {
+        bounds: currentBounds
+      })
+      this.scheduleTileSourcePrefetch(previewTiles)
     },
 
     onVisibilityChange(visible) {
@@ -412,12 +462,14 @@ Component({
       const requiredTileSignature = requiredTiles.map((tile) => tile.stringId).join('|')
       const requiredTileUrlSet = new Set(requiredTiles.map((tile) => tile.url))
       const requiredTileIdSet = new Set(requiredTiles.map((tile) => tile.stringId))
+      const retainedTileUrlSet = new Set(this.calculateRetainedTiles().map((tile) => tile.url))
       const updateRequestId = this._tileUpdateRequestId + 1
+      const hasMissingRequiredTiles = requiredTiles.some((tile) => !this._activeTiles.has(tile.url))
       const shouldSkipRefresh = (
         requiredTileSignature
         && requiredTileSignature === this._lastVisibleTileSignature
         && this._failedTiles.size === 0
-        && this._activeTiles.size === requiredTiles.length
+        && !hasMissingRequiredTiles
       )
 
       if (shouldSkipRefresh) {
@@ -454,18 +506,26 @@ Component({
       }
 
       const retainedActiveTiles = new Map()
+      const cachedActiveTiles = new Map()
       const tilesToLoad = []
-      const staleActiveTiles = new Map()
+      const removableActiveTiles = new Map()
 
       for (const [url, overlayId] of this._activeTiles.entries()) {
-        if (!requiredTileUrlSet.has(url)) {
-          staleActiveTiles.set(url, overlayId)
+        if (requiredTileUrlSet.has(url)) {
+          retainedActiveTiles.set(url, overlayId)
+          continue
         }
+
+        if (retainedTileUrlSet.has(url)) {
+          cachedActiveTiles.set(url, overlayId)
+          continue
+        }
+
+        removableActiveTiles.set(url, overlayId)
       }
 
       requiredTiles.forEach((tile) => {
-        if (this._activeTiles.has(tile.url)) {
-          retainedActiveTiles.set(tile.url, this._activeTiles.get(tile.url))
+        if (retainedActiveTiles.has(tile.url)) {
           return
         }
 
@@ -477,10 +537,14 @@ Component({
       })
 
       if (!tilesToLoad.length) {
-        this.removeOverlayEntries(staleActiveTiles)
-        this._activeTiles = retainedActiveTiles
+        this.removeOverlayEntries(removableActiveTiles)
+        this._activeTiles = new Map([
+          ...cachedActiveTiles.entries(),
+          ...retainedActiveTiles.entries()
+        ])
         this._failedTiles = new Map()
         this.setLoadingState(false, updateRequestId)
+        this.scheduleTileSourcePrefetch(requiredTiles, updateRequestId)
         finalizeTileUpdate()
         return
       }
@@ -492,7 +556,10 @@ Component({
             return
           }
 
-          const nextActiveTiles = new Map(retainedActiveTiles)
+          const nextActiveTiles = new Map(cachedActiveTiles)
+          retainedActiveTiles.forEach((overlayId, url) => {
+            nextActiveTiles.set(url, overlayId)
+          })
           const nextFailedTiles = new Map()
 
           loadedTiles.forEach((tile) => {
@@ -502,13 +569,7 @@ Component({
             nextFailedTiles.set(tile.stringId, tile)
           })
 
-          if (failedTiles.length) {
-            for (const [url, overlayId] of staleActiveTiles.entries()) {
-              nextActiveTiles.set(url, overlayId)
-            }
-          } else {
-            this.removeOverlayEntries(staleActiveTiles)
-          }
+          this.removeOverlayEntries(removableActiveTiles)
 
           this._activeTiles = nextActiveTiles
           this._failedTiles = nextFailedTiles
@@ -524,16 +585,18 @@ Component({
               tiles: failedTiles
             })
           }
+
+          this.scheduleTileSourcePrefetch(requiredTiles, updateRequestId)
         })
         .catch((error) => {
           if (updateRequestId !== this._tileUpdateRequestId) {
             return
           }
 
-          const nextActiveTiles = new Map(retainedActiveTiles)
-          for (const [url, overlayId] of staleActiveTiles.entries()) {
+          const nextActiveTiles = new Map(cachedActiveTiles)
+          retainedActiveTiles.forEach((overlayId, url) => {
             nextActiveTiles.set(url, overlayId)
-          }
+          })
           this._activeTiles = nextActiveTiles
           this._failedTiles = new Map(tilesToLoad.map((tile) => [tile.stringId, {
             ...tile,
@@ -997,9 +1060,15 @@ Component({
     clearAllTiles() {
       const mapCtx = this.properties.mapCtx
       this._tileUpdateRequestId += 1
+      this._tilePrefetchRequestId += 1
+      this._pendingTilePrefetchRequestId = 0
       this._isTileUpdateInFlight = false
       this._needsFollowUpTileUpdate = false
       this.setLoadingState(false)
+      if (this.prefetchTimer) {
+        clearTimeout(this.prefetchTimer)
+        this.prefetchTimer = null
+      }
 
       if (!mapCtx || !this._activeTiles || typeof mapCtx.removeGroundOverlay !== 'function') {
         return
@@ -1023,17 +1092,41 @@ Component({
 
     calculateVisibleTiles() {
       const zoom = this.getZoomLevel()
-      let bounds = this.getCurrentBounds()
-      if (!bounds) {
-        return []
+      return this.calculateTilesForZoom(zoom, {
+        bounds: this.getCurrentBounds()
+      })
+    },
+
+    calculateRetainedTiles() {
+      const zoom = this.getZoomLevel()
+      const retentionBufferRatio = Math.min(
+        this.getZoomAdaptiveConfig(zoom).bufferRatio * TILE_RETENTION_BUFFER_MULTIPLIER,
+        TILE_RETENTION_MAX_BUFFER_RATIO
+      )
+
+      return this.calculateTilesForZoom(zoom, {
+        bounds: this.getCurrentBounds(),
+        bufferRatio: retentionBufferRatio
+      })
+    },
+
+    buildBufferedBounds(bounds, bufferRatio) {
+      if (
+        !bounds
+        || !bounds.southwest
+        || !bounds.northeast
+        || !Number.isFinite(Number(bounds.southwest.latitude))
+        || !Number.isFinite(Number(bounds.southwest.longitude))
+        || !Number.isFinite(Number(bounds.northeast.latitude))
+        || !Number.isFinite(Number(bounds.northeast.longitude))
+      ) {
+        return null
       }
 
       const latRange = bounds.northeast.latitude - bounds.southwest.latitude
       const lngRange = bounds.northeast.longitude - bounds.southwest.longitude
-      const zoomConfig = this.getZoomAdaptiveConfig(zoom)
-      const bufferRatio = zoomConfig.bufferRatio
 
-      bounds = {
+      return {
         southwest: {
           latitude: bounds.southwest.latitude - latRange * bufferRatio,
           longitude: bounds.southwest.longitude - lngRange * bufferRatio
@@ -1043,8 +1136,28 @@ Component({
           longitude: bounds.northeast.longitude + lngRange * bufferRatio
         }
       }
+    },
 
-      const sourceBounds = this.convertMapBoundsToTileSource(bounds)
+    calculateTilesForZoom(zoom, options = {}) {
+      const {
+        bounds = this.getCurrentBounds(),
+        bufferRatio
+      } = options
+
+      if (!bounds) {
+        return []
+      }
+
+      const zoomConfig = this.getZoomAdaptiveConfig(zoom)
+      const effectiveBufferRatio = Number.isFinite(Number(bufferRatio))
+        ? Math.max(0, Number(bufferRatio))
+        : zoomConfig.bufferRatio
+      const bufferedBounds = this.buildBufferedBounds(bounds, effectiveBufferRatio)
+      if (!bufferedBounds) {
+        return []
+      }
+
+      const sourceBounds = this.convertMapBoundsToTileSource(bufferedBounds)
       let minTileX = Math.floor(this.longitudeToTileX(sourceBounds.southwest.longitude, zoom))
       let maxTileX = Math.ceil(this.longitudeToTileX(sourceBounds.northeast.longitude, zoom))
       let minTileY = Math.floor(this.latitudeToTileY(sourceBounds.northeast.latitude, zoom))
@@ -1200,6 +1313,163 @@ Component({
     updateBounds(bounds) {
       this.dynamicBounds = bounds
       this.scheduleUpdateTiles('bounds')
+    },
+
+    pickTilePrefetchCandidates(tiles, maxCount) {
+      if (!Array.isArray(tiles) || !tiles.length || maxCount <= 0) {
+        return []
+      }
+
+      if (tiles.length <= maxCount) {
+        return tiles.slice()
+      }
+
+      let minTileX = Number.POSITIVE_INFINITY
+      let maxTileX = Number.NEGATIVE_INFINITY
+      let minTileY = Number.POSITIVE_INFINITY
+      let maxTileY = Number.NEGATIVE_INFINITY
+
+      tiles.forEach((tile) => {
+        minTileX = Math.min(minTileX, tile.x)
+        maxTileX = Math.max(maxTileX, tile.x)
+        minTileY = Math.min(minTileY, tile.y)
+        maxTileY = Math.max(maxTileY, tile.y)
+      })
+
+      const centerTileX = (minTileX + maxTileX) / 2
+      const centerTileY = (minTileY + maxTileY) / 2
+
+      return tiles
+        .slice()
+        .sort((left, right) => {
+          const leftDistance = Math.abs(left.x - centerTileX) + Math.abs(left.y - centerTileY)
+          const rightDistance = Math.abs(right.x - centerTileX) + Math.abs(right.y - centerTileY)
+          return leftDistance - rightDistance
+        })
+        .slice(0, maxCount)
+    },
+
+    prefetchTileSources(tiles, requestId = 0) {
+      const filteredTiles = (tiles || []).filter((tile) => {
+        const sourceUrl = normalizeStringValue(tile?.url)
+        return sourceUrl
+          && !this._activeTiles.has(sourceUrl)
+          && !this._prefetchedTileSourceUrls.has(sourceUrl)
+      })
+
+      if (!filteredTiles.length) {
+        return Promise.resolve()
+      }
+
+      let cursor = 0
+      const workerCount = Math.max(1, Math.min(TILE_PREFETCH_CONCURRENCY, filteredTiles.length))
+      const runWorker = async () => {
+        while (cursor < filteredTiles.length) {
+          if (requestId && requestId !== this._pendingTilePrefetchRequestId) {
+            return
+          }
+
+          const currentIndex = cursor
+          cursor += 1
+          const tile = filteredTiles[currentIndex]
+          const sourceUrl = normalizeStringValue(tile?.url)
+          if (!sourceUrl || this._prefetchedTileSourceUrls.has(sourceUrl)) {
+            continue
+          }
+
+          const pendingPromise = this._tileSourcePrefetchPromises.get(sourceUrl)
+          if (pendingPromise) {
+            await pendingPromise.catch(() => {})
+            continue
+          }
+
+          const prefetchPromise = this.resolveTileSourceCandidates(tile)
+            .then((sourceCandidates) => this.normalizeTileSourceCandidates(sourceCandidates))
+            .then(() => {
+              this._prefetchedTileSourceUrls.add(sourceUrl)
+            })
+            .catch(() => {})
+            .finally(() => {
+              this._tileSourcePrefetchPromises.delete(sourceUrl)
+            })
+
+          this._tileSourcePrefetchPromises.set(sourceUrl, prefetchPromise)
+          await prefetchPromise
+        }
+      }
+
+      return Promise.all(Array.from({ length: workerCount }, () => runWorker())).then(() => undefined)
+    },
+
+    scheduleTileSourcePrefetch(visibleTiles, requestId = 0) {
+      if (!this.properties.visible || !Array.isArray(visibleTiles) || !visibleTiles.length) {
+        return
+      }
+
+      if (this.hasRemoteTileSource()) {
+        return
+      }
+
+      const bounds = this.getCurrentBounds()
+      if (!bounds) {
+        return
+      }
+
+      const config = this.getResolvedTileConfig()
+      const currentZoom = this.getZoomLevel()
+      const allowedZoomSet = new Set(
+        (Array.isArray(config.allowedZooms) && config.allowedZooms.length
+          ? config.allowedZooms
+          : [currentZoom]
+        ).map((zoom) => Math.round(Number(zoom))).filter((zoom) => Number.isFinite(zoom))
+      )
+
+      const prefetchTiles = []
+      const appendedSourceUrls = new Set()
+
+      TILE_PREFETCH_ZOOM_OFFSETS.forEach((zoomOffset) => {
+        const targetZoom = currentZoom + zoomOffset
+        if (!allowedZoomSet.has(targetZoom)) {
+          return
+        }
+
+        const zoomBufferRatio = Math.min(this.getZoomAdaptiveConfig(targetZoom).bufferRatio * 0.55, 0.12)
+        const candidateTiles = this.calculateTilesForZoom(targetZoom, {
+          bounds,
+          bufferRatio: zoomBufferRatio
+        })
+
+        this.pickTilePrefetchCandidates(candidateTiles, TILE_PREFETCH_MAX_TILES_PER_ZOOM).forEach((tile) => {
+          const sourceUrl = normalizeStringValue(tile?.url)
+          if (!sourceUrl || appendedSourceUrls.has(sourceUrl)) {
+            return
+          }
+
+          appendedSourceUrls.add(sourceUrl)
+          prefetchTiles.push(tile)
+        })
+      })
+
+      if (!prefetchTiles.length) {
+        return
+      }
+
+      this._tilePrefetchRequestId += 1
+      const prefetchRequestId = this._tilePrefetchRequestId
+      this._pendingTilePrefetchRequestId = prefetchRequestId
+
+      if (this.prefetchTimer) {
+        clearTimeout(this.prefetchTimer)
+      }
+
+      this.prefetchTimer = setTimeout(() => {
+        this.prefetchTimer = null
+        if (requestId && requestId !== this._tileUpdateRequestId) {
+          return
+        }
+
+        this.prefetchTileSources(prefetchTiles, prefetchRequestId)
+      }, TILE_PREFETCH_DELAY_MS)
     },
 
     gcj02ToWgs84(gcjLng, gcjLat) {

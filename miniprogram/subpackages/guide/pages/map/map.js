@@ -3306,16 +3306,7 @@ Page({
   },
 
   onGroundTilesLoaded() {
-    if (!this.pageVisible || this.groundTileOverlayLoadToastShown) {
-      return
-    }
-
     this.groundTileOverlayLoadToastShown = true
-    wx.showToast({
-      title: '景区底图已开始加载',
-      icon: 'none',
-      duration: 1500
-    })
   },
 
   onGroundTilesError(event) {
