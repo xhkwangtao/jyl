@@ -1,5 +1,5 @@
-const request = require('../../../../../utils/request')
 const auth = require('../../../../../utils/auth')
+const paymentService = require('../../../../../services/payment-service')
 const { setFeaturePaid } = require('../../../../../utils/audio-access.js')
 const {
   GUIDE_MAP_PAGE
@@ -78,6 +78,15 @@ function safeDecode(value) {
   }
 }
 
+function centsToYuan(amountCents) {
+  const numeric = Number(amountCents)
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return DEFAULT_PRICE
+  }
+
+  return numeric / 100
+}
+
 function formatAmount(amount) {
   const numeric = Number(amount)
   if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -105,23 +114,20 @@ function grantPaidAccess(featureKey = '') {
   }
 }
 
-function yuanToCents(value) {
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    return Math.round(DEFAULT_PRICE * 100)
-  }
-
-  return Math.round(numeric * 100)
-}
-
 function requestWxPayment(paymentParams = {}) {
+  const timeStamp = String(paymentParams.timeStamp || paymentParams.time_stamp || '')
+  const nonceStr = String(paymentParams.nonceStr || paymentParams.nonce_str || '')
+  const packageValue = String(paymentParams.package || paymentParams.packageValue || '')
+  const signType = String(paymentParams.signType || paymentParams.sign_type || 'RSA')
+  const paySign = String(paymentParams.paySign || paymentParams.pay_sign || '')
+
   return new Promise((resolve, reject) => {
     wx.requestPayment({
-      timeStamp: String(paymentParams.timeStamp || ''),
-      nonceStr: String(paymentParams.nonceStr || ''),
-      package: String(paymentParams.package || ''),
-      signType: String(paymentParams.signType || 'RSA'),
-      paySign: String(paymentParams.paySign || ''),
+      timeStamp,
+      nonceStr,
+      package: packageValue,
+      signType,
+      paySign,
       success: resolve,
       fail: reject
     })
@@ -130,6 +136,7 @@ function requestWxPayment(paymentParams = {}) {
 
 Page({
   data: {
+    productCode: 'vip',
     featureKey: 'vip',
     featureName: DEFAULT_FEATURE_NAME,
     description: DEFAULT_DESCRIPTION,
@@ -139,6 +146,7 @@ Page({
     currency: DEFAULT_CURRENCY,
     heroImageSrc: REMOTE_HERO_IMAGE,
     agreed: true,
+    priceLoaded: false,
     loading: false,
     paymentError: '',
     successRedirectUrl: ''
@@ -146,10 +154,14 @@ Page({
 
   onLoad(options = {}) {
     this.parseOptions(options)
+    this.loadProductPrice()
   },
 
   parseOptions(options = {}) {
     const featureKey = safeDecode(options.feature) || 'vip'
+    const productCode = safeDecode(options.productCode)
+      || safeDecode(options.product_code)
+      || 'vip'
     const featureConfig = FEATURE_CONFIG[featureKey] || FEATURE_CONFIG.vip
     const amount = Number(options.amount)
     const originalPrice = Number(options.originalPrice)
@@ -162,6 +174,7 @@ Page({
       || DEFAULT_DESCRIPTION
 
     this.setData({
+      productCode,
       featureKey,
       featureName,
       description,
@@ -171,6 +184,41 @@ Page({
       currency: safeDecode(options.currency) || DEFAULT_CURRENCY,
       successRedirectUrl: safeDecode(options.successRedirect)
     })
+  },
+
+  async loadProductPrice() {
+    const productCode = String(this.data.productCode || '').trim() || 'vip'
+
+    try {
+      const pricePayload = await paymentService.getProductPrice(productCode)
+      const currentAmount = centsToYuan(pricePayload.current_amount_cents)
+      const originalAmount = centsToYuan(pricePayload.original_amount_cents)
+      const remoteProductName = safeDecode(pricePayload.product_name)
+      const remoteDescription = safeDecode(pricePayload.description)
+      const currentFeatureName = String(this.data.featureName || '').trim()
+      const currentDescription = String(this.data.description || '').trim()
+      const shouldUseRemoteFeatureName = !currentFeatureName || currentFeatureName === DEFAULT_FEATURE_NAME
+      const shouldUseRemoteDescription = !currentDescription || currentDescription === DEFAULT_DESCRIPTION
+
+      this.setData({
+        priceLoaded: true,
+        amount: currentAmount,
+        displayAmount: formatAmount(currentAmount),
+        displayOriginalPrice: formatAmount(originalAmount > 0 ? originalAmount : currentAmount),
+        currency: safeDecode(pricePayload.currency) || DEFAULT_CURRENCY,
+        featureName: shouldUseRemoteFeatureName
+          ? (remoteProductName || currentFeatureName || DEFAULT_FEATURE_NAME)
+          : currentFeatureName,
+        description: shouldUseRemoteDescription
+          ? (remoteDescription || currentDescription || DEFAULT_DESCRIPTION)
+          : currentDescription
+      })
+    } catch (error) {
+      console.warn('[subscribe] load product price failed', error)
+      this.setData({
+        priceLoaded: false
+      })
+    }
   },
 
   onGoHome() {
@@ -325,20 +373,15 @@ Page({
     })
 
     try {
-      const loginResult = await auth.wxLogin()
-      const paymentOrder = await request.request({
-        url: '/client/payments/jsapi-prepay',
-        method: 'POST',
-        data: {
-          login_code: loginResult.code,
-          product_name: this.data.featureName,
-          product_type: this.data.featureKey || 'vip',
-          quantity: 1,
-          unit_amount_cents: yuanToCents(this.data.amount),
-          description: this.data.description,
-          feature_key: this.data.featureKey
-        },
-        timeout: 10000
+      const loginReady = await auth.checkAndAutoLogin(3000)
+      if (!loginReady || !auth.getToken()) {
+        throw new Error('登录失败，请稍后重试')
+      }
+
+      const paymentOrder = await paymentService.createJsapiPrepay({
+        productCode: this.data.productCode || 'vip',
+        quantity: 1,
+        featureKey: this.data.featureKey
       })
 
       if (!paymentOrder.dry_run) {
