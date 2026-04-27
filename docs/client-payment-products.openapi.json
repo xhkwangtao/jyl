@@ -1,0 +1,277 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "九眼楼小程序产品价格与支付接口",
+    "version": "1.0.0",
+    "description": "小程序端读取后台配置的产品价格，并使用普通用户 JWT 发起微信支付。产品价格以后端后台配置为准，小程序只负责展示原价、现价和提交产品编码。"
+  },
+  "servers": [
+    {
+      "url": "https://jyl.flexai.cc/api/v1",
+      "description": "生产环境小程序接口"
+    },
+    {
+      "url": "http://127.0.0.1:8000/api/v1",
+      "description": "本地后端直连"
+    }
+  ],
+  "tags": [
+    {
+      "name": "client-payments",
+      "description": "小程序产品价格与支付接口"
+    }
+  ],
+  "paths": {
+    "/client/payments/products/prices": {
+      "get": {
+        "tags": [
+          "client-payments"
+        ],
+        "summary": "获取启用产品价格列表",
+        "description": "返回后台已启用的产品价格。小程序用于展示原价、现价、优惠金额和产品名称。该接口不要求登录。",
+        "operationId": "listClientPaymentProductPrices",
+        "responses": {
+          "200": {
+            "description": "启用产品价格列表。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientPaymentProductPriceListResponse"
+                },
+                "examples": {
+                  "default": {
+                    "value": {
+                      "items": [
+                        {
+                          "product_code": "vip",
+                          "product_name": "VIP尊享功能",
+                          "product_type": "vip",
+                          "original_amount_cents": 1280,
+                          "current_amount_cents": 780,
+                          "discount_amount_cents": 500,
+                          "currency": "CNY",
+                          "has_discount": true,
+                          "description": "小程序付费墙产品"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/payments/products/prices/{product_code}": {
+      "get": {
+        "tags": [
+          "client-payments"
+        ],
+        "summary": "获取单个启用产品价格",
+        "description": "按产品编码读取单个启用产品价格。停用或不存在的产品返回 404。",
+        "operationId": "getClientPaymentProductPrice",
+        "parameters": [
+          {
+            "name": "product_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "vip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "产品价格。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientPaymentProductPrice"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "产品不存在或未启用。"
+          }
+        }
+      }
+    },
+    "/client/payments/jsapi-prepay": {
+      "post": {
+        "tags": [
+          "client-payments"
+        ],
+        "summary": "创建小程序 JSAPI 支付订单",
+        "description": "小程序必须先调用 /client/users/wechat-login 获取普通用户 JWT，再通过 Authorization: Bearer <access_token> 调用本接口。请求体只需要提交产品编码和数量；后端根据后台产品价格配置读取现价，创建订单、支付记录和微信预支付会话。小程序传入的金额不会作为可信支付金额。",
+        "operationId": "createClientJsapiPrepay",
+        "security": [
+          {
+            "ClientUserBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientJsapiPrepayRequest"
+              },
+              "examples": {
+                "default": {
+                  "value": {
+                    "product_code": "vip",
+                    "quantity": 1,
+                    "feature_key": "vip"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "订单和微信支付参数创建成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientJsapiPrepayResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无效的普通用户 JWT。"
+          },
+          "404": {
+            "description": "产品不存在或未启用。"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ClientUserBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ClientPaymentProductPriceListResponse": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientPaymentProductPrice"
+            }
+          }
+        }
+      },
+      "ClientPaymentProductPrice": {
+        "type": "object",
+        "required": [
+          "product_code",
+          "product_name",
+          "product_type",
+          "original_amount_cents",
+          "current_amount_cents",
+          "discount_amount_cents",
+          "currency",
+          "has_discount"
+        ],
+        "properties": {
+          "product_code": {
+            "type": "string",
+            "example": "vip"
+          },
+          "product_name": {
+            "type": "string",
+            "example": "VIP尊享功能"
+          },
+          "product_type": {
+            "type": "string",
+            "example": "vip"
+          },
+          "original_amount_cents": {
+            "type": "integer",
+            "example": 1280
+          },
+          "current_amount_cents": {
+            "type": "integer",
+            "example": 780
+          },
+          "discount_amount_cents": {
+            "type": "integer",
+            "example": 500
+          },
+          "currency": {
+            "type": "string",
+            "example": "CNY"
+          },
+          "has_discount": {
+            "type": "boolean",
+            "example": true
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ClientJsapiPrepayRequest": {
+        "type": "object",
+        "required": [
+          "product_code"
+        ],
+        "properties": {
+          "product_code": {
+            "type": "string",
+            "example": "vip"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "feature_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "vip"
+          }
+        }
+      },
+      "ClientJsapiPrepayResponse": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "description": "本地支付订单，包含用户 ID、openid、产品编码、原价快照、现价快照、订单金额和支付状态。"
+          },
+          "payment": {
+            "type": "object",
+            "description": "本地支付记录，包含商户订单号、微信交易号、支付金额和支付状态。"
+          },
+          "payment_params": {
+            "type": "object",
+            "description": "传给 wx.requestPayment 的参数。"
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
