@@ -1,0 +1,20 @@
+{
+  "mode": "merchant",
+  "api_base_url": "https://api.mch.weixin.qq.com",
+  "mchid": "1742711175",
+  "certificate_serial_no": "69C984770F092503A43C12442D9D478607976C36",
+  "private_key_path": ".local-secrets/apiclient_key.pem",
+  "appid": "wxf1d1b5eaf421b1ed",
+  "payment": {
+    "notify_url": "https://jyl.flexai.cc/",
+    "description": "九眼楼支付测试",
+    "out_trade_no_prefix": "jylpay",
+    "amount": {
+      "total": 100,
+      "currency": "CNY"
+    },
+    "settle_info": {
+      "profit_sharing": true
+    }
+  }
+}

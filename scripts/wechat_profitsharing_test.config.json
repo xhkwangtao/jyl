@@ -1,0 +1,30 @@
+{
+  "mode": "merchant",
+  "api_base_url": "https://api.mch.weixin.qq.com",
+  "mchid": "1742711175",
+  "sub_mchid": "",
+  "certificate_serial_no": "69C984770F092503A43C12442D9D478607976C36",
+  "private_key_path": ".local-secrets/apiclient_key.pem",
+  "wechatpay_serial": "PUB_KEY_ID_0117427111752026040800191827000001",
+  "wechatpay_public_key_path": ".local-secrets/wechatpay_public_key.pem",
+  "appid": "wxf1d1b5eaf421b1ed",
+  "sub_appid": "",
+  "transaction_id": "4200003052202604196396107502",
+  "receiver": {
+    "type": "MERCHANT_ID",
+    "account": "1110914570",
+    "name": "维优（北京）文化艺术科技有限公司",
+    "relation_type": "SUPPLIER",
+    "custom_relation": ""
+  },
+  "profitsharing": {
+    "amount": 10,
+    "description": "九眼楼分账测试",
+    "out_order_no_prefix": "jylps",
+    "unfreeze_unsplit": false
+  },
+  "unfreeze": {
+    "description": "九眼楼分账测试解冻",
+    "out_order_no_prefix": "jyluf"
+  }
+}
