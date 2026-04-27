@@ -66,6 +66,27 @@
       <text class="manual-tip {{manualCollectEnabled ? 'manual-tip-testing' : 'manual-tip-live'}}">{{manualCollectTip}}</text>
     </view>
 
+    <view class="rules-card">
+      <view class="section-head section-head-static">
+        <view>
+          <text class="section-title">研学流程</text>
+          <text class="section-caption">现在这页会明确展示已经拿到的暗号图案和剩余待收集的图案。</text>
+        </view>
+      </view>
+
+      <view class="rule-list">
+        <view class="rule-item" wx:for="{{ruleList}}" wx:key="indexText">
+          <view class="rule-index-shell">
+            <text class="rule-index">{{item.indexText}}</text>
+          </view>
+          <view class="rule-copy">
+            <text class="rule-title">{{item.title}}</text>
+            <text class="rule-desc">{{item.desc}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <view class="filter-shell">
       <view
         class="filter-chip {{currentFilter === item.value ? 'filter-chip-active' : ''}}"
