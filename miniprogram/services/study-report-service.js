@@ -135,8 +135,28 @@ class StudyReportService {
     clientRequestId
   }) {
     return new Promise((resolve, reject) => {
+      const uploadUrl = buildUrl(STUDY_REPORT_GENERATE_PATH)
+      const uploadFormData = {
+        student_name: studentName || '',
+        student_code: studentCode || '',
+        study_date: studyDate || '',
+        duration_minutes: durationMinutes === undefined || durationMinutes === null || durationMinutes === ''
+          ? ''
+          : String(durationMinutes),
+        scene: scene || 'qrcode:study-report',
+        client_request_id: clientRequestId || ''
+      }
+
+      console.log('[study-report] upload payload', {
+        url: uploadUrl,
+        fileFieldName: 'worksheet_image',
+        filePath,
+        hasToken: !!token,
+        formData: uploadFormData
+      })
+
       wx.uploadFile({
-        url: buildUrl(STUDY_REPORT_GENERATE_PATH),
+        url: uploadUrl,
         filePath,
         name: 'worksheet_image',
         timeout: 60000,
@@ -144,16 +164,7 @@ class StudyReportService {
           Accept: 'application/json',
           Authorization: token ? `Bearer ${token}` : ''
         },
-        formData: {
-          student_name: studentName || '',
-          student_code: studentCode || '',
-          study_date: studyDate || '',
-          duration_minutes: durationMinutes === undefined || durationMinutes === null || durationMinutes === ''
-            ? ''
-            : String(durationMinutes),
-          scene: scene || 'qrcode:study-report',
-          client_request_id: clientRequestId || ''
-        },
+        formData: uploadFormData,
         success: (res) => {
           const parsedPayload = safeParseJson(res.data)
           const payload = parsedPayload || res.data

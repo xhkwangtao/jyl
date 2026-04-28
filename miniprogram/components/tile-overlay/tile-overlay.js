@@ -11,6 +11,9 @@ const TILE_PREFETCH_ZOOM_OFFSETS = [1, -1]
 const TILE_PREFETCH_MAX_TILES_PER_ZOOM = 18
 const TILE_RETENTION_BUFFER_MULTIPLIER = 2
 const TILE_RETENTION_MAX_BUFFER_RATIO = 0.45
+const TILE_OVERLAY_CACHE_SIZE_MULTIPLIER = 2.2
+const TILE_OVERLAY_CACHE_MIN_SIZE = 96
+const TILE_OVERLAY_CACHE_MAX_SIZE = 280
 
 const DEFAULT_TILE_CONFIG = {
   packageRoots: [],
@@ -73,6 +76,45 @@ function isWxFileUrl(value) {
 function shouldStagePackageTile(value) {
   const normalizedPath = normalizeMiniProgramPackagePath(value)
   return !!normalizedPath && !isRemoteTileUrl(value) && !isWxFileUrl(value)
+}
+
+function shouldCacheTileLocally(value) {
+  return shouldStagePackageTile(value) || isRemoteTileUrl(value)
+}
+
+function sanitizePathSegment(segment) {
+  return String(segment || '')
+    .replace(/[^0-9A-Za-z._-]/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+function buildRemoteTileCacheRelativePath(sourceUrl) {
+  const normalizedUrl = normalizeStringValue(sourceUrl)
+    .replace(/[?#].*$/, '')
+    .replace(/^https?:\/\//i, '')
+
+  if (!normalizedUrl) {
+    return ''
+  }
+
+  const sanitizedSegments = normalizedUrl
+    .split('/')
+    .map((segment) => sanitizePathSegment(segment))
+    .filter(Boolean)
+
+  return sanitizedSegments.length ? `remote/${sanitizedSegments.join('/')}` : ''
+}
+
+function buildTileCacheRelativePath(sourcePath) {
+  if (shouldStagePackageTile(sourcePath)) {
+    return normalizeMiniProgramPackagePath(sourcePath)
+  }
+
+  if (isRemoteTileUrl(sourcePath)) {
+    return buildRemoteTileCacheRelativePath(sourcePath)
+  }
+
+  return ''
 }
 
 function getDirectoryPath(filePath) {
@@ -152,6 +194,7 @@ Component({
   lifetimes: {
     attached() {
       this._activeTiles = new Map()
+      this._activeTileMeta = new Map()
       this._failedTiles = new Map()
       this._tileLocalPathCache = new Map()
       this._tileSourceReadyPromises = new Map()
@@ -180,6 +223,7 @@ Component({
 
     detached() {
       this.clearAllTiles()
+      this._activeTileMeta.clear()
       this._tileLocalPathCache.clear()
       this._tileSourceReadyPromises.clear()
       this._tileImageInfoPathCache.clear()
@@ -203,6 +247,116 @@ Component({
       const overlayId = this._overlayIdSeed
       this._overlayIdSeed += 1
       return overlayId
+    },
+
+    upsertActiveTileEntry(tile, options = {}) {
+      const sourceUrl = normalizeStringValue(tile?.url)
+      const overlayId = Number(tile?.overlayId || tile?.id)
+      if (!sourceUrl || !Number.isFinite(overlayId)) {
+        return
+      }
+
+      const now = Date.now()
+      const previousMeta = this._activeTileMeta.get(sourceUrl) || {}
+      this._activeTiles.set(sourceUrl, overlayId)
+      this._activeTileMeta.set(sourceUrl, {
+        ...previousMeta,
+        url: sourceUrl,
+        overlayId,
+        stringId: tile?.stringId || previousMeta.stringId || '',
+        x: Number.isFinite(Number(tile?.x)) ? Number(tile.x) : previousMeta.x,
+        y: Number.isFinite(Number(tile?.y)) ? Number(tile.y) : previousMeta.y,
+        z: Number.isFinite(Number(tile?.z)) ? Number(tile.z) : previousMeta.z,
+        bounds: tile?.bounds || previousMeta.bounds || null,
+        createdAt: previousMeta.createdAt || now,
+        lastTouchedAt: now,
+        lastVisibleAt: options.visible ? now : (previousMeta.lastVisibleAt || 0)
+      })
+    },
+
+    touchActiveTileEntry(sourceUrl, options = {}) {
+      const normalizedSourceUrl = normalizeStringValue(sourceUrl)
+      if (!normalizedSourceUrl) {
+        return
+      }
+
+      const previousMeta = this._activeTileMeta.get(normalizedSourceUrl)
+      if (!previousMeta) {
+        return
+      }
+
+      const now = Date.now()
+      this._activeTileMeta.set(normalizedSourceUrl, {
+        ...previousMeta,
+        lastTouchedAt: now,
+        lastVisibleAt: options.visible ? now : previousMeta.lastVisibleAt
+      })
+    },
+
+    getTileOverlayCacheLimit(zoom = this.getZoomLevel()) {
+      const zoomConfig = this.getZoomAdaptiveConfig(zoom)
+      const configuredMaxTiles = Number(zoomConfig?.maxTiles)
+      if (!Number.isFinite(configuredMaxTiles) || configuredMaxTiles <= 0) {
+        return TILE_OVERLAY_CACHE_MAX_SIZE
+      }
+
+      return Math.max(
+        TILE_OVERLAY_CACHE_MIN_SIZE,
+        Math.min(
+          TILE_OVERLAY_CACHE_MAX_SIZE,
+          Math.round(configuredMaxTiles * TILE_OVERLAY_CACHE_SIZE_MULTIPLIER)
+        )
+      )
+    },
+
+    pruneActiveTileCache(protectedTileUrlSet = new Set(), zoom = this.getZoomLevel()) {
+      if (!(this._activeTiles instanceof Map) || this._activeTiles.size <= 0) {
+        return new Map()
+      }
+
+      const overflowCount = this._activeTiles.size - this.getTileOverlayCacheLimit(zoom)
+      if (overflowCount <= 0) {
+        return new Map()
+      }
+
+      const removableCandidates = Array.from(this._activeTiles.entries())
+        .filter(([url]) => !protectedTileUrlSet.has(url))
+        .map(([url, overlayId]) => {
+          const meta = this._activeTileMeta.get(url) || {}
+          return {
+            url,
+            overlayId,
+            createdAt: Number(meta.createdAt) || 0,
+            lastTouchedAt: Number(meta.lastTouchedAt) || 0,
+            lastVisibleAt: Number(meta.lastVisibleAt) || 0
+          }
+        })
+        .sort((left, right) => {
+          if (left.lastVisibleAt !== right.lastVisibleAt) {
+            return left.lastVisibleAt - right.lastVisibleAt
+          }
+
+          if (left.lastTouchedAt !== right.lastTouchedAt) {
+            return left.lastTouchedAt - right.lastTouchedAt
+          }
+
+          return left.createdAt - right.createdAt
+        })
+
+      if (!removableCandidates.length) {
+        return new Map()
+      }
+
+      const removableEntries = removableCandidates.slice(0, overflowCount)
+      const removableMap = new Map()
+
+      removableEntries.forEach(({ url, overlayId }) => {
+        removableMap.set(url, overlayId)
+        this._activeTiles.delete(url)
+        this._activeTileMeta.delete(url)
+      })
+
+      return removableMap
     },
 
     setLoadingState(isLoading, requestId = 0) {
@@ -506,22 +660,20 @@ Component({
       }
 
       const retainedActiveTiles = new Map()
-      const cachedActiveTiles = new Map()
       const tilesToLoad = []
-      const removableActiveTiles = new Map()
 
       for (const [url, overlayId] of this._activeTiles.entries()) {
         if (requiredTileUrlSet.has(url)) {
           retainedActiveTiles.set(url, overlayId)
+          this.touchActiveTileEntry(url, {
+            visible: true
+          })
           continue
         }
 
         if (retainedTileUrlSet.has(url)) {
-          cachedActiveTiles.set(url, overlayId)
-          continue
+          this.touchActiveTileEntry(url)
         }
-
-        removableActiveTiles.set(url, overlayId)
       }
 
       requiredTiles.forEach((tile) => {
@@ -537,13 +689,13 @@ Component({
       })
 
       if (!tilesToLoad.length) {
-        this.removeOverlayEntries(removableActiveTiles)
-        this._activeTiles = new Map([
-          ...cachedActiveTiles.entries(),
-          ...retainedActiveTiles.entries()
-        ])
         this._failedTiles = new Map()
         this.setLoadingState(false, updateRequestId)
+        const removableActiveTiles = this.pruneActiveTileCache(
+          new Set([...requiredTileUrlSet, ...retainedTileUrlSet]),
+          this.getZoomLevel()
+        )
+        this.removeOverlayEntries(removableActiveTiles)
         this.scheduleTileSourcePrefetch(requiredTiles, updateRequestId)
         finalizeTileUpdate()
         return
@@ -556,23 +708,23 @@ Component({
             return
           }
 
-          const nextActiveTiles = new Map(cachedActiveTiles)
-          retainedActiveTiles.forEach((overlayId, url) => {
-            nextActiveTiles.set(url, overlayId)
-          })
           const nextFailedTiles = new Map()
 
           loadedTiles.forEach((tile) => {
-            nextActiveTiles.set(tile.url, tile.overlayId || tile.id)
+            this.upsertActiveTileEntry(tile, {
+              visible: true
+            })
           })
           failedTiles.forEach((tile) => {
             nextFailedTiles.set(tile.stringId, tile)
           })
 
-          this.removeOverlayEntries(removableActiveTiles)
-
-          this._activeTiles = nextActiveTiles
           this._failedTiles = nextFailedTiles
+          const removableActiveTiles = this.pruneActiveTileCache(
+            new Set([...requiredTileUrlSet, ...retainedTileUrlSet]),
+            this.getZoomLevel()
+          )
+          this.removeOverlayEntries(removableActiveTiles)
 
           if (loadedTiles.length) {
             this.triggerEvent('tilesLoaded', {
@@ -593,11 +745,6 @@ Component({
             return
           }
 
-          const nextActiveTiles = new Map(cachedActiveTiles)
-          retainedActiveTiles.forEach((overlayId, url) => {
-            nextActiveTiles.set(url, overlayId)
-          })
-          this._activeTiles = nextActiveTiles
           this._failedTiles = new Map(tilesToLoad.map((tile) => [tile.stringId, {
             ...tile,
             error
@@ -759,13 +906,38 @@ Component({
 
     buildLocalTileCachePath(sourcePath) {
       const tileConfig = this.getResolvedTileConfig()
-      const normalizedSourcePath = normalizeMiniProgramPackagePath(sourcePath)
+      const normalizedSourcePath = buildTileCacheRelativePath(sourcePath)
       const userDataPath = normalizeUserDataPath(wx && wx.env ? wx.env.USER_DATA_PATH : '')
       if (!normalizedSourcePath || !userDataPath) {
         return ''
       }
 
       return `${userDataPath}/${tileConfig.localCacheDirName}/${normalizedSourcePath}`
+    },
+
+    downloadRemoteTileToLocalPath(sourceUrl, targetPath) {
+      const normalizedSourceUrl = normalizeStringValue(sourceUrl)
+      const normalizedTargetPath = normalizeUserDataPath(targetPath)
+      if (!normalizedSourceUrl || !normalizedTargetPath) {
+        return Promise.reject(new Error('remote tile cache path is empty'))
+      }
+
+      return new Promise((resolve, reject) => {
+        wx.downloadFile({
+          url: normalizedSourceUrl,
+          success: (result = {}) => {
+            if (!(result.statusCode >= 200 && result.statusCode < 300) || !result.tempFilePath) {
+              reject(result)
+              return
+            }
+
+            this.copyLocalFile(result.tempFilePath, normalizedTargetPath)
+              .then(() => resolve(normalizedTargetPath))
+              .catch(reject)
+          },
+          fail: reject
+        })
+      })
     },
 
     getImageInfoPath(src) {
@@ -808,7 +980,7 @@ Component({
         return Promise.resolve([])
       }
 
-      const localStagePromise = shouldStagePackageTile(sourceUrl)
+      const localStagePromise = shouldCacheTileLocally(sourceUrl)
         ? this.resolveTileRuntimeSrc(tile).catch(() => sourceUrl)
         : Promise.resolve(sourceUrl)
 
@@ -843,7 +1015,7 @@ Component({
 
     resolveTileRuntimeSrc(tile) {
       const sourceUrl = normalizeStringValue(tile?.url)
-      if (!sourceUrl || !shouldStagePackageTile(sourceUrl)) {
+      if (!sourceUrl || !shouldCacheTileLocally(sourceUrl)) {
         return Promise.resolve(sourceUrl)
       }
 
@@ -865,18 +1037,26 @@ Component({
       const localTargetDir = getDirectoryPath(localTargetPath)
       const resolvePromise = this.ensureFileSystemDirectory(localTargetDir)
         .then(() => this.accessFileSystemPath(localTargetPath).catch(() => {
-          return this.copyMiniProgramPackageFile(sourceUrl, localTargetPath)
-            .catch((packageCopyError) => {
-              return this.getImageInfoPath(sourceUrl)
-                .then((imageInfoPath) => {
-                  const normalizedImageInfoPath = normalizeUserDataPath(imageInfoPath)
-                  if (!normalizedImageInfoPath || normalizedImageInfoPath === sourceUrl) {
-                    throw packageCopyError
-                  }
+          if (shouldStagePackageTile(sourceUrl)) {
+            return this.copyMiniProgramPackageFile(sourceUrl, localTargetPath)
+              .catch((packageCopyError) => {
+                return this.getImageInfoPath(sourceUrl)
+                  .then((imageInfoPath) => {
+                    const normalizedImageInfoPath = normalizeUserDataPath(imageInfoPath)
+                    if (!normalizedImageInfoPath || normalizedImageInfoPath === sourceUrl) {
+                      throw packageCopyError
+                    }
 
-                  return this.copyLocalFile(normalizedImageInfoPath, localTargetPath)
-                })
-            })
+                    return this.copyLocalFile(normalizedImageInfoPath, localTargetPath)
+                  })
+              })
+          }
+
+          if (isRemoteTileUrl(sourceUrl)) {
+            return this.downloadRemoteTileToLocalPath(sourceUrl, localTargetPath)
+          }
+
+          return Promise.reject(new Error('unsupported tile source type'))
         }))
         .then((resolvedLocalPath) => {
           const normalizedResolvedLocalPath = normalizeUserDataPath(resolvedLocalPath)
@@ -1070,18 +1250,17 @@ Component({
         this.prefetchTimer = null
       }
 
-      if (!mapCtx || !this._activeTiles || typeof mapCtx.removeGroundOverlay !== 'function') {
-        return
-      }
-
-      for (const [, overlayId] of this._activeTiles.entries()) {
-        mapCtx.removeGroundOverlay({
-          id: overlayId,
-          fail: () => {}
-        })
+      if (mapCtx && this._activeTiles && typeof mapCtx.removeGroundOverlay === 'function') {
+        for (const [, overlayId] of this._activeTiles.entries()) {
+          mapCtx.removeGroundOverlay({
+            id: overlayId,
+            fail: () => {}
+          })
+        }
       }
 
       this._activeTiles.clear()
+      this._activeTileMeta.clear()
       this._failedTiles.clear()
       this._lastVisibleTileSignature = ''
       this.setData({
@@ -1403,10 +1582,6 @@ Component({
 
     scheduleTileSourcePrefetch(visibleTiles, requestId = 0) {
       if (!this.properties.visible || !Array.isArray(visibleTiles) || !visibleTiles.length) {
-        return
-      }
-
-      if (this.hasRemoteTileSource()) {
         return
       }
 
