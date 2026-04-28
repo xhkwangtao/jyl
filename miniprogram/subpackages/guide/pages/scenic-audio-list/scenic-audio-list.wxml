@@ -35,111 +35,134 @@
           </view>
         </view>
 
-        <view class="info-block info-list-block">
-          <view class="info-list">
-            <view
-              class="audio-group"
-              wx:for="{{audioGroups}}"
-              wx:key="id"
-              wx:for-index="groupIndex"
-              wx:for-item="group"
-            >
-              <view class="group-header" bindtap="onGroupToggle" data-index="{{groupIndex}}">
-                <view class="group-left">
-                  <view class="group-icon">
-                    <image src="{{group.cover}}" mode="aspectFill" />
-                  </view>
-                  <view class="group-texts">
-                    <text class="group-title">{{group.title}}</text>
-                    <text class="group-subtitle">音频列表</text>
-                  </view>
-                </view>
-                <view class="group-right">
-                  <view class="group-meta">
-                    <text class="group-count">{{group.items.length}} 段</text>
-                    <text class="group-duration">{{group.summaryDuration}}</text>
-                  </view>
-                  <view class="group-arrow {{group.expanded ? 'expanded' : ''}}"></view>
-                </view>
+        <view wx:if="{{loading}}" class="state-card">
+          <text class="state-text">正在同步地图点位内容...</text>
+        </view>
+
+        <view wx:elif="{{errorText}}" class="state-card state-card-error">
+          <text class="state-text">{{errorText}}</text>
+        </view>
+
+        <view wx:elif="{{emptyText}}" class="state-card">
+          <text class="state-text">{{emptyText}}</text>
+        </view>
+
+        <block wx:elif="{{currentPoi}}">
+          <view class="info-block current-poi-card">
+            <image
+              class="current-poi-cover"
+              src="{{currentPoi.coverImage}}"
+              mode="aspectFill"
+              data-url="{{currentPoi.coverImage}}"
+              bindtap="onPreviewImageTap"
+            />
+            <view class="current-poi-body">
+              <view class="current-poi-header">
+                <text class="current-poi-title">{{currentPoi.displayName}}</text>
+                <text class="current-poi-type">{{currentPoi.typeLabel}}</text>
               </view>
-
-              <view class="group-divider"></view>
-
-              <view class="group-body" wx:if="{{group.expanded}}">
-                <view
-                  class="group-child"
-                  wx:for="{{group.items}}"
-                  wx:key="id"
-                  wx:for-index="childIndex"
-                  wx:for-item="child"
-                >
-                  <view class="child-left">
-                    <view
-                      class="child-cover"
-                      bindtap="onSubAudioPlay"
-                      data-group-index="{{groupIndex}}"
-                      data-item-index="{{childIndex}}"
-                    >
-                      <image class="child-cover-img" src="{{child.cover}}" mode="aspectFill" />
-                      <view class="child-cover-overlay">
-                        <image
-                          class="child-cover-play"
-                          src="{{(child.playing && audioPlaying) ? '/images/poi-detail/pause.svg' : '/images/poi-detail/play.svg'}}"
-                          mode="widthFix"
-                        />
-                      </view>
-                    </view>
-                    <view class="child-texts">
-                      <text class="child-title">{{child.title}}</text>
-                      <text class="child-desc">音频讲解</text>
-                    </view>
-                  </view>
-                  <text class="child-duration">{{child.duration}}</text>
-                </view>
-
-                <view wx:if="{{!group.items || !group.items.length}}" class="group-empty">暂无子集音频，敬请期待</view>
+              <text class="current-poi-subtitle">{{currentPoi.subtitle}}</text>
+              <text class="current-poi-desc">{{currentPoi.description}}</text>
+              <view class="media-tags" wx:if="{{currentPoi.mediaTags.length}}">
+                <text class="media-tag" wx:for="{{currentPoi.mediaTags}}" wx:key="*this">{{item}}</text>
               </view>
             </view>
+          </view>
 
-            <view
-              class="flat-item-row"
-              wx:for="{{flatAudios}}"
-              wx:key="id"
-            >
-              <view class="list-item flat-item">
+          <view class="info-block gallery-block" wx:if="{{currentPoi.previewImageUrls.length}}">
+            <view class="block-title-row">
+              <text class="block-title">景点图片</text>
+              <text class="block-caption">共 {{currentPoi.previewImageUrls.length}} 张</text>
+            </view>
+            <scroll-view class="gallery-scroll" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+              <view class="gallery-track">
+                <image
+                  class="gallery-image"
+                  wx:for="{{currentPoi.previewImageUrls}}"
+                  wx:key="*this"
+                  src="{{item}}"
+                  mode="aspectFill"
+                  data-url="{{item}}"
+                  bindtap="onPreviewImageTap"
+                />
+              </view>
+            </scroll-view>
+          </view>
+
+          <view class="info-block video-block" wx:if="{{currentPoi.videoUrl}}">
+            <view class="block-title-row">
+              <text class="block-title">景点视频</text>
+              <text class="block-caption">{{currentPoi.videoUrls.length}} 段</text>
+            </view>
+            <video
+              class="poi-video"
+              src="{{currentPoi.videoUrl}}"
+              poster="{{currentPoi.coverImage}}"
+              controls="{{true}}"
+              show-center-play-btn="{{true}}"
+              show-fullscreen-btn="{{true}}"
+              object-fit="cover"
+            ></video>
+          </view>
+
+          <view class="info-block info-list-block">
+            <view class="block-title-row">
+              <text class="block-title">景点列表</text>
+              <text class="block-caption">来源于地图点位接口</text>
+            </view>
+
+            <view class="info-list">
+              <view
+                class="poi-list-item {{item.selected ? 'selected' : ''}}"
+                wx:for="{{poiList}}"
+                wx:key="id"
+                data-id="{{item.id}}"
+                bindtap="onPoiSelect"
+              >
                 <view
                   class="child-cover"
-                  bindtap="onFlatAudioPlay"
                   data-id="{{item.id}}"
+                  catchtap="onPoiPlay"
                 >
-                  <image class="child-cover-img" src="{{item.cover}}" mode="aspectFill"></image>
+                  <image class="child-cover-img" src="{{item.coverImage}}" mode="aspectFill"></image>
                   <view class="child-cover-overlay">
                     <image
+                      wx:if="{{item.hasAudio}}"
                       class="child-cover-play"
                       src="{{(item.playing && audioPlaying) ? '/images/poi-detail/pause.svg' : '/images/poi-detail/play.svg'}}"
                       mode="widthFix"
                     />
+                    <text wx:else class="child-cover-badge">{{item.hasVideo ? '视频' : '图片'}}</text>
                   </view>
                 </view>
-                <view class="item-text">
-                  <text class="item-title">{{item.title}}</text>
-                  <text class="item-subtitle">音频讲解</text>
+
+                <view class="item-body">
+                  <view class="item-head">
+                    <text class="item-title">{{item.displayName}}</text>
+                    <text class="item-type">{{item.typeLabel}}</text>
+                  </view>
+                  <text class="item-subtitle">{{item.mediaSummary}}</text>
+                  <text class="item-desc">{{item.description}}</text>
                 </view>
-                <text class="flat-duration">{{item.duration}}</text>
+
+                <view class="item-side">
+                  <text class="item-duration">{{item.audioDurationDisplay}}</text>
+                  <text class="item-action">{{item.hasAudio ? ((item.playing && audioPlaying) ? '暂停' : '播放') : '查看'}}</text>
+                </view>
               </view>
             </view>
           </view>
-        </view>
+        </block>
       </view>
     </view>
   </view>
 
-  <view class="audio-player">
+  <view class="audio-player" wx:if="{{currentPoi}}">
     <image class="player-bg-decor" src="/images/poi-detail/player-bg.svg" mode="scaleToFill" />
     <view class="player-content">
       <view class="player-left">
         <image class="player-cover" src="{{audioCover}}" mode="aspectFill" />
-        <view class="player-controls" bindtap="toggleAudioPlay">
+        <view class="player-controls {{!currentPoi.hasAudio ? 'disabled' : ''}}" bindtap="toggleAudioPlay">
           <image
             wx:if="{{!audioPlaying}}"
             class="player-control-icon"
@@ -157,6 +180,7 @@
 
       <view class="player-right">
         <text class="player-title">{{audioTitle}}</text>
+        <text class="player-tip">{{currentPoi.hasAudio ? currentPoi.mediaSummary : '当前景点暂无音频讲解，可查看上方图片或视频内容'}}</text>
         <view class="player-info-row">
           <text class="player-duration">音频时长 {{audioDurationDisplay}}</text>
           <text class="player-current">当前 {{audioCurrentDisplay}}</text>
@@ -171,6 +195,7 @@
             block-size="20"
             activeColor="#2cedb8"
             backgroundColor="#e5e5e5"
+            disabled="{{!currentPoi.hasAudio}}"
             bindchanging="onSliderChanging"
             bindchange="onSliderChange"
           />

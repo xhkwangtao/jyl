@@ -5860,7 +5860,7 @@ Page({
       }, () => {
         const audioPlayer = this.selectComponent('#audioPlayerGuide')
         if (!audioPlayer) {
-          navigateToPage(`${GUIDE_AUDIO_LIST_PAGE}?poiName=${encodeURIComponent(fallbackPoiName)}`)
+          navigateToPage(`${GUIDE_AUDIO_LIST_PAGE}?poiId=${encodeURIComponent(String(point.id || point.markerId || ''))}&poiName=${encodeURIComponent(fallbackPoiName)}`)
           return
         }
 
@@ -5899,7 +5899,7 @@ Page({
     }, () => {
       const audioPlayer = this.selectComponent('#audioPlayerGuide')
       if (!audioPlayer) {
-        navigateToPage(`${GUIDE_AUDIO_LIST_PAGE}?poiName=${encodeURIComponent(fallbackPoiName)}`)
+        navigateToPage(`${GUIDE_AUDIO_LIST_PAGE}?poiId=${encodeURIComponent(String(point.id || point.markerId || ''))}&poiName=${encodeURIComponent(fallbackPoiName)}`)
         return
       }
 
