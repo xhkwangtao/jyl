@@ -26,7 +26,12 @@ class Request {
       return overrideBaseUrl
     }
 
-    return normalizeBaseUrl(apiConfig.API_BASE_URL)
+    const onlineBaseUrl = normalizeBaseUrl(apiConfig.ONLINE_API_BASE_URL)
+    if (onlineBaseUrl) {
+      return onlineBaseUrl
+    }
+
+    return normalizeBaseUrl(apiConfig.API_BASE_URL || apiConfig.LOCAL_API_BASE_URL)
   }
 
   buildUrl(url = '') {

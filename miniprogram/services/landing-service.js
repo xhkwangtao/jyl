@@ -1,5 +1,7 @@
 const request = require('../utils/request')
 
+const LANDING_CONFIG_PATH = '/client/landing-pages/config'
+
 function normalizeSourceCode(value = '') {
   return String(value || '').trim().toLowerCase()
 }
@@ -40,7 +42,7 @@ class LandingService {
     }
 
     try {
-      const data = await request.get(`/client/landing-pages/config/${encodeURIComponent(normalizedSourceCode)}`, {
+      const data = await request.get(LANDING_CONFIG_PATH, {
         s: normalizedSourceCode,
         scene: normalizedSceneValue
       })
