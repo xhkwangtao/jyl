@@ -486,17 +486,19 @@ Page({
     this.entrySecretId = normalizeOptionValue(options.secretId)
     this.entryTargetHintShown = false
     this.refreshPageState()
+    this.resumePendingStudyReportPollingIfNeeded()
   },
 
   onShow() {
     this.refreshPageState()
+    this.resumePendingStudyReportPollingIfNeeded()
   },
 
   noop() {},
 
   getWorksheetEntryState() {
     const hasCachedReport = studyReportService.hasLatestReportRenderCache() || studyReportService.hasLatestPdfUrl()
-    const hasRequested = studyReportService.hasScanRequestRecord()
+    const hasRequested = studyReportService.getPendingScanRecordId() > 0
 
     return {
       hasCachedReport,
@@ -548,6 +550,151 @@ Page({
     }, () => {
       this.notifyEntryTarget(targetSecret)
     })
+  },
+
+  applyGeneratedReportResult(result = {}, options = {}) {
+    const reportRenderCache = studyReportService.getLatestReportRenderCache()
+    const warningText = Array.isArray(result?.payload?.warnings) && result.payload.warnings.length
+      ? result.payload.warnings.join('；')
+      : ''
+    const generatedReportGeneratedAtText = formatDateTimeText(result?.payload?.generated_at || '')
+    const generatedReportStudentName = String(options.studentName || reportRenderCache.studentName || '').trim()
+    const generatedReportStudentCode = String(options.studentCode || reportRenderCache.studentCode || '').trim()
+    const generatedReportPdfTitle = String(reportRenderCache.title || '').trim()
+      || '九眼楼AI研学报告'
+
+    this.setData({
+      generatedReportReady: true,
+      generatedReportStudentName,
+      generatedReportStudentCode,
+      generatedReportDescText: buildGeneratedReportDescText(generatedReportStudentName, generatedReportStudentCode),
+      generatedReportPdfTitle,
+      generatedReportPdfTempPath: '',
+      generatedReportPdfSavedPath: '',
+      generatedReportRemotePdfUrl: '',
+      generatedReportPosterTempPath: '',
+      generatedReportPosterCacheKey: '',
+      generatedReportGeneratedAtText,
+      generatedReportWarningText: warningText
+    })
+
+    this.refreshPageState()
+  },
+
+  async resumePendingStudyReportPollingIfNeeded() {
+    if (this.pendingStudyReportPollingPromise || this.data.worksheetTaskRunning) {
+      return this.pendingStudyReportPollingPromise || null
+    }
+
+    const pendingRecordId = studyReportService.getPendingScanRecordId()
+    if (!pendingRecordId) {
+      return null
+    }
+
+    if (studyReportService.hasLatestReportRenderCache()) {
+      studyReportService.clearScanRequestState()
+      return null
+    }
+
+    this.pendingStudyReportPollingPromise = this.pollPendingStudyReportJob({
+      recordId: pendingRecordId,
+      showLoading: false,
+      showSuccessToast: true
+    }).finally(() => {
+      this.pendingStudyReportPollingPromise = null
+    })
+
+    return this.pendingStudyReportPollingPromise
+  },
+
+  async pollPendingStudyReportJob({
+    recordId,
+    token: initialToken = '',
+    showLoading = false,
+    showSuccessToast = true
+  }) {
+    console.log('[study-report] start polling pending job', {
+      recordId: Number(recordId || 0),
+      showLoading,
+      showSuccessToast,
+      hasInitialToken: !!String(initialToken || '').trim()
+    })
+
+    this.setData({
+      worksheetTaskRunning: true
+    })
+
+    let currentLoadingTitle = '继续获取报告中...'
+    const showTaskLoading = (title) => {
+      const nextTitle = String(title || '').trim() || 'AI识别中...'
+
+      if (nextTitle === currentLoadingTitle) {
+        return
+      }
+
+      currentLoadingTitle = nextTitle
+      if (showLoading) {
+        wx.showLoading({
+          title: currentLoadingTitle,
+          mask: true
+        })
+      }
+    }
+
+    if (showLoading) {
+      wx.showLoading({
+        title: currentLoadingTitle,
+        mask: true
+      })
+    }
+
+    try {
+      let token = String(initialToken || '').trim()
+      if (!token) {
+        const hasLogin = await auth.checkAndAutoLogin(3000)
+        if (!hasLogin) {
+          throw new Error('登录失败，请稍后重试')
+        }
+
+        token = auth.getToken()
+      }
+
+      if (!token) {
+        throw new Error('缺少用户登录状态，请重新进入页面后再试')
+      }
+
+      const result = await studyReportService.pollStudyReportJob({
+        token,
+        recordId,
+        onProgress: (payload) => {
+          showTaskLoading(resolveStudyReportLoadingTitle(payload))
+        }
+      })
+
+      this.applyGeneratedReportResult(result)
+
+      if (showSuccessToast) {
+        wx.showToast({
+          title: '研学报告已生成',
+          icon: 'success',
+          duration: 1800
+        })
+      }
+    } catch (error) {
+      this.refreshPageState()
+      wx.showToast({
+        title: error?.message || '研学报告获取失败',
+        icon: 'none',
+        duration: 2200
+      })
+    } finally {
+      if (showLoading) {
+        wx.hideLoading()
+      }
+      this.setData({
+        worksheetTaskRunning: false
+      })
+    }
   },
 
   buildGeneratedReportCardState() {
@@ -830,34 +977,36 @@ Page({
         studentName: worksheetStudentName,
         studentCode: worksheetStudentCode,
         studyDate: buildStudyDateText(),
+        deferPollingOnPending: true,
         onProgress: (payload) => {
           showTaskLoading(resolveStudyReportLoadingTitle(payload))
         }
       })
 
-      const warningText = Array.isArray(result?.payload?.warnings) && result.payload.warnings.length
-        ? result.payload.warnings.join('；')
-        : ''
-      const generatedReportGeneratedAtText = formatDateTimeText(result?.payload?.generated_at || '')
-      const generatedReportPdfTitle = String(studyReportService.getLatestReportRenderCache().title || '').trim()
-        || '九眼楼AI研学报告'
+      if (result?.pending) {
+        this.refreshPageState()
 
-      this.setData({
-        generatedReportReady: true,
-        generatedReportStudentName: worksheetStudentName,
-        generatedReportStudentCode: worksheetStudentCode,
-        generatedReportDescText: buildGeneratedReportDescText(worksheetStudentName, worksheetStudentCode),
-        generatedReportPdfTitle: generatedReportPdfTitle,
-        generatedReportPdfTempPath: '',
-        generatedReportPdfSavedPath: '',
-        generatedReportRemotePdfUrl: '',
-        generatedReportPosterTempPath: '',
-        generatedReportPosterCacheKey: '',
-        generatedReportGeneratedAtText,
-        generatedReportWarningText: warningText
+        this.pendingStudyReportPollingPromise = this.pollPendingStudyReportJob({
+          recordId: Number(result.recordId || studyReportService.getPendingScanRecordId() || 0),
+          token,
+          showLoading: false,
+          showSuccessToast: true
+        }).finally(() => {
+          this.pendingStudyReportPollingPromise = null
+        })
+
+        wx.showToast({
+          title: '报告生成中，请稍后查看',
+          icon: 'none',
+          duration: 2200
+        })
+        return
+      }
+
+      this.applyGeneratedReportResult(result, {
+        studentName: worksheetStudentName,
+        studentCode: worksheetStudentCode
       })
-
-      this.refreshPageState()
 
       wx.showToast({
         title: '研学报告已生成',
@@ -873,9 +1022,11 @@ Page({
       })
     } finally {
       wx.hideLoading()
-      this.setData({
-        worksheetTaskRunning: false
-      })
+      if (!this.pendingStudyReportPollingPromise) {
+        this.setData({
+          worksheetTaskRunning: false
+        })
+      }
     }
   },
 

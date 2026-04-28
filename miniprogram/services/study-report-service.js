@@ -284,6 +284,7 @@ class StudyReportService {
 
     if (reportRenderCachePayload.hasContent) {
       wx.setStorageSync(LATEST_STUDY_REPORT_RENDER_CACHE_STORAGE_KEY, reportRenderCachePayload)
+      this.clearScanRequestState()
     } else {
       this.clearLatestReportRenderCache()
     }
@@ -404,6 +405,18 @@ class StudyReportService {
     return !!this.getScanRequestState().requested
   }
 
+  getPendingScanRecordId() {
+    const scanRequestState = this.getScanRequestState()
+    const recordId = Number(scanRequestState.recordId || 0)
+    return Number.isFinite(recordId) && recordId > 0 ? recordId : 0
+  }
+
+  clearScanRequestState() {
+    try {
+      wx.removeStorageSync(STUDY_REPORT_SCAN_REQUEST_STORAGE_KEY)
+    } catch (error) {}
+  }
+
   requestStudyReportJob({ token, recordId }) {
     return new Promise((resolve, reject) => {
       wx.request({
@@ -444,6 +457,11 @@ class StudyReportService {
     if (!Number.isFinite(normalizedRecordId) || normalizedRecordId <= 0) {
       throw new Error('接口未返回有效的任务记录 ID')
     }
+
+    this.persistScanRequestState({
+      requested: true,
+      recordId: normalizedRecordId
+    })
 
     const deadlineAt = Date.now() + Math.max(Number(timeoutMs) || 0, 10000)
 
@@ -646,6 +664,7 @@ class StudyReportService {
     studentCode,
     studyDate,
     durationMinutes,
+    deferPollingOnPending = false,
     pollIntervalMs,
     pollTimeoutMs,
     onProgress
@@ -684,6 +703,16 @@ class StudyReportService {
 
     if (submitStatus === 'failed') {
       throw new Error(extractErrorMessage(submitPayload?.last_error || submitPayload, '研学报告生成失败'))
+    }
+
+    if (deferPollingOnPending) {
+      return {
+        payload: submitPayload,
+        cachePayload: null,
+        pdfDescriptor: extractPdfDescriptor(submitPayload || {}),
+        pending: true,
+        recordId: submitRecordId
+      }
     }
 
     return this.pollStudyReportJob({

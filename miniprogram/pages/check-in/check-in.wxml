@@ -186,7 +186,7 @@
     </view>
   </view>
 
-  <view class="worksheet-dialog-mask" wx:if="{{showWorksheetDialog}}" catchtouchmove="noop">
+  <view class="worksheet-dialog-mask" wx:if="{{showWorksheetDialog}}">
     <view class="worksheet-dialog" catchtap="noop">
       <text class="worksheet-dialog-title">扫描答题卡</text>
       <text class="worksheet-dialog-desc">请先填写学员编号和姓名，随后将直接打开摄像头拍摄答题卡。</text>
