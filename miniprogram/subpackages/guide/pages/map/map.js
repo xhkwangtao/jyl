@@ -1588,12 +1588,71 @@ function buildNavigationGuidePoints(route, targetPoint = null) {
   }).filter(Boolean).sort((left, right) => left.closestPathIndex - right.closestPathIndex)
 }
 
-function buildDefaultPolylineData() {
-  return DISPLAY_ROUTE_POLYLINES.map((polyline) => clonePolyline(polyline))
+function collectFilteredRouteSourcePathIndexes(filterType = 'all') {
+  const safeFilterType = normalizePoiFilter(filterType) || 'all'
+  if (safeFilterType === 'all') {
+    return null
+  }
+
+  const filteredPoints = getFilteredDisplayPoints(safeFilterType)
+  if (!filteredPoints.length) {
+    return new Set()
+  }
+
+  const entryPoint = decoratePointWithRouteMeta(DEFAULT_ENTRY_POINT) || filteredPoints[0]
+  const routeSourcePathIndexSet = new Set()
+
+  filteredPoints.forEach((point) => {
+    const safePoint = Array.isArray(point?.routePathIndexes) ? point : decoratePointWithRouteMeta(point)
+    let pathIndexes = []
+
+    if (entryPoint && isValidCoordinatePoint(entryPoint) && isValidCoordinatePoint(safePoint)) {
+      pathIndexes = findPolylinePathIndexes(SOURCE_ROUTE_POLYLINES, entryPoint, safePoint)
+    }
+
+    if (!pathIndexes.length && Array.isArray(safePoint?.routePathIndexes)) {
+      pathIndexes = safePoint.routePathIndexes
+    }
+
+    pathIndexes.forEach((index) => {
+      if (Number.isInteger(index)) {
+        routeSourcePathIndexSet.add(index)
+      }
+    })
+  })
+
+  return routeSourcePathIndexSet
 }
 
-function buildPlanningBasePolylines() {
-  return DISPLAY_ROUTE_POLYLINES.map((polyline, index) => ({
+function getDisplayRoutePolylinesByFilter(filterType = 'all') {
+  const safeFilterType = normalizePoiFilter(filterType) || 'all'
+  if (safeFilterType === 'all') {
+    return DISPLAY_ROUTE_POLYLINES
+  }
+
+  const filteredPoints = getFilteredDisplayPoints(safeFilterType)
+  const routeSourcePathIndexSet = collectFilteredRouteSourcePathIndexes(safeFilterType)
+  if (!(routeSourcePathIndexSet instanceof Set) || !routeSourcePathIndexSet.size) {
+    return []
+  }
+
+  const filteredSourcePolylines = SOURCE_ROUTE_POLYLINES.filter((polyline, index) => (
+    routeSourcePathIndexSet.has(getPolylineSourceIndex(polyline, index))
+  ))
+
+  if (!filteredSourcePolylines.length) {
+    return []
+  }
+
+  return buildDisplayRoutePolylines(filteredSourcePolylines, filteredPoints)
+}
+
+function buildDefaultPolylineData(filterType = 'all') {
+  return getDisplayRoutePolylinesByFilter(filterType).map((polyline) => clonePolyline(polyline))
+}
+
+function buildPlanningBasePolylines(filterType = 'all') {
+  return getDisplayRoutePolylinesByFilter(filterType).map((polyline, index) => ({
     points: polyline.points,
     color: ORIGINAL_ROUTE_DIM_COLOR,
     width: index === 0 ? ORIGINAL_ROUTE_PRIMARY_WIDTH : ORIGINAL_ROUTE_SECONDARY_WIDTH
@@ -1617,13 +1676,13 @@ function buildPlannedRoutePolylines(route) {
   }))
 }
 
-function buildMapPolylines(selectedRoute = null) {
+function buildMapPolylines(selectedRoute = null, filterType = 'all') {
   if (!selectedRoute) {
-    return buildDefaultPolylineData()
+    return buildDefaultPolylineData(filterType)
   }
 
   return [
-    ...buildPlanningBasePolylines(),
+    ...buildPlanningBasePolylines(filterType),
     ...buildPlannedRoutePolylines(selectedRoute)
   ]
 }
@@ -3268,7 +3327,7 @@ Page({
       }),
       allMarkers: this.buildVisibleMarkers(currentFilter, null),
       markers: [],
-      polylineData: buildMapPolylines(),
+      polylineData: buildMapPolylines(null, currentFilter),
       currentAudioPoi: currentPoint,
       audioPoiList: ALL_AUDIO_POI_POINTS,
       plannerRoutes: INTELLIGENT_ROUTE_CARD_OPTIONS,
@@ -5630,6 +5689,7 @@ Page({
       selectedPointId: nextSelectedPointId,
       currentAudioPoi: nextAudioPoi,
       allMarkers: this.buildVisibleMarkers(safeFilterType, nextSelectedPointId, this.selectedIntelligentRoute),
+      polylineData: buildMapPolylines(this.selectedIntelligentRoute, safeFilterType),
       showPoiPopup: closePopup ? false : this.data.showPoiPopup,
       currentPopupData: closePopup ? null : this.data.currentPopupData,
       showAudioListDrawer: closeAudioListDrawer ? false : this.data.showAudioListDrawer
