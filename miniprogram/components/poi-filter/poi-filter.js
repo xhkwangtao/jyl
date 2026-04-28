@@ -13,21 +13,21 @@ Component({
   data: {
     selectedFilter: 'all',
     allSpotsText: '全部景点',
-    photoSpotText: '网红拍照',
-    explorationText: '探索任务',
-    facilityText: '公共设施',
+    scenicText: '景点',
+    junctionText: '路口',
+    serviceText: '服务点',
     filterTypes: {
       all: {
         name: '全部景点'
       },
-      photo_spot: {
-        name: '网红拍照'
+      scenic: {
+        name: '景点'
       },
-      exploration: {
-        name: '探索任务'
+      junction: {
+        name: '路口'
       },
-      facility: {
-        name: '公共设施'
+      service: {
+        name: '服务点'
       }
     }
   },

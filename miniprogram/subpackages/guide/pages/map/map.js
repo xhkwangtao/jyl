@@ -1674,13 +1674,15 @@ function createDisplayPoint(point, index) {
 }
 
 function matchesPoiFilter(point, filterType) {
+  const pointType = String(point?.type || '').trim().toLowerCase()
+
   switch (filterType) {
-    case 'photo_spot':
-      return point.type === 'scenic'
-    case 'exploration':
-      return point.type === 'junction'
-    case 'facility':
-      return point.type === 'service'
+    case 'scenic':
+      return ['scenic', 'guide'].includes(pointType)
+    case 'junction':
+      return pointType === 'junction'
+    case 'service':
+      return ['service', 'start', 'end'].includes(pointType)
     default:
       return true
   }
@@ -1696,20 +1698,27 @@ function normalizePoiFilter(filterType) {
     all: 'all',
     全部: 'all',
     全部景点: 'all',
-    photo_spot: 'photo_spot',
-    photospot: 'photo_spot',
-    photo: 'photo_spot',
-    scenic: 'photo_spot',
-    网红拍照: 'photo_spot',
-    拍照: 'photo_spot',
-    exploration: 'exploration',
-    explore: 'exploration',
-    探索: 'exploration',
-    探索任务: 'exploration',
-    facility: 'facility',
-    service: 'facility',
-    公共设施: 'facility',
-    设施: 'facility'
+    scenic: 'scenic',
+    spot: 'scenic',
+    景点: 'scenic',
+    景观点: 'scenic',
+    photo_spot: 'scenic',
+    photospot: 'scenic',
+    photo: 'scenic',
+    网红拍照: 'scenic',
+    拍照: 'scenic',
+    junction: 'junction',
+    crossing: 'junction',
+    路口: 'junction',
+    exploration: 'junction',
+    explore: 'junction',
+    探索: 'junction',
+    探索任务: 'junction',
+    service: 'service',
+    服务点: 'service',
+    facility: 'service',
+    公共设施: 'service',
+    设施: 'service'
   }
 
   return filterAliasMap[normalizedValue] || ''
@@ -1955,20 +1964,17 @@ function buildPoiDataSourceState(source = 'local', options = {}) {
 }
 
 function getPointTypeLabel(point) {
-  switch (point?.type) {
-    case 'start':
-    case 'end':
-      return '入口点'
-    case 'junction':
-      return '路线点'
-    case 'guide':
-      return '导览点'
-    case 'service':
-      return '服务点'
-    case 'scenic':
-    default:
-      return '景观点'
+  const pointType = String(point?.type || '').trim().toLowerCase()
+
+  if (pointType === 'junction') {
+    return '路口'
   }
+
+  if (['service', 'start', 'end'].includes(pointType)) {
+    return '服务点'
+  }
+
+  return '景点'
 }
 
 function buildPopupPrimaryMetric(point) {

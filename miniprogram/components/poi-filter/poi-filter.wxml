@@ -1,22 +1,22 @@
-<!-- POI筛选器组件 - 简化为三类 -->
+<!-- POI筛选器组件 -->
 <view class="poi-filter-container" wx:if="{{visible}}">
   <view class="filter-item {{selectedFilter === 'all' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="all">
     <view class="filter-background"></view>
     <text class="filter-text">{{allSpotsText}}</text>
   </view>
   
-  <view class="filter-item {{selectedFilter === 'photo_spot' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="photo_spot">
+  <view class="filter-item {{selectedFilter === 'scenic' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="scenic">
     <view class="filter-background"></view>
-    <text class="filter-text">{{photoSpotText}}</text>
+    <text class="filter-text">{{scenicText}}</text>
   </view>
   
-  <view class="filter-item {{selectedFilter === 'exploration' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="exploration">
+  <view class="filter-item {{selectedFilter === 'junction' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="junction">
     <view class="filter-background"></view>
-    <text class="filter-text">{{explorationText}}</text>
+    <text class="filter-text">{{junctionText}}</text>
   </view>
   
-  <view class="filter-item {{selectedFilter === 'facility' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="facility">
+  <view class="filter-item {{selectedFilter === 'service' ? 'active' : ''}}" bind:tap="onFilterTap" data-filter="service">
     <view class="filter-background"></view>
-    <text class="filter-text">{{facilityText}}</text>
+    <text class="filter-text">{{serviceText}}</text>
   </view>
 </view>
