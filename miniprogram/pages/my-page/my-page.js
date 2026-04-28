@@ -4,10 +4,40 @@ const {
 const {
   buildAiOfficerState
 } = require('../../utils/ai-officer')
+const studyReportService = require('../../services/study-report-service')
 
 const PAGE_STYLE = 'background: #f6f1e8;'
 const UNLOCK_ANIMATION_DURATION_MS = 1800
 const SECRET_REVEALED_STORAGE_KEY = 'jyl_secret_revealed_ids'
+const REPORT_FILLED_CELL_SECRET_MAPPING = [
+  { filledCellCode: '11', secretId: 'poi-02', themeName: '工匠', symbolName: '九边十一镇' },
+  { filledCellCode: '12', secretId: 'poi-11', themeName: '军防', symbolName: '大炮' },
+  { filledCellCode: '13', secretId: 'poi-08', themeName: '军防', symbolName: '战鼓' },
+  { filledCellCode: '14', secretId: 'secret-point-08', themeName: '生态', symbolName: '柏叶' },
+  { filledCellCode: '15', secretId: 'secret-point-10', themeName: '工匠', symbolName: '火焰广场' },
+  { filledCellCode: '16', secretId: 'poi-06', themeName: '工匠', symbolName: '石料小景' },
+  { filledCellCode: '17', secretId: 'secret-point-17', themeName: '文化', symbolName: '碑帖' },
+  { filledCellCode: '21', secretId: 'poi-12', themeName: '工匠', symbolName: '毛驴' },
+  { filledCellCode: '22', secretId: 'secret-point-14', themeName: '文化', symbolName: '诗词' },
+  { filledCellCode: '23', secretId: 'poi-16', themeName: '生态', symbolName: '平衡' },
+  { filledCellCode: '24', secretId: 'secret-point-18', themeName: '生态', symbolName: '角度' },
+  { filledCellCode: '25', secretId: 'poi-17', themeName: '军防', symbolName: '营房' },
+  { filledCellCode: '26', secretId: 'secret-point-23', themeName: '军防', symbolName: '堡垒' },
+  { filledCellCode: '27', secretId: 'poi-20', themeName: '军防', symbolName: '烽火台' },
+  { filledCellCode: '31', secretId: 'poi-22', themeName: '军防', symbolName: '敌楼' },
+  { filledCellCode: '32', secretId: 'poi-23', themeName: '文化', symbolName: '碑刻' },
+  { filledCellCode: '33', secretId: 'secret-point-27', themeName: '生态', symbolName: '熊掌' },
+  { filledCellCode: '34', secretId: 'secret-point-28', themeName: '生态', symbolName: '矿产' },
+  { filledCellCode: '35', secretId: 'secret-point-29', themeName: '生态', symbolName: '保护区' }
+]
+const REPORT_FILLED_CELL_META_BY_SECRET_ID = REPORT_FILLED_CELL_SECRET_MAPPING.reduce((accumulator, item) => {
+  accumulator[item.secretId] = item
+  return accumulator
+}, {})
+const REPORT_FILLED_CELL_SECRET_ID_BY_CODE = REPORT_FILLED_CELL_SECRET_MAPPING.reduce((accumulator, item) => {
+  accumulator[item.filledCellCode] = item.secretId
+  return accumulator
+}, {})
 
 function getLayoutMetrics() {
   try {
@@ -95,6 +125,112 @@ function saveRevealedSecretIdSet(revealedIdSet = new Set()) {
   } catch (error) {}
 }
 
+function normalizeFilledCellCode(value) {
+  return String(value === undefined || value === null ? '' : value).trim()
+}
+
+function buildReportFilledSecretIdSet(filledCellList = []) {
+  const secretIdSet = new Set()
+
+  ;(filledCellList || []).forEach((filledCellCode) => {
+    const normalizedFilledCellCode = normalizeFilledCellCode(filledCellCode)
+    const secretId = REPORT_FILLED_CELL_SECRET_ID_BY_CODE[normalizedFilledCellCode]
+
+    if (secretId) {
+      secretIdSet.add(secretId)
+    }
+  })
+
+  return secretIdSet
+}
+
+function buildReportDrivenSecretList(secretList = [], filledCellList = []) {
+  const reportFilledSecretIdSet = buildReportFilledSecretIdSet(filledCellList)
+  const hasReportFilledCells = reportFilledSecretIdSet.size > 0
+  const secretItemMap = new Map(
+    (secretList || []).map((item) => [String(item?.id || ''), item])
+  )
+  const orderedSecretList = []
+
+  REPORT_FILLED_CELL_SECRET_MAPPING.forEach((reportMeta) => {
+    const sourceItem = secretItemMap.get(reportMeta.secretId)
+
+    if (!sourceItem) {
+      return
+    }
+
+    secretItemMap.delete(reportMeta.secretId)
+
+    const collected = hasReportFilledCells
+      ? reportFilledSecretIdSet.has(reportMeta.secretId)
+      : !!sourceItem.collected
+    const patternLabel = `${reportMeta.themeName}暗号`
+    const collectionHint = hasReportFilledCells
+      ? (
+        collected
+          ? `${reportMeta.themeName} · ${reportMeta.symbolName} 已收入你的研学档案`
+          : `答题卡识别 ${reportMeta.themeName} · ${reportMeta.symbolName} 后将在这里点亮`
+      )
+      : sourceItem.collectionHint
+
+    orderedSecretList.push({
+      ...sourceItem,
+      collected,
+      statusText: collected ? '已收集' : '未收集',
+      iconDisplayPath: collected ? sourceItem.iconDarkPath : sourceItem.iconGrayPath,
+      themeTag: reportMeta.themeName,
+      categoryName: patternLabel,
+      patternLabel,
+      secretName: reportMeta.symbolName,
+      secretIndexText: reportMeta.filledCellCode,
+      timeText: hasReportFilledCells
+        ? (collected ? '已同步答题卡图谱' : '答题卡识别后点亮')
+        : sourceItem.timeText,
+      collectionHint,
+      reportFilledCellCode: reportMeta.filledCellCode
+    })
+  })
+
+  return orderedSecretList.concat(Array.from(secretItemMap.values()))
+}
+
+function buildThemeSummaryList(secretList = []) {
+  const themeOrder = ['工匠', '军防', '文化', '生态']
+
+  return themeOrder.map((themeName) => {
+    const itemList = (secretList || []).filter((item) => String(item.themeTag || '').trim() === themeName)
+    const collectedCount = itemList.filter((item) => item?.collected).length
+
+    return {
+      themeName,
+      totalCount: itemList.length,
+      collectedCount,
+      pendingCount: Math.max(itemList.length - collectedCount, 0)
+    }
+  }).filter((item) => item.totalCount > 0)
+}
+
+function buildHeroCopy(totalCount, collectedCount) {
+  if (collectedCount <= 0) {
+    return {
+      heroTitle: `开始收集 ${totalCount} 枚研学暗号`,
+      heroDesc: '答题卡识别后，这里会按研学报告中的暗号图谱点亮对应图案。'
+    }
+  }
+
+  if (collectedCount >= totalCount) {
+    return {
+      heroTitle: '全部暗号图案已收齐',
+      heroDesc: '当前答题卡中的暗号图谱已经完整点亮，可以继续查看本次研学成果。'
+    }
+  }
+
+  return {
+    heroTitle: `已收集 ${collectedCount} / ${totalCount} 枚暗号`,
+    heroDesc: '答题卡识别后，这里会同步展示已经点亮的暗号图谱。'
+  }
+}
+
 function decorateSecretWallList(secretList = [], options = {}) {
   const pendingRevealIdSet = options.pendingRevealIdSet instanceof Set
     ? options.pendingRevealIdSet
@@ -148,9 +284,13 @@ Page({
     aiOfficerScoreRuleText: '',
     totalCount: 0,
     collectedCount: 0,
+    displayCollectedCount: 0,
     pendingCount: 0,
+    displayPendingCount: 0,
     progressPercent: 0,
     progressPercentText: '0%',
+    displayProgressPercent: 0,
+    displayProgressPercentText: '0%',
     reportUnlocked: false,
     reportStatusText: '待解锁',
     reportTitle: '',
@@ -189,7 +329,17 @@ Page({
 
   refreshSecretState() {
     const collectionState = buildSecretCollectionState()
-    const currentCollectedSecretIdSet = buildSecretCollectionIdSet(collectionState.secretList)
+    const reportFilledCellList = studyReportService.getLatestFilledCells()
+    const reportDrivenSecretList = buildReportDrivenSecretList(collectionState.secretList, reportFilledCellList)
+    const displayCollectedCount = studyReportService.getLatestMatchedCount({
+      totalCount: collectionState.totalCount,
+      fallbackCount: collectionState.collectedCount
+    })
+    const displayPendingCount = Math.max(collectionState.totalCount - displayCollectedCount, 0)
+    const displayProgressPercent = collectionState.totalCount
+      ? Math.round((displayCollectedCount / collectionState.totalCount) * 100)
+      : 0
+    const currentCollectedSecretIdSet = buildSecretCollectionIdSet(reportDrivenSecretList)
     const nextRevealedSecretIdSet = new Set()
     const nextPendingUnlockAnimationSecretIdSet = new Set()
 
@@ -206,9 +356,11 @@ Page({
     this.pendingUnlockAnimationSecretIdSet = nextPendingUnlockAnimationSecretIdSet
     saveRevealedSecretIdSet(this.revealedSecretIdSet)
 
-    const nextSecretList = decorateSecretWallList(collectionState.secretList, {
+    const nextSecretList = decorateSecretWallList(reportDrivenSecretList, {
       pendingRevealIdSet: this.pendingUnlockAnimationSecretIdSet
     })
+    const heroCopy = buildHeroCopy(collectionState.totalCount, displayCollectedCount)
+    const reportUnlocked = collectionState.reportUnlocked || displayCollectedCount >= collectionState.totalCount
 
     if (this.unlockAnimationTimer) {
       clearTimeout(this.unlockAnimationTimer)
@@ -218,8 +370,17 @@ Page({
     this.setData({
       userNickname: getUserNickname(),
       ...collectionState,
+      ...heroCopy,
+      displayCollectedCount,
+      displayPendingCount,
+      displayProgressPercent,
+      displayProgressPercentText: `${displayProgressPercent}%`,
+      reportUnlocked,
+      themeSummaryList: buildThemeSummaryList(reportDrivenSecretList),
       secretList: nextSecretList,
-      ...buildAiOfficerState(collectionState.secretList)
+      collectedSecretList: reportDrivenSecretList.filter((item) => item.collected),
+      pendingSecretList: reportDrivenSecretList.filter((item) => !item.collected),
+      ...buildAiOfficerState(reportDrivenSecretList)
     })
   },
 

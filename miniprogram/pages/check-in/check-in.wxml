@@ -29,13 +29,13 @@
       <view class="hero-progress-row">
         <view class="hero-progress-copy">
           <text class="hero-progress-label">当前已收集</text>
-          <text class="hero-progress-value">{{collectedCount}} / {{totalCount}}</text>
+          <text class="hero-progress-value">{{displayCollectedCount}} / {{totalCount}}</text>
         </view>
-        <text class="hero-progress-percent">{{progressPercentText}}</text>
+        <text class="hero-progress-percent">{{displayProgressPercentText}}</text>
       </view>
 
       <view class="progress-track">
-        <view class="progress-fill" style="width: {{progressPercent}}%;"></view>
+        <view class="progress-fill" style="width: {{displayProgressPercent}}%;"></view>
       </view>
 
       <view class="stats-grid">
@@ -45,11 +45,11 @@
         </view>
         <view class="stat-card stat-card-checked">
           <text class="stat-label">已收集</text>
-          <text class="stat-value">{{collectedCount}}</text>
+          <text class="stat-value">{{displayCollectedCount}}</text>
         </view>
         <view class="stat-card">
           <text class="stat-label">未收集</text>
-          <text class="stat-value">{{pendingCount}}</text>
+          <text class="stat-value">{{displayPendingCount}}</text>
         </view>
       </view>
 

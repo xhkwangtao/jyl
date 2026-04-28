@@ -15,6 +15,7 @@ const {
   GUIDE_AUDIO_LIST_PAGE,
   GUIDE_SUBSCRIBE_PAGE
 } = require('../../utils/guide-routes')
+const studyReportService = require('../../services/study-report-service')
 
 const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
 const AI_CHAT_PAYMENT_FEATURE_KEY = 'ai.chat.send-message'
@@ -33,11 +34,13 @@ Page({
     checkInDescription: '暗号点已整理完成\n到景点扫码后可逐个解锁图案',
     checkInAction: '去收集',
     checkInTotalCount: 19,
-    checkInCompletedCount: 0
+    checkInCompletedCount: 0,
+    checkInDisplayCompletedCount: 0
   },
 
   onLoad(options = {}) {
     this.pendingLandingRedirect = false
+    this.syncingLatestStudyReport = false
 
     if (this.handleLandingRedirect(options)) {
       return
@@ -57,18 +60,28 @@ Page({
       isLoggingIn: true
     })
 
-    this.silentLogin().finally(() => {
-      this.setData({
-        isLoggingIn: false
-      }, () => {
-        if (!this.pendingAIChatNavigation) {
+    this.silentLogin()
+      .then((hasLogin) => {
+        if (!hasLogin) {
           return
         }
 
-        this.pendingAIChatNavigation = false
-        this.navigateToAIChat()
+        return this.syncLatestStudyReport().then(() => {
+          this.syncCheckInEntry()
+        })
       })
-    })
+      .finally(() => {
+        this.setData({
+          isLoggingIn: false
+        }, () => {
+          if (!this.pendingAIChatNavigation) {
+            return
+          }
+
+          this.pendingAIChatNavigation = false
+          this.navigateToAIChat()
+        })
+      })
   },
 
   onUnload() {
@@ -316,10 +329,40 @@ Page({
     }
   },
 
+  async syncLatestStudyReport() {
+    if (this.syncingLatestStudyReport) {
+      return
+    }
+
+    const token = auth.getToken()
+
+    if (!token) {
+      return
+    }
+
+    this.syncingLatestStudyReport = true
+
+    try {
+      await studyReportService.getLatestReport({
+        token
+      })
+    } catch (error) {
+      if (Number(error?.statusCode) === 404) {
+        studyReportService.clearLatestReportCache()
+      }
+    } finally {
+      this.syncingLatestStudyReport = false
+    }
+  },
+
   syncCheckInEntry() {
     const collectionState = buildSecretCollectionState()
     const totalCount = collectionState.totalCount
     const completedCount = collectionState.collectedCount
+    const displayCompletedCount = studyReportService.getLatestMatchedCount({
+      totalCount,
+      fallbackCount: completedCount
+    })
 
     let checkInDescription = `${totalCount}枚暗号等待收集\n到指定景点扫码后解锁研学报告`
     let checkInAction = '去收集'
@@ -336,7 +379,8 @@ Page({
       checkInDescription,
       checkInAction,
       checkInTotalCount: totalCount,
-      checkInCompletedCount: completedCount
+      checkInCompletedCount: completedCount,
+      checkInDisplayCompletedCount: displayCompletedCount
     })
   },
 

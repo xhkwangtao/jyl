@@ -68,13 +68,13 @@
       <view class="hero-progress-row">
         <view class="hero-progress-copy">
           <text class="hero-progress-label">{{userNickname}} 的暗号收集进度</text>
-          <text class="hero-progress-value">{{collectedCount}} / {{totalCount}}</text>
+          <text class="hero-progress-value">{{displayCollectedCount}} / {{totalCount}}</text>
         </view>
-        <text class="hero-progress-percent">{{progressPercentText}}</text>
+        <text class="hero-progress-percent">{{displayProgressPercentText}}</text>
       </view>
 
       <view class="progress-track">
-        <view class="progress-fill" style="width: {{progressPercent}}%;"></view>
+        <view class="progress-fill" style="width: {{displayProgressPercent}}%;"></view>
       </view>
     </view>
 
@@ -83,7 +83,7 @@
         <text class="section-title">暗号图谱</text>
         <text class="section-caption">未解锁时不显示图谱；新解锁的暗号会先出现锁定提示，点击后才正式解锁展示。只有 19 枚暗号全部点亮后，才可领取研学报告。</text>
       </view>
-      <text class="section-right">{{collectedCount}} / {{totalCount}}</text>
+      <text class="section-right">{{displayCollectedCount}} / {{totalCount}}</text>
     </view>
 
     <view class="theme-summary-grid">

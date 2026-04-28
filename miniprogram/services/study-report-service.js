@@ -5,6 +5,8 @@ const {
 } = require('../utils/api-config')
 
 const STUDY_REPORT_GENERATE_PATH = '/client/study-reports/generate'
+const STUDY_REPORT_LATEST_PATH = '/client/study-reports/latest'
+const LATEST_STUDY_REPORT_STORAGE_KEY = 'latestStudyReport'
 
 function getStorageValue(key) {
   try {
@@ -55,6 +57,39 @@ function extractErrorMessage(payload, fallbackMessage) {
   }
 
   return fallbackMessage
+}
+
+function buildRequestError(statusCode, payload, fallbackMessage) {
+  const error = new Error(extractErrorMessage(payload, fallbackMessage))
+  error.statusCode = Number(statusCode) || 0
+  error.payload = payload
+  return error
+}
+
+function normalizeCount(value, fallbackValue = 0, maxValue = Number.POSITIVE_INFINITY) {
+  const normalizedFallbackValue = Number.isFinite(Number(fallbackValue))
+    ? Math.max(Math.floor(Number(fallbackValue)), 0)
+    : 0
+  const normalizedMaxValue = Number.isFinite(Number(maxValue))
+    ? Math.max(Math.floor(Number(maxValue)), 0)
+    : Number.POSITIVE_INFINITY
+  const numericValue = Number(value)
+
+  if (!Number.isFinite(numericValue)) {
+    return Math.min(normalizedFallbackValue, normalizedMaxValue)
+  }
+
+  return Math.min(Math.max(Math.floor(numericValue), 0), normalizedMaxValue)
+}
+
+function normalizeIdList(value) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => String(item === undefined || item === null ? '' : item).trim())
+    .filter(Boolean)
 }
 
 function normalizePdfUrl(url = '') {
@@ -124,6 +159,121 @@ function extractPdfDescriptor(payload = {}) {
 }
 
 class StudyReportService {
+  extractMatchedCount(payload = {}, options = {}) {
+    const normalizedPayload = payload && typeof payload === 'object' ? payload : {}
+    const candidateValue = normalizedPayload.report?.hidden_symbol_summary?.matched_count
+      ?? normalizedPayload.hidden_symbol_summary?.matched_count
+      ?? normalizedPayload.report?.matched_count
+      ?? normalizedPayload.matched_count
+
+    return normalizeCount(candidateValue, options.fallbackCount, options.totalCount)
+  }
+
+  extractFilledCells(payload = {}) {
+    const normalizedPayload = payload && typeof payload === 'object' ? payload : {}
+    const candidateList = normalizedPayload.report?.hidden_symbol_summary?.filled_cells
+      ?? normalizedPayload.hidden_symbol_summary?.filled_cells
+      ?? normalizedPayload.report?.filled_cells
+      ?? normalizedPayload.filled_cells
+
+    return normalizeIdList(candidateList)
+  }
+
+  persistLatestReport(payload = {}) {
+    const normalizedPayload = payload && typeof payload === 'object' ? payload : {}
+    const report = normalizedPayload.report && typeof normalizedPayload.report === 'object'
+      ? normalizedPayload.report
+      : {}
+
+    const cachePayload = {
+      payload: normalizedPayload,
+      cachedAt: Date.now(),
+      recordId: Number(normalizedPayload.record_id || 0) || 0,
+      worksheetImageUrl: String(normalizedPayload.worksheet_image_url || '').trim(),
+      pdfUrl: normalizePdfUrl(normalizedPayload.pdf_url || normalizedPayload.report?.pdf_url || ''),
+      studentName: String(report.student_name || '').trim(),
+      studentCode: String(report.student_code || '').trim(),
+      studyDate: String(report.study_date || '').trim()
+    }
+
+    wx.setStorageSync(LATEST_STUDY_REPORT_STORAGE_KEY, cachePayload)
+    return cachePayload
+  }
+
+  getLatestReportCache() {
+    try {
+      return wx.getStorageSync(LATEST_STUDY_REPORT_STORAGE_KEY) || null
+    } catch (error) {
+      return null
+    }
+  }
+
+  clearLatestReportCache() {
+    try {
+      wx.removeStorageSync(LATEST_STUDY_REPORT_STORAGE_KEY)
+    } catch (error) {}
+  }
+
+  getLatestMatchedCount(options = {}) {
+    const cachePayload = this.getLatestReportCache()
+    const payload = cachePayload?.payload && typeof cachePayload.payload === 'object'
+      ? cachePayload.payload
+      : null
+
+    if (!payload) {
+      return normalizeCount(options.fallbackCount, options.fallbackCount, options.totalCount)
+    }
+
+    return this.extractMatchedCount(payload, options)
+  }
+
+  getLatestFilledCells() {
+    const cachePayload = this.getLatestReportCache()
+    const payload = cachePayload?.payload && typeof cachePayload.payload === 'object'
+      ? cachePayload.payload
+      : null
+
+    if (!payload) {
+      return []
+    }
+
+    return this.extractFilledCells(payload)
+  }
+
+  async getLatestReport({ token } = {}) {
+    return new Promise((resolve, reject) => {
+      wx.request({
+        url: buildUrl(STUDY_REPORT_LATEST_PATH),
+        method: 'GET',
+        timeout: 15000,
+        header: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: token ? `Bearer ${token}` : ''
+        },
+        success: (res) => {
+          const payload = res.data
+
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            reject(buildRequestError(payload?.statusCode || res.statusCode, payload, `研学报告查询失败 (${res.statusCode})`))
+            return
+          }
+
+          const cachePayload = this.persistLatestReport(payload)
+
+          resolve({
+            payload,
+            cachePayload,
+            pdfDescriptor: extractPdfDescriptor(payload || {})
+          })
+        },
+        fail: (error) => {
+          reject(new Error(error?.errMsg || '研学报告查询失败'))
+        }
+      })
+    })
+  }
+
   async generateReport({
     token,
     filePath,
@@ -170,12 +320,17 @@ class StudyReportService {
           const payload = parsedPayload || res.data
 
           if (res.statusCode < 200 || res.statusCode >= 300) {
-            reject(new Error(extractErrorMessage(payload, `研学报告生成失败 (${res.statusCode})`)))
+            reject(buildRequestError(payload?.statusCode || res.statusCode, payload, `研学报告生成失败 (${res.statusCode})`))
             return
           }
 
+          const cachePayload = parsedPayload && typeof parsedPayload === 'object'
+            ? this.persistLatestReport(parsedPayload)
+            : null
+
           resolve({
             payload,
+            cachePayload,
             pdfDescriptor: extractPdfDescriptor(parsedPayload || {})
           })
         },

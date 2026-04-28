@@ -138,9 +138,13 @@ Page({
     heroDesc: '',
     totalCount: 0,
     collectedCount: 0,
+    displayCollectedCount: 0,
     pendingCount: 0,
+    displayPendingCount: 0,
     progressPercent: 0,
     progressPercentText: '0%',
+    displayProgressPercent: 0,
+    displayProgressPercentText: '0%',
     sectionCaption: '',
     visibleCount: 0,
     secretList: [],
@@ -196,9 +200,21 @@ Page({
     const visibleSecretList = filterSecretList(collectionState.secretList, currentFilter)
     const targetSecret = this.resolveEntryTargetSecret(collectionState.secretList)
     const targetSecretId = targetSecret?.id || ''
+    const displayCollectedCount = studyReportService.getLatestMatchedCount({
+      totalCount: collectionState.totalCount,
+      fallbackCount: collectionState.collectedCount
+    })
+    const displayPendingCount = Math.max(collectionState.totalCount - displayCollectedCount, 0)
+    const displayProgressPercent = collectionState.totalCount
+      ? Math.round((displayCollectedCount / collectionState.totalCount) * 100)
+      : 0
 
     this.setData({
       ...collectionState,
+      displayCollectedCount,
+      displayPendingCount,
+      displayProgressPercent,
+      displayProgressPercentText: `${displayProgressPercent}%`,
       visibleSecretList,
       targetSecretId,
       visibleCount: visibleSecretList.length,
@@ -441,6 +457,8 @@ Page({
         generatedReportGeneratedAtText,
         generatedReportWarningText: warningText
       })
+
+      this.refreshPageState()
 
       wx.showToast({
         title: '研学报告已生成',
