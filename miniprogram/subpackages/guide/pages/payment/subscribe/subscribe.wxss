@@ -382,9 +382,10 @@
 
 .purchase-button {
   position: absolute;
-  left: 74rpx;
+  left: 50%;
   bottom: 200rpx;
-  width: 600rpx;
+  width: calc(100vw - 76rpx);
+  max-width: 652rpx;
   height: 100rpx;
   color: #000000;
   font-size: 36rpx;
@@ -394,6 +395,8 @@
   border: none;
   border-radius: 192rpx;
   box-shadow: 0 8rpx 24rpx rgba(44, 237, 184, 0.3);
+  box-sizing: border-box;
+  transform: translateX(-50%);
   z-index: 15;
   transition: all 0.3s ease;
 }
@@ -403,7 +406,7 @@
 }
 
 .purchase-button:active {
-  transform: scale(0.98);
+  transform: translateX(-50%) scale(0.98);
   box-shadow: 0 4rpx 12rpx rgba(44, 237, 184, 0.5);
 }
 
