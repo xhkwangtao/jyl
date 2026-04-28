@@ -55,7 +55,7 @@
 
       <view class="hero-actions">
         <view class="hero-action hero-action-primary" bindtap="onScanCollect">
-          <text class="hero-action-text hero-action-text-primary">扫码收集</text>
+          <text class="hero-action-text hero-action-text-primary">扫描答题卡</text>
         </view>
         <view class="hero-action hero-action-secondary" bindtap="onMyPageTap">
           <text class="hero-action-text hero-action-text-secondary">我的档案</text>
@@ -64,6 +64,25 @@
 
       <text class="scan-tip">{{scanTip}}</text>
       <text class="manual-tip {{manualCollectEnabled ? 'manual-tip-testing' : 'manual-tip-live'}}">{{manualCollectTip}}</text>
+    </view>
+
+    <view class="generated-report-card" wx:if="{{generatedReportReady}}">
+      <view class="generated-report-chip">
+        <text class="generated-report-chip-text">PDF 已生成</text>
+      </view>
+      <text class="generated-report-title">{{generatedReportPdfTitle}}</text>
+      <text class="generated-report-desc">学员 {{generatedReportStudentName}} · 编号 {{generatedReportStudentCode}}</text>
+      <text class="generated-report-meta" wx:if="{{generatedReportGeneratedAtText}}">生成时间 {{generatedReportGeneratedAtText}}</text>
+      <text class="generated-report-warning" wx:if="{{generatedReportWarningText}}">提示：{{generatedReportWarningText}}</text>
+
+      <view class="generated-report-actions">
+        <view class="generated-report-action generated-report-action-primary" bindtap="onPreviewGeneratedReportTap">
+          <text class="generated-report-action-text generated-report-action-text-primary">预览PDF</text>
+        </view>
+        <view class="generated-report-action generated-report-action-secondary" bindtap="onSaveGeneratedReportTap">
+          <text class="generated-report-action-text generated-report-action-text-secondary">{{generatedReportPdfSavedPath ? '已保存' : '保存PDF'}}</text>
+        </view>
+      </view>
     </view>
 
     <view class="rules-card">
@@ -164,6 +183,46 @@
     <view class="empty-state" wx:else>
       <text class="empty-title">当前筛选下暂无暗号点</text>
       <text class="empty-desc">切换筛选后可查看其它暗号的收集状态。</text>
+    </view>
+  </view>
+
+  <view class="worksheet-dialog-mask" wx:if="{{showWorksheetDialog}}" catchtouchmove="noop">
+    <view class="worksheet-dialog" catchtap="noop">
+      <text class="worksheet-dialog-title">扫描答题卡</text>
+      <text class="worksheet-dialog-desc">请先填写学员编号和姓名，随后将直接打开摄像头拍摄答题卡。</text>
+
+      <view class="worksheet-field">
+        <text class="worksheet-field-label">学员编号</text>
+        <input
+          class="worksheet-field-input"
+          placeholder="请输入编号"
+          maxlength="80"
+          value="{{worksheetStudentCode}}"
+          data-field="worksheetStudentCode"
+          bindinput="onWorksheetInput"
+        />
+      </view>
+
+      <view class="worksheet-field">
+        <text class="worksheet-field-label">学员姓名</text>
+        <input
+          class="worksheet-field-input"
+          placeholder="请输入姓名"
+          maxlength="60"
+          value="{{worksheetStudentName}}"
+          data-field="worksheetStudentName"
+          bindinput="onWorksheetInput"
+        />
+      </view>
+
+      <view class="worksheet-dialog-actions">
+        <view class="worksheet-dialog-action worksheet-dialog-action-secondary" bindtap="onWorksheetDialogClose">
+          <text class="worksheet-dialog-action-text worksheet-dialog-action-text-secondary">取消</text>
+        </view>
+        <view class="worksheet-dialog-action worksheet-dialog-action-primary" bindtap="onWorksheetDialogConfirm">
+          <text class="worksheet-dialog-action-text worksheet-dialog-action-text-primary">去拍照</text>
+        </view>
+      </view>
     </view>
   </view>
 </view>
