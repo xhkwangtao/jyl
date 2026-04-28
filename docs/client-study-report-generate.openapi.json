@@ -1,59 +1,42 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "九眼楼小程序答题卡研学报告接口",
-    "version": "1.0.0",
-    "description": "小程序端扫描或拍摄答题卡后，上传照片并获取 AI 研学报告。该接口面向小程序客户端，不使用后台管理接口路径。第一版按即时生成设计，不要求服务端保存报告历史。"
+    "title": "九眼楼小程序研学报告接口",
+    "version": "1.2.0",
+    "description": "小程序端上传答题卡照片生成研学报告，并支持在后续通过 JWT 查看自己最近一条或指定一条历史研学报告。"
   },
   "servers": [
     {
       "url": "https://jyl.flexai.cc/api/v1",
-      "description": "生产环境小程序接口"
+      "description": "生产环境"
     },
     {
-      "url": "http://127.0.0.1:8000/api/v1",
-      "description": "本地后端直连"
+      "url": "http://127.0.0.1:3100/api/v1",
+      "description": "本地联调环境"
     }
   ],
   "tags": [
     {
       "name": "client-study-reports",
-      "description": "小程序答题卡识别与研学报告生成接口"
+      "description": "小程序答题卡识别与研学报告生成"
     }
   ],
   "paths": {
     "/client/study-reports/generate": {
       "post": {
-        "tags": [
-          "client-study-reports"
-        ],
+        "tags": ["client-study-reports"],
         "summary": "上传答题卡照片并生成研学报告",
-        "description": "小程序端通过拍照、相册选择或扫码后的拍摄流程拿到答题卡照片后，使用 multipart/form-data 上传。后端必须从 Authorization: Bearer <access_token> 中解析当前普通用户，并通过 get_current_client_user 查库确认用户存在且状态正常；小程序不需要、也不允许通过表单传 userId/openid。后端识别照片中的暗号收集区和选择题作答情况，生成一份可直接在小程序展示的 AI 研学报告，并将本次生成行为关联到当前普通用户 ID。小程序推荐使用 wx.uploadFile 调用该接口，文件字段名固定为 worksheet_image。",
+        "description": "小程序使用 multipart/form-data 上传答题卡照片。后端必须依赖 get_current_client_user，从 Authorization Bearer JWT 解析用户 ID 和 openid，并查库确认用户状态正常；接口不接收 userId/openid 表单字段。成功后保存原图 URL、PDF URL、qwen3.6-plus 识别 JSON、文本模型输出 JSON 和最终报告内容。",
         "operationId": "clientGenerateStudyReport",
+        "security": [{"ClientBearerAuth": []}],
         "requestBody": {
           "required": true,
           "content": {
             "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/ClientStudyReportGenerateRequest"
-              },
+              "schema": {"$ref": "#/components/schemas/ClientStudyReportGenerateRequest"},
               "encoding": {
                 "worksheet_image": {
                   "contentType": "image/jpeg, image/png, image/webp"
-                }
-              },
-              "examples": {
-                "wxUploadFile": {
-                  "summary": "小程序 wx.uploadFile 表单字段",
-                  "value": {
-                    "worksheet_image": "答题卡照片文件二进制内容",
-                    "student_name": "张小九",
-                    "student_code": "JYL20260427001",
-                    "study_date": "2026-04-27",
-                    "duration_minutes": 90,
-                    "scene": "qrcode:study-report",
-                    "client_request_id": "mp-20260427-0001"
-                  }
                 }
               }
             }
@@ -61,663 +44,229 @@
         },
         "responses": {
           "200": {
-            "description": "识别完成并返回研学报告。",
+            "description": "生成成功",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClientStudyReportGenerateResponse"
-                },
-                "examples": {
-                  "success": {
-                    "summary": "生成成功",
-                    "value": {
-                      "report_id": null,
-                      "generated_at": "2026-04-27T17:10:30.000000Z",
-                      "student": {
-                        "user_id": 12,
-                        "name": "张小九",
-                        "code": "JYL20260427001",
-                        "study_date": "2026-04-27",
-                        "duration_minutes": 90
-                      },
-                      "report": {
-                        "heading": "九眼楼长城守城人",
-                        "subheading": "AI研学报告",
-                        "overall_accuracy_percent": 86,
-                        "overall_comment": "你已经较完整地完成了九眼楼研学任务，能够从暗号收集和诗词线索中理解长城防御体系的特点。",
-                        "sections": [
-                          {
-                            "key": "cipher_analysis",
-                            "title": "暗号解读",
-                            "accuracy_percent": 84,
-                            "content": "暗号收集区完成度较高，说明你在现场观察时能够持续记录关键线索。"
-                          },
-                          {
-                            "key": "poem_analysis",
-                            "title": "诗词解读",
-                            "accuracy_percent": 88,
-                            "content": "诗词题整体判断准确，能够把诗句中的边关、雄楼和防御意象与九眼楼场景联系起来。"
-                          }
-                        ],
-                        "badge": {
-                          "title": "长城守城・百户",
-                          "description": "授予能够完成主要线索识别并理解九眼楼防御价值的研学者。"
-                        },
-                        "final_comment": "继续保持观察和追问，你会更容易发现长城建筑背后的历史逻辑。"
-                      },
-                      "recognition": {
-                        "hidden_symbol_summary": {
-                          "filled_cells": [
-                            1,
-                            2,
-                            3,
-                            4,
-                            5,
-                            6,
-                            8,
-                            9,
-                            10,
-                            11,
-                            12,
-                            13,
-                            14,
-                            15,
-                            16,
-                            18
-                          ],
-                          "filled_count": 16,
-                          "total_cells": 19,
-                          "accuracy_percent": 84
-                        },
-                        "question_summary": {
-                          "correct_count": 3,
-                          "total_questions": 4,
-                          "accuracy_percent": 75
-                        },
-                        "question_results": [
-                          {
-                            "question_number": 1,
-                            "prompt": "龙剑 / 雄关 / 胜算",
-                            "selected_option": "C",
-                            "correct_option": "C",
-                            "selected_title": "《登火焰山楼》",
-                            "correct_title": "《登火焰山楼》",
-                            "is_correct": true
-                          }
-                        ]
-                      },
-                      "warnings": []
-                    }
-                  }
-                }
+                "schema": {"$ref": "#/components/schemas/ClientStudyReportGenerateResponse"}
               }
             }
           },
           "400": {
-            "description": "业务校验失败，例如未配置 AI、模型不支持图片识别、照片为空、文件过大或 AI 返回格式不可解析。",
+            "description": "图片或 AI 处理错误",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "imageRequired": {
-                    "summary": "缺少或不是图片",
-                    "value": {
-                      "detail": "答题卡照片必须是图片文件。",
-                      "code": "application_error"
-                    }
-                  },
-                  "imageTooLarge": {
-                    "summary": "图片过大",
-                    "value": {
-                      "detail": "答题卡照片过大，请压缩到 15MB 以内后重试。",
-                      "code": "application_error"
-                    }
-                  },
-                  "visionModelRequired": {
-                    "summary": "当前模型不支持图片识别",
-                    "value": {
-                      "detail": "当前 AI 模型不支持图像识别，请切换到视觉模型后重试。",
-                      "code": "application_error"
-                    }
-                  }
-                }
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
               }
             }
           },
           "401": {
-            "description": "缺少普通用户登录令牌、令牌无效，或令牌对应的普通用户不存在 / 状态不可用。小程序应重新执行微信登录换取 access_token。",
+            "description": "未登录或 JWT 无效",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "missingToken": {
-                    "summary": "缺少用户认证令牌",
-                    "value": {
-                      "detail": "缺少用户认证令牌。"
-                    }
-                  },
-                  "invalidToken": {
-                    "summary": "用户认证令牌无效",
-                    "value": {
-                      "detail": "用户认证令牌无效。"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "408": {
-            "description": "AI 识别超时。小程序可提示用户稍后重试，或压缩图片后再次提交。",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "timeout": {
-                    "summary": "识别超时",
-                    "value": {
-                      "detail": "AI 识别超时，请稍后重试。",
-                      "code": "application_error"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "上传文件超过服务端限制。当前建议限制为 15MB。",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "请求体校验失败，例如 duration_minutes 不是数字，或 worksheet_image 字段缺失。",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "AI 服务或后端服务暂时不可用。",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                },
-                "examples": {
-                  "providerUnavailable": {
-                    "summary": "AI 服务不可用",
-                    "value": {
-                      "detail": "AI 识别服务暂时不可用，请稍后重试。",
-                      "code": "application_error"
-                    }
-                  }
-                }
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
               }
             }
           }
-        },
-        "security": [
+        }
+      }
+    },
+    "/client/study-reports/latest": {
+      "get": {
+        "tags": ["client-study-reports"],
+        "summary": "获取当前用户最近一条研学报告",
+        "description": "后端必须依赖 get_current_client_user，从 Authorization Bearer JWT 解析用户 ID 和 openid，并且只返回当前用户最近一条正式生成成功的研学报告。接口不重新调用模型，直接返回落库记录中的正式结果，成功响应结构与 POST /client/study-reports/generate 完全一致。",
+        "operationId": "clientGetLatestStudyReport",
+        "security": [{"ClientBearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ClientStudyReportGenerateResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或 JWT 无效",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "404": {
+            "description": "当前用户没有研学报告记录",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/study-reports/{record_id}": {
+      "get": {
+        "tags": ["client-study-reports"],
+        "summary": "获取当前用户指定一条研学报告",
+        "description": "后端必须依赖 get_current_client_user，从 Authorization Bearer JWT 解析用户 ID 和 openid，并且只返回当前用户自己的那一条记录。即使前端知道别人的 record_id，也不会返回。接口不重新调用模型，直接返回落库记录中的正式结果，成功响应结构与 POST /client/study-reports/generate 完全一致。",
+        "operationId": "clientGetStudyReportByRecordId",
+        "security": [{"ClientBearerAuth": []}],
+        "parameters": [
           {
-            "ClientUserBearerAuth": []
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "minimum": 1},
+            "description": "当前用户自己的研学报告记录 ID"
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ClientStudyReportGenerateResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或 JWT 无效",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "404": {
+            "description": "记录不存在或不属于当前用户",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
       }
     }
   },
   "components": {
-    "schemas": {
-      "ClientStudyReportGenerateRequest": {
-        "type": "object",
-        "required": [
-          "worksheet_image"
-        ],
-        "properties": {
-          "worksheet_image": {
-            "type": "string",
-            "format": "binary",
-            "description": "答题卡照片文件。字段名必须为 worksheet_image。建议使用 jpg、png 或 webp，大小不超过 15MB。"
-          },
-          "student_name": {
-            "type": "string",
-            "maxLength": 60,
-            "description": "学员姓名。可选；不传时报告中显示未填写。"
-          },
-          "student_code": {
-            "type": "string",
-            "maxLength": 80,
-            "description": "学员编号。可选；可用于线下活动编号或报名编号。"
-          },
-          "study_date": {
-            "type": "string",
-            "format": "date",
-            "description": "研学日期，格式 YYYY-MM-DD。可选。"
-          },
-          "duration_minutes": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 1440,
-            "description": "探索时长，单位分钟。可选。"
-          },
-          "scene": {
-            "type": "string",
-            "maxLength": 120,
-            "description": "小程序进入场景或二维码 scene。可选，用于后端日志和后续统计。"
-          },
-          "client_request_id": {
-            "type": "string",
-            "maxLength": 120,
-            "description": "小程序侧生成的请求 ID。可选，用于排查重复提交或日志追踪；第一版不承诺幂等保存。"
-          }
-        },
-        "additionalProperties": false
-      },
-      "ClientStudyReportGenerateResponse": {
-        "type": "object",
-        "required": [
-          "report_id",
-          "generated_at",
-          "student",
-          "report",
-          "recognition",
-          "warnings"
-        ],
-        "properties": {
-          "report_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "报告 ID。第一版即时生成不保存历史时返回 null；如果后续接入报告保存，可返回服务端报告 ID。"
-          },
-          "generated_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "报告生成时间。"
-          },
-          "student": {
-            "$ref": "#/components/schemas/StudyReportStudent"
-          },
-          "report": {
-            "$ref": "#/components/schemas/StudyReportDisplayContent"
-          },
-          "recognition": {
-            "$ref": "#/components/schemas/StudyReportRecognitionResult"
-          },
-          "warnings": {
-            "type": "array",
-            "description": "非阻断提示。例如照片倾斜、部分题目无法确认等。",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "additionalProperties": false
-      },
-      "StudyReportStudent": {
-        "type": "object",
-        "required": [
-          "user_id",
-          "name",
-          "code",
-          "study_date",
-          "duration_minutes"
-        ],
-        "properties": {
-          "name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "学员姓名。"
-          },
-          "code": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "学员编号。"
-          },
-          "study_date": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date",
-            "description": "研学日期。"
-          },
-          "duration_minutes": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 0,
-            "description": "探索时长，单位分钟。"
-          },
-          "user_id": {
-            "type": "integer",
-            "description": "当前普通用户 ID，由后端从 JWT 解析并查库确认后写入。小程序不传该字段。"
-          }
-        },
-        "additionalProperties": false
-      },
-      "StudyReportDisplayContent": {
-        "type": "object",
-        "required": [
-          "heading",
-          "subheading",
-          "overall_accuracy_percent",
-          "overall_comment",
-          "sections",
-          "badge",
-          "final_comment"
-        ],
-        "properties": {
-          "heading": {
-            "type": "string",
-            "description": "报告主标题，例如“九眼楼长城守城人”。"
-          },
-          "subheading": {
-            "type": "string",
-            "description": "报告副标题，例如“AI研学报告”。"
-          },
-          "overall_accuracy_percent": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 100,
-            "description": "综合完成度或正确率。"
-          },
-          "overall_comment": {
-            "type": "string",
-            "description": "总评正文。"
-          },
-          "sections": {
-            "type": "array",
-            "minItems": 2,
-            "items": {
-              "$ref": "#/components/schemas/StudyReportSection"
-            },
-            "description": "报告正文分段。当前固定包含暗号解读和诗词解读。"
-          },
-          "badge": {
-            "$ref": "#/components/schemas/StudyReportBadge"
-          },
-          "final_comment": {
-            "type": "string",
-            "description": "AI 综合评语。"
-          }
-        },
-        "additionalProperties": false
-      },
-      "StudyReportSection": {
-        "type": "object",
-        "required": [
-          "key",
-          "title",
-          "accuracy_percent",
-          "content"
-        ],
-        "properties": {
-          "key": {
-            "type": "string",
-            "enum": [
-              "cipher_analysis",
-              "poem_analysis"
-            ],
-            "description": "分段标识。"
-          },
-          "title": {
-            "type": "string",
-            "description": "分段标题。"
-          },
-          "accuracy_percent": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 100,
-            "description": "该分段对应的完成度或正确率。"
-          },
-          "content": {
-            "type": "string",
-            "description": "分段正文。"
-          }
-        },
-        "additionalProperties": false
-      },
-      "StudyReportBadge": {
-        "type": "object",
-        "required": [
-          "title",
-          "description"
-        ],
-        "properties": {
-          "title": {
-            "type": "string",
-            "description": "授予称号。"
-          },
-          "description": {
-            "type": "string",
-            "description": "称号说明或授予语。"
-          }
-        },
-        "additionalProperties": false
-      },
-      "StudyReportRecognitionResult": {
-        "type": "object",
-        "required": [
-          "hidden_symbol_summary",
-          "question_summary",
-          "question_results"
-        ],
-        "properties": {
-          "hidden_symbol_summary": {
-            "$ref": "#/components/schemas/HiddenSymbolSummary"
-          },
-          "question_summary": {
-            "$ref": "#/components/schemas/QuestionSummary"
-          },
-          "question_results": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/QuestionResult"
-            },
-            "description": "选择题识别结果。"
-          }
-        },
-        "additionalProperties": false
-      },
-      "HiddenSymbolSummary": {
-        "type": "object",
-        "required": [
-          "filled_cells",
-          "filled_count",
-          "total_cells",
-          "accuracy_percent"
-        ],
-        "properties": {
-          "filled_cells": {
-            "type": "array",
-            "description": "识别为已填写的暗号格编号。编号从 1 到 19，按答题卡从左到右、从上到下排列。",
-            "items": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 19
-            }
-          },
-          "filled_count": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "已填写暗号格数量。"
-          },
-          "total_cells": {
-            "type": "integer",
-            "const": 19,
-            "description": "暗号格总数。"
-          },
-          "accuracy_percent": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 100,
-            "description": "暗号收集完成度。"
-          }
-        },
-        "additionalProperties": false
-      },
-      "QuestionSummary": {
-        "type": "object",
-        "required": [
-          "correct_count",
-          "total_questions",
-          "accuracy_percent"
-        ],
-        "properties": {
-          "correct_count": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "选择题答对数量。"
-          },
-          "total_questions": {
-            "type": "integer",
-            "const": 4,
-            "description": "选择题总数。"
-          },
-          "accuracy_percent": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 100,
-            "description": "选择题正确率。"
-          }
-        },
-        "additionalProperties": false
-      },
-      "QuestionResult": {
-        "type": "object",
-        "required": [
-          "question_number",
-          "prompt",
-          "selected_option",
-          "correct_option",
-          "selected_title",
-          "correct_title",
-          "is_correct"
-        ],
-        "properties": {
-          "question_number": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 4,
-            "description": "题号。"
-          },
-          "prompt": {
-            "type": "string",
-            "description": "题干线索，例如“龙剑 / 雄关 / 胜算”。"
-          },
-          "selected_option": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "A",
-              "B",
-              "C",
-              null
-            ],
-            "description": "识别出的用户选择。无法确认时为 null。"
-          },
-          "correct_option": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "A",
-              "B",
-              "C",
-              null
-            ],
-            "description": "正确选项。"
-          },
-          "selected_title": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "用户选择对应的诗词或资料标题。"
-          },
-          "correct_title": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "正确答案对应的诗词或资料标题。"
-          },
-          "is_correct": {
-            "type": "boolean",
-            "description": "该题是否答对。"
-          }
-        },
-        "additionalProperties": false
-      },
-      "ErrorResponse": {
-        "type": "object",
-        "required": [
-          "detail",
-          "code"
-        ],
-        "properties": {
-          "detail": {
-            "type": "string",
-            "description": "错误说明，可直接用于小程序提示。"
-          },
-          "code": {
-            "type": "string",
-            "description": "应用错误码。"
-          }
-        },
-        "additionalProperties": true
-      },
-      "ValidationErrorResponse": {
-        "type": "object",
-        "properties": {
-          "detail": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          }
-        },
-        "additionalProperties": true
-      }
-    },
     "securitySchemes": {
-      "ClientUserBearerAuth": {
+      "ClientBearerAuth": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "普通用户登录令牌。小程序先调用 /client/users/wechat-login 获取 access_token，之后请求本接口时放入 Authorization: Bearer <access_token>。后端通过 get_current_client_user 解析 JWT 中的 user_id/openid 并查库确认用户有效。"
+        "description": "小程序普通用户登录令牌。由 /client/users/wechat-login 返回。"
+      }
+    },
+    "schemas": {
+      "ClientStudyReportGenerateRequest": {
+        "type": "object",
+        "required": ["worksheet_image"],
+        "properties": {
+          "worksheet_image": {"type": "string", "format": "binary", "description": "答题卡照片"},
+          "student_name": {"type": "string", "description": "学生姓名，可选"},
+          "student_code": {"type": "string", "description": "学生编号兜底值；优先使用模型识别的编号"},
+          "study_date": {"type": "string", "description": "研学日期"},
+          "duration_minutes": {"type": "integer", "minimum": 0, "description": "研学时长，单位分钟"}
+        }
+      },
+      "ClientStudyReportGenerateResponse": {
+        "type": "object",
+        "required": ["record_id", "worksheet_image_url", "pdf_url", "writer_payload", "report"],
+        "properties": {
+          "record_id": {"type": "integer", "minimum": 1, "description": "本次研学报告记录 ID"},
+          "worksheet_image_url": {"type": "string", "description": "答题卡照片上传到 COS 或本地存储后的 URL"},
+          "pdf_url": {"type": "string", "description": "最终研学报告 PDF 上传到 COS 或本地存储后的 URL"},
+          "writer_payload": {
+            "type": "object",
+            "description": "第二个模型返回的研学报告原始 JSON；文本模型失败走兜底时为空对象",
+            "additionalProperties": true
+          },
+          "report": {"$ref": "#/components/schemas/StudyReportGenerateResponse"}
+        }
+      },
+      "StudyReportGenerateResponse": {
+        "type": "object",
+        "required": ["heading", "subheading", "hidden_symbol_summary", "question_results", "question_summary", "overall_accuracy_percent", "overall_comment", "cipher_analysis", "poem_analysis", "badge_title", "badge_description", "final_comment", "current_model", "provider"],
+        "properties": {
+          "student_name": {"type": ["string", "null"]},
+          "student_code": {"type": ["string", "null"], "description": "优先来自答题卡编号识别结果"},
+          "study_date": {"type": ["string", "null"]},
+          "duration_minutes": {"type": ["integer", "null"], "minimum": 0},
+          "heading": {"type": "string"},
+          "subheading": {"type": "string"},
+          "hidden_symbol_summary": {"$ref": "#/components/schemas/HiddenSymbolSummary"},
+          "question_results": {"type": "array", "items": {"$ref": "#/components/schemas/QuestionResult"}},
+          "question_summary": {"$ref": "#/components/schemas/QuestionSummary"},
+          "overall_accuracy_percent": {"type": "integer", "minimum": 0, "maximum": 100},
+          "overall_comment": {"type": "string"},
+          "cipher_analysis": {"type": "string"},
+          "poem_analysis": {"type": "string"},
+          "badge_title": {"type": "string"},
+          "badge_description": {"type": "string"},
+          "final_comment": {"type": "string"},
+          "current_model": {"type": "string", "example": "qwen3.6-plus"},
+          "provider": {"type": "string"}
+        }
+      },
+      "HiddenSymbolSummary": {
+        "type": "object",
+        "required": ["filled_cells", "filled_count", "matched_symbols", "matched_count", "total_cells", "accuracy_percent"],
+        "properties": {
+          "filled_cells": {"type": "array", "items": {"type": "integer"}, "description": "用户涂画的暗号 ID"},
+          "filled_count": {"type": "integer", "minimum": 0},
+          "matched_symbols": {"type": "array", "items": {"$ref": "#/components/schemas/HiddenSymbolMatch"}},
+          "matched_count": {"type": "integer", "minimum": 0},
+          "total_cells": {"type": "integer", "example": 19},
+          "accuracy_percent": {"type": "integer", "minimum": 0, "maximum": 100}
+        }
+      },
+      "HiddenSymbolMatch": {
+        "type": "object",
+        "required": ["symbol_code", "symbol_name"],
+        "properties": {
+          "symbol_code": {"type": "string", "example": "13"},
+          "symbol_name": {"type": "string", "example": "13:军防-战鼓"}
+        }
+      },
+      "QuestionResult": {
+        "type": "object",
+        "required": ["question_number", "prompt", "is_correct"],
+        "properties": {
+          "question_number": {"type": "integer", "minimum": 1, "maximum": 4},
+          "prompt": {"type": "string"},
+          "selected_option": {"type": ["string", "null"], "enum": ["A", "B", "C", null]},
+          "correct_option": {"type": ["string", "null"], "enum": ["A", "B", "C", null]},
+          "selected_title": {"type": ["string", "null"]},
+          "correct_title": {"type": ["string", "null"]},
+          "is_correct": {"type": "boolean"}
+        }
+      },
+      "QuestionSummary": {
+        "type": "object",
+        "required": ["correct_count", "total_questions", "accuracy_percent"],
+        "properties": {
+          "correct_count": {"type": "integer", "minimum": 0},
+          "total_questions": {"type": "integer", "example": 4},
+          "accuracy_percent": {"type": "integer", "minimum": 0, "maximum": 100}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "detail": {"type": "string"},
+          "code": {"type": "string"}
+        }
       }
     }
   },
-  "x-implementation-notes": {
-    "recommendedBackendRoute": "backend/app/api/v1/endpoints/client/study_reports.py",
+  "x-implementation": {
+    "backendRoute": "backend/app/api/v1/endpoints/client/study_reports.py",
     "routerMount": "client_router.include_router(client_study_reports.router, prefix=\"/study-reports\", tags=[\"client-study-reports\"])",
-    "reuseService": "可复用现有 StudyReportService 的图片识别和报告生成逻辑，但建议为小程序端增加响应 DTO，避免暴露 provider/current_model 等后台诊断字段。",
-    "wechatMiniProgramCall": "小程序端建议使用 wx.uploadFile，header.Authorization 固定为 Bearer <access_token>，name 固定为 worksheet_image，formData 只传 student_name、student_code、study_date、duration_minutes、scene、client_request_id，不传 userId/openid。",
-    "modelRequirement": "后端 AI 配置必须使用支持视觉识别的模型，纯文本模型无法识别答题卡照片。",
-    "authentication": "接口必须依赖 get_current_client_user。后端从 Authorization Bearer JWT 中解析 user_id/openid，再查库确认用户存在且 status=active；不得相信前端传来的 userId/openid。",
-    "userBehaviorRecord": "本次答题卡识别 / 研学报告生成行为应关联 current_user.id。第一版如果不保存完整报告历史，也建议至少在日志或后续 report 表中保留 user_id、client_request_id、scene、generated_at、识别状态。"
+    "authDependency": "get_current_client_user",
+    "recognitionModel": "qwen3.6-plus",
+    "recordTable": "study_report_records",
+    "storageTable": "storage_resources"
   }
 }
