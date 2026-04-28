@@ -59,7 +59,7 @@ function createAIMessage(content) {
   return {
     id: buildMessageId('ai'),
     type: 'ai',
-    avatar: '/images/xiaoying-avatar.png',
+    avatar: '/images/xiaojiu.png',
     content: safeContent,
     segments: safeContent
       ? [{

@@ -7,7 +7,7 @@ Component({
   },
 
   data: {
-    avatarSrc: '/images/ai-assistant-xiaoying.png'
+    avatarSrc: '/images/xiaojiu.png'
   },
 
   lifetimes: {
@@ -18,21 +18,9 @@ Component({
 
   methods: {
     setAvatarByDPR() {
-      try {
-        const systemInfo = wx.getSystemInfoSync()
-        const pixelRatio = systemInfo.pixelRatio || 1
-        const avatarSrc = pixelRatio >= 2
-          ? '/images/ai-assistant-xiaoying@2x.png'
-          : '/images/ai-assistant-xiaoying.png'
-
-        this.setData({
-          avatarSrc
-        })
-      } catch (error) {
-        this.setData({
-          avatarSrc: '/images/ai-assistant-xiaoying.png'
-        })
-      }
+      this.setData({
+        avatarSrc: '/images/xiaojiu.png'
+      })
     },
 
     onGoToMapTap() {

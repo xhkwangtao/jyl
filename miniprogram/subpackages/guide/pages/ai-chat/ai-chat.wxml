@@ -116,7 +116,7 @@
   <view class="loading-background-layer"></view>
   <view class="loading-container">
     <view class="loading-avatar">
-      <image class="avatar-image" src="/images/ai-assistant-xiaoying.png" mode="aspectFill" />
+      <image class="avatar-image" src="/images/xiaojiu.png" mode="aspectFill" />
     </view>
     <text class="loading-text">AI助手正在准备中...</text>
     <view class="loading-dots">
