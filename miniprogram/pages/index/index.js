@@ -348,7 +348,7 @@ Page({
       })
     } catch (error) {
       if (Number(error?.statusCode) === 404) {
-        studyReportService.clearLatestReportCache()
+        studyReportService.persistEmptyLatestReport()
       }
     } finally {
       this.syncingLatestStudyReport = false

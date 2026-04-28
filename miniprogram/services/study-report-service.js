@@ -9,8 +9,10 @@ const STUDY_REPORT_GENERATE_PATH = '/client/study-reports/generate'
 const STUDY_REPORT_JOB_PATH = '/client/study-reports/jobs'
 const STUDY_REPORT_LATEST_PATH = '/client/study-reports/latest'
 const LATEST_STUDY_REPORT_STORAGE_KEY = 'latestStudyReport'
+const STUDY_REPORT_SCAN_REQUEST_STORAGE_KEY = 'studyReportScanRequestState'
 const DEFAULT_STUDY_REPORT_POLL_INTERVAL_MS = 2000
 const DEFAULT_STUDY_REPORT_POLL_TIMEOUT_MS = 120000
+const DEFAULT_STUDY_REPORT_PDF_FILE_NAME = '研学报告.pdf'
 
 function getStorageValue(key) {
   try {
@@ -164,8 +166,8 @@ function extractPdfDescriptor(payload = {}) {
       || payload.file_name
       || payload.fileName
       || payload.pdf?.file_name
-      || '九眼楼研学报告.pdf'
-  ).trim() || '九眼楼研学报告.pdf'
+      || DEFAULT_STUDY_REPORT_PDF_FILE_NAME
+  ).trim() || DEFAULT_STUDY_REPORT_PDF_FILE_NAME
 
   if (candidateUrls.length) {
     return {
@@ -186,42 +188,102 @@ function extractPdfDescriptor(payload = {}) {
   return null
 }
 
+function extractMatchedCountValue(payload = {}) {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+
+  const candidateValue = payload.report?.hidden_symbol_summary?.matched_count
+    ?? payload.hidden_symbol_summary?.matched_count
+    ?? payload.report?.matched_count
+    ?? payload.matched_count
+    ?? payload.hiddenSymbolSummary?.matchedCount
+    ?? payload.matchedCount
+
+  const numericValue = Number(candidateValue)
+  return Number.isFinite(numericValue) ? Math.max(Math.floor(numericValue), 0) : null
+}
+
+function extractFilledCellsValue(payload = {}) {
+  if (!payload || typeof payload !== 'object') {
+    return []
+  }
+
+  const candidateList = payload.report?.hidden_symbol_summary?.filled_cells
+    ?? payload.hidden_symbol_summary?.filled_cells
+    ?? payload.report?.filled_cells
+    ?? payload.filled_cells
+    ?? payload.hiddenSymbolSummary?.filledCells
+    ?? payload.filledCells
+
+  return normalizeIdList(candidateList)
+}
+
+function buildLatestReportCachePayload(payload = {}) {
+  const normalizedPayload = payload && typeof payload === 'object' ? payload : {}
+
+  return {
+    cachedAt: Date.now(),
+    matchedCount: extractMatchedCountValue(normalizedPayload),
+    filledCells: extractFilledCellsValue(normalizedPayload),
+    pdfUrl: normalizePdfUrl(
+      normalizedPayload.pdf_url
+        || normalizedPayload.pdfUrl
+        || normalizedPayload.report?.pdf_url
+        || normalizedPayload.report?.pdfUrl
+        || normalizedPayload.pdf?.url
+        || normalizedPayload.file_url
+        || ''
+    )
+  }
+}
+
+function normalizeLatestReportCache(cachePayload = null) {
+  if (!cachePayload || typeof cachePayload !== 'object') {
+    return {
+      cachedAt: 0,
+      matchedCount: null,
+      filledCells: [],
+      pdfUrl: ''
+    }
+  }
+
+  if (cachePayload.payload && typeof cachePayload.payload === 'object') {
+    return buildLatestReportCachePayload(cachePayload.payload)
+  }
+
+  return {
+    cachedAt: Number(cachePayload.cachedAt) || 0,
+    matchedCount: extractMatchedCountValue(cachePayload),
+    filledCells: extractFilledCellsValue(cachePayload),
+    pdfUrl: normalizePdfUrl(cachePayload.pdfUrl || cachePayload.pdf_url || '')
+  }
+}
+
 class StudyReportService {
   extractMatchedCount(payload = {}, options = {}) {
-    const normalizedPayload = payload && typeof payload === 'object' ? payload : {}
-    const candidateValue = normalizedPayload.report?.hidden_symbol_summary?.matched_count
-      ?? normalizedPayload.hidden_symbol_summary?.matched_count
-      ?? normalizedPayload.report?.matched_count
-      ?? normalizedPayload.matched_count
+    const candidateValue = extractMatchedCountValue(payload)
 
     return normalizeCount(candidateValue, options.fallbackCount, options.totalCount)
   }
 
   extractFilledCells(payload = {}) {
-    const normalizedPayload = payload && typeof payload === 'object' ? payload : {}
-    const candidateList = normalizedPayload.report?.hidden_symbol_summary?.filled_cells
-      ?? normalizedPayload.hidden_symbol_summary?.filled_cells
-      ?? normalizedPayload.report?.filled_cells
-      ?? normalizedPayload.filled_cells
-
-    return normalizeIdList(candidateList)
+    return extractFilledCellsValue(payload)
   }
 
   persistLatestReport(payload = {}) {
-    const normalizedPayload = payload && typeof payload === 'object' ? payload : {}
-    const report = normalizedPayload.report && typeof normalizedPayload.report === 'object'
-      ? normalizedPayload.report
-      : {}
+    const cachePayload = buildLatestReportCachePayload(payload)
 
+    wx.setStorageSync(LATEST_STUDY_REPORT_STORAGE_KEY, cachePayload)
+    return cachePayload
+  }
+
+  persistEmptyLatestReport() {
     const cachePayload = {
-      payload: normalizedPayload,
       cachedAt: Date.now(),
-      recordId: Number(normalizedPayload.record_id || 0) || 0,
-      worksheetImageUrl: String(normalizedPayload.worksheet_image_url || '').trim(),
-      pdfUrl: normalizePdfUrl(normalizedPayload.pdf_url || normalizedPayload.report?.pdf_url || ''),
-      studentName: String(report.student_name || '').trim(),
-      studentCode: String(report.student_code || '').trim(),
-      studyDate: String(report.study_date || '').trim()
+      matchedCount: null,
+      filledCells: [],
+      pdfUrl: ''
     }
 
     wx.setStorageSync(LATEST_STUDY_REPORT_STORAGE_KEY, cachePayload)
@@ -230,9 +292,9 @@ class StudyReportService {
 
   getLatestReportCache() {
     try {
-      return wx.getStorageSync(LATEST_STUDY_REPORT_STORAGE_KEY) || null
+      return normalizeLatestReportCache(wx.getStorageSync(LATEST_STUDY_REPORT_STORAGE_KEY) || null)
     } catch (error) {
-      return null
+      return normalizeLatestReportCache(null)
     }
   }
 
@@ -244,28 +306,66 @@ class StudyReportService {
 
   getLatestMatchedCount(options = {}) {
     const cachePayload = this.getLatestReportCache()
-    const payload = cachePayload?.payload && typeof cachePayload.payload === 'object'
-      ? cachePayload.payload
-      : null
-
-    if (!payload) {
+    if (!Number.isFinite(Number(cachePayload?.matchedCount))) {
       return normalizeCount(options.fallbackCount, options.fallbackCount, options.totalCount)
     }
 
-    return this.extractMatchedCount(payload, options)
+    return normalizeCount(cachePayload.matchedCount, options.fallbackCount, options.totalCount)
   }
 
   getLatestFilledCells() {
     const cachePayload = this.getLatestReportCache()
-    const payload = cachePayload?.payload && typeof cachePayload.payload === 'object'
-      ? cachePayload.payload
-      : null
+    return Array.isArray(cachePayload?.filledCells) ? cachePayload.filledCells.slice() : []
+  }
 
-    if (!payload) {
-      return []
+  getLatestPdfUrl() {
+    const cachePayload = this.getLatestReportCache()
+    return normalizePdfUrl(cachePayload?.pdfUrl || '')
+  }
+
+  hasLatestPdfUrl() {
+    return !!this.getLatestPdfUrl()
+  }
+
+  persistScanRequestState(requestState = {}) {
+    const normalizedState = requestState && typeof requestState === 'object' ? requestState : {}
+    const cachePayload = {
+      requested: normalizedState.requested !== false,
+      requestedAt: Number(normalizedState.requestedAt) || Date.now(),
+      recordId: Number(normalizedState.recordId || 0) || 0
     }
 
-    return this.extractFilledCells(payload)
+    wx.setStorageSync(STUDY_REPORT_SCAN_REQUEST_STORAGE_KEY, cachePayload)
+    return cachePayload
+  }
+
+  getScanRequestState() {
+    try {
+      const cachePayload = wx.getStorageSync(STUDY_REPORT_SCAN_REQUEST_STORAGE_KEY)
+      if (!cachePayload || typeof cachePayload !== 'object') {
+        return {
+          requested: false,
+          requestedAt: 0,
+          recordId: 0
+        }
+      }
+
+      return {
+        requested: cachePayload.requested !== false,
+        requestedAt: Number(cachePayload.requestedAt) || 0,
+        recordId: Number(cachePayload.recordId || 0) || 0
+      }
+    } catch (error) {
+      return {
+        requested: false,
+        requestedAt: 0,
+        recordId: 0
+      }
+    }
+  }
+
+  hasScanRequestRecord() {
+    return !!this.getScanRequestState().requested
   }
 
   requestStudyReportJob({ token, recordId }) {
@@ -488,6 +588,11 @@ class StudyReportService {
             reject(buildRequestError(responsePayload?.statusCode || res.statusCode, responsePayload, `研学报告提交失败 (${res.statusCode})`))
             return
           }
+
+          this.persistScanRequestState({
+            requested: true,
+            recordId: Number(responsePayload?.record_id || 0) || 0
+          })
 
           resolve(responsePayload || {})
         },

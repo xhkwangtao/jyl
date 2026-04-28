@@ -71,7 +71,7 @@
         <text class="generated-report-chip-text">PDF 已生成</text>
       </view>
       <text class="generated-report-title">{{generatedReportPdfTitle}}</text>
-      <text class="generated-report-desc">学员 {{generatedReportStudentName}} · 编号 {{generatedReportStudentCode}}</text>
+      <text class="generated-report-desc">{{generatedReportDescText}}</text>
       <text class="generated-report-meta" wx:if="{{generatedReportGeneratedAtText}}">生成时间 {{generatedReportGeneratedAtText}}</text>
       <text class="generated-report-warning" wx:if="{{generatedReportWarningText}}">提示：{{generatedReportWarningText}}</text>
 
