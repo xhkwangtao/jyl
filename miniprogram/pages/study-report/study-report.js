@@ -1,11 +1,14 @@
+const auth = require('../../utils/auth')
+const studyReportService = require('../../services/study-report-service')
 const {
-  buildSecretCollectionState
-} = require('../../utils/secret-collection')
-const {
-  buildAiOfficerState
-} = require('../../utils/ai-officer')
+  POSTER_CANVAS_WIDTH,
+  POSTER_CANVAS_HEIGHT,
+  POSTER_EXPORT_WIDTH,
+  POSTER_EXPORT_HEIGHT,
+  renderStudyReportPoster
+} = require('../../utils/study-report-poster')
 
-const PAGE_STYLE = 'background: #f6f1e8;'
+const PAGE_STYLE = 'background: #e8edf3;'
 
 function getLayoutMetrics() {
   try {
@@ -40,28 +43,6 @@ function getLayoutMetrics() {
   }
 }
 
-function getUserNickname() {
-  const userInfo = wx.getStorageSync('userInfo') || {}
-  return userInfo.nickName || userInfo.nickname || '游客'
-}
-
-function formatDateTime(timestamp) {
-  const safeTimestamp = Number(timestamp)
-
-  if (!Number.isFinite(safeTimestamp) || safeTimestamp <= 0) {
-    return '刚刚完成'
-  }
-
-  const date = new Date(safeTimestamp)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-
-  return `${year}-${month}-${day} ${hours}:${minutes}`
-}
-
 function navigateToPage(url) {
   wx.navigateTo({
     url,
@@ -73,19 +54,29 @@ function navigateToPage(url) {
   })
 }
 
+function buildPosterPreviewCacheKey(reportRenderCache = {}) {
+  return [
+    Number(reportRenderCache?.recordId || 0),
+    Number(reportRenderCache?.cachedAt || 0),
+    String(reportRenderCache?.title || '').trim(),
+    String(reportRenderCache?.studentCode || '').trim()
+  ].join('::')
+}
+
 Page({
   data: {
-    pageReady: false,
     pageStyle: PAGE_STYLE,
+    pageReady: false,
     navBarHeightStyle: '',
-    userNickname: '游客',
-    completedAtText: '',
-    aiOfficerTitle: '',
-    aiOfficerScoreText: '',
-    totalCount: 0,
-    themeSummaryList: [],
-    secretList: [],
-    reportSummaryList: []
+    reportRecordId: 0,
+    posterPreviewCacheKey: '',
+    reportTitle: '',
+    reportSubtitle: '',
+    reportMetaList: [],
+    reportSectionList: [],
+    posterPreviewPath: '',
+    posterGenerating: false,
+    posterErrorText: ''
   },
 
   onLoad() {
@@ -102,17 +93,47 @@ Page({
     this.refreshReportState()
   },
 
-  refreshReportState() {
-    const collectionState = buildSecretCollectionState()
+  async refreshReportState() {
+    let reportRenderCache = studyReportService.getLatestReportRenderCache()
 
-    if (!collectionState.reportUnlocked) {
+    if (!reportRenderCache.hasContent) {
+      const hasLogin = await auth.checkAndAutoLogin(2500).catch(() => false)
+
+      if (hasLogin) {
+        try {
+          await studyReportService.getLatestReport({
+            token: auth.getToken()
+          })
+        } catch (error) {
+          if (Number(error?.statusCode) === 404) {
+            studyReportService.persistEmptyLatestReport()
+          }
+        }
+
+        reportRenderCache = studyReportService.getLatestReportRenderCache()
+      }
+    }
+
+    if (!reportRenderCache.hasContent) {
       wx.showToast({
-        title: '收齐全部暗号后解锁研学报告',
+        title: '当前没有可查看的研学报告',
         icon: 'none',
         duration: 1800
       })
 
       setTimeout(() => {
+        if (getCurrentPages().length > 1) {
+          wx.navigateBack({
+            delta: 1,
+            fail: () => {
+              wx.redirectTo({
+                url: '/pages/my-page/my-page'
+              })
+            }
+          })
+          return
+        }
+
         wx.redirectTo({
           url: '/pages/my-page/my-page'
         })
@@ -120,26 +141,141 @@ Page({
       return
     }
 
-    const completedAt = Math.max(...collectionState.secretList.map((item) => item.collectedAt || 0))
-    const aiOfficerState = buildAiOfficerState(collectionState.secretList)
-    const reportSummaryList = [
-      `已完成 ${collectionState.totalCount} / ${collectionState.totalCount} 枚暗号收集`,
-      `已将小九晋升为 ${aiOfficerState.aiOfficerTitle}`,
-      '已依次解锁工匠、军防、生态、文化四条研学线索',
-      '当前页面可作为现场研学任务完成后的收集总览'
-    ]
-
     this.setData({
       pageReady: true,
-      userNickname: getUserNickname(),
-      completedAtText: formatDateTime(completedAt),
-      aiOfficerTitle: aiOfficerState.aiOfficerTitle,
-      aiOfficerScoreText: aiOfficerState.aiOfficerScoreText,
-      totalCount: collectionState.totalCount,
-      themeSummaryList: collectionState.themeSummaryList,
-      secretList: collectionState.secretList,
-      reportSummaryList
+      reportRecordId: reportRenderCache.recordId || 0,
+      reportTitle: reportRenderCache.title,
+      reportSubtitle: reportRenderCache.subtitle,
+      reportMetaList: reportRenderCache.metaList,
+      reportSectionList: reportRenderCache.sectionList
     })
+
+    this.refreshPosterPreview(reportRenderCache)
+  },
+
+  getStudyReportPreviewCanvasNode() {
+    if (this.studyReportPreviewCanvasPromise) {
+      return this.studyReportPreviewCanvasPromise
+    }
+
+    this.studyReportPreviewCanvasPromise = new Promise((resolve, reject) => {
+      const query = this.createSelectorQuery()
+      query.select('#study-report-preview-canvas').fields({
+        node: true,
+        size: true
+      }).exec((resultList) => {
+        const canvasResult = Array.isArray(resultList) ? resultList[0] : null
+        const canvasNode = canvasResult?.node || null
+
+        if (!canvasNode) {
+          this.studyReportPreviewCanvasPromise = null
+          reject(new Error('研学报告预览初始化失败'))
+          return
+        }
+
+        const systemInfo = wx.getSystemInfoSync()
+        const pixelRatio = Number(systemInfo?.pixelRatio) || 1
+        const context2d = canvasNode.getContext('2d')
+
+        canvasNode.width = POSTER_CANVAS_WIDTH * pixelRatio
+        canvasNode.height = POSTER_CANVAS_HEIGHT * pixelRatio
+
+        this.studyReportPreviewCanvasInfo = {
+          canvasNode,
+          context2d,
+          pixelRatio
+        }
+
+        resolve(this.studyReportPreviewCanvasInfo)
+      })
+    })
+
+    return this.studyReportPreviewCanvasPromise
+  },
+
+  async generateStudyReportPosterPreviewTempFile(reportRenderCache) {
+    const canvasInfo = await this.getStudyReportPreviewCanvasNode()
+    const canvasNode = canvasInfo?.canvasNode
+    const context2d = canvasInfo?.context2d
+    const pixelRatio = Number(canvasInfo?.pixelRatio) || 1
+    const exportWidth = Math.round(POSTER_EXPORT_WIDTH * pixelRatio)
+    const exportHeight = Math.round(POSTER_EXPORT_HEIGHT * pixelRatio)
+
+    if (!canvasNode || !context2d) {
+      throw new Error('研学报告预览初始化失败')
+    }
+
+    if (typeof context2d.setTransform === 'function') {
+      context2d.setTransform(1, 0, 0, 1, 0, 0)
+    }
+
+    context2d.clearRect(0, 0, canvasNode.width, canvasNode.height)
+    context2d.scale(pixelRatio, pixelRatio)
+    renderStudyReportPoster(context2d, reportRenderCache)
+
+    return new Promise((resolve, reject) => {
+      wx.canvasToTempFilePath({
+        canvas: canvasNode,
+        x: 0,
+        y: 0,
+        width: POSTER_CANVAS_WIDTH,
+        height: POSTER_CANVAS_HEIGHT,
+        destWidth: exportWidth,
+        destHeight: exportHeight,
+        fileType: 'png',
+        quality: 1,
+        success: (result) => resolve(result.tempFilePath),
+        fail: (error) => reject(new Error(error?.errMsg || '研学报告预览生成失败'))
+      }, this)
+    })
+  },
+
+  async refreshPosterPreview(reportRenderCache) {
+    if (!reportRenderCache?.hasContent) {
+      return
+    }
+
+    const previewCacheKey = buildPosterPreviewCacheKey(reportRenderCache)
+
+    if (
+      this.data.posterPreviewPath
+      && this.data.posterPreviewCacheKey === previewCacheKey
+    ) {
+      return
+    }
+
+    const renderToken = Date.now()
+    this.latestPosterRenderToken = renderToken
+
+    this.setData({
+      posterGenerating: true,
+      posterErrorText: ''
+    })
+
+    try {
+      const previewPath = await this.generateStudyReportPosterPreviewTempFile(reportRenderCache)
+      if (this.latestPosterRenderToken !== renderToken) {
+        return
+      }
+
+      this.setData({
+        posterPreviewPath: previewPath,
+        posterPreviewCacheKey: previewCacheKey,
+        posterGenerating: false,
+        posterErrorText: ''
+      })
+    } catch (error) {
+      if (this.latestPosterRenderToken !== renderToken) {
+        return
+      }
+
+      this.setData({
+        posterPreviewPath: '',
+        posterPreviewCacheKey: '',
+        posterGenerating: false,
+        posterErrorText: error?.message || '预览生成失败'
+      })
+    }
   },
 
   onBackTap() {

@@ -3,12 +3,17 @@ const {
   ONLINE_API_BASE_URL,
   LOCAL_API_BASE_URL
 } = require('../utils/api-config')
+const {
+  buildLatestStudyReportRenderCachePayload,
+  normalizeLatestStudyReportRenderCache
+} = require('../utils/study-report-view-model')
 
 const STUDY_REPORT_UPLOAD_PATH = '/client/study-reports/upload'
 const STUDY_REPORT_GENERATE_PATH = '/client/study-reports/generate'
 const STUDY_REPORT_JOB_PATH = '/client/study-reports/jobs'
 const STUDY_REPORT_LATEST_PATH = '/client/study-reports/latest'
 const LATEST_STUDY_REPORT_STORAGE_KEY = 'latestStudyReport'
+const LATEST_STUDY_REPORT_RENDER_CACHE_STORAGE_KEY = 'latestStudyReportRenderCache'
 const STUDY_REPORT_SCAN_REQUEST_STORAGE_KEY = 'studyReportScanRequestState'
 const DEFAULT_STUDY_REPORT_POLL_INTERVAL_MS = 2000
 const DEFAULT_STUDY_REPORT_POLL_TIMEOUT_MS = 120000
@@ -273,8 +278,16 @@ class StudyReportService {
 
   persistLatestReport(payload = {}) {
     const cachePayload = buildLatestReportCachePayload(payload)
+    const reportRenderCachePayload = buildLatestStudyReportRenderCachePayload(payload)
 
     wx.setStorageSync(LATEST_STUDY_REPORT_STORAGE_KEY, cachePayload)
+
+    if (reportRenderCachePayload.hasContent) {
+      wx.setStorageSync(LATEST_STUDY_REPORT_RENDER_CACHE_STORAGE_KEY, reportRenderCachePayload)
+    } else {
+      this.clearLatestReportRenderCache()
+    }
+
     return cachePayload
   }
 
@@ -287,6 +300,7 @@ class StudyReportService {
     }
 
     wx.setStorageSync(LATEST_STUDY_REPORT_STORAGE_KEY, cachePayload)
+    this.clearLatestReportRenderCache()
     return cachePayload
   }
 
@@ -302,6 +316,28 @@ class StudyReportService {
     try {
       wx.removeStorageSync(LATEST_STUDY_REPORT_STORAGE_KEY)
     } catch (error) {}
+
+    this.clearLatestReportRenderCache()
+  }
+
+  getLatestReportRenderCache() {
+    try {
+      return normalizeLatestStudyReportRenderCache(
+        wx.getStorageSync(LATEST_STUDY_REPORT_RENDER_CACHE_STORAGE_KEY) || null
+      )
+    } catch (error) {
+      return normalizeLatestStudyReportRenderCache(null)
+    }
+  }
+
+  clearLatestReportRenderCache() {
+    try {
+      wx.removeStorageSync(LATEST_STUDY_REPORT_RENDER_CACHE_STORAGE_KEY)
+    } catch (error) {}
+  }
+
+  hasLatestReportRenderCache() {
+    return !!this.getLatestReportRenderCache().hasContent
   }
 
   getLatestMatchedCount(options = {}) {

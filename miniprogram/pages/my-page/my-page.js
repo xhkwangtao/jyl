@@ -339,6 +339,7 @@ Page({
     const displayProgressPercent = collectionState.totalCount
       ? Math.round((displayCollectedCount / collectionState.totalCount) * 100)
       : 0
+    const hasRenderedStudyReport = studyReportService.hasLatestReportRenderCache()
     const currentCollectedSecretIdSet = buildSecretCollectionIdSet(reportDrivenSecretList)
     const nextRevealedSecretIdSet = new Set()
     const nextPendingUnlockAnimationSecretIdSet = new Set()
@@ -360,7 +361,9 @@ Page({
       pendingRevealIdSet: this.pendingUnlockAnimationSecretIdSet
     })
     const heroCopy = buildHeroCopy(collectionState.totalCount, displayCollectedCount)
-    const reportUnlocked = collectionState.reportUnlocked || displayCollectedCount >= collectionState.totalCount
+    const reportUnlocked = collectionState.reportUnlocked
+      || displayCollectedCount >= collectionState.totalCount
+      || hasRenderedStudyReport
 
     if (this.unlockAnimationTimer) {
       clearTimeout(this.unlockAnimationTimer)
@@ -449,7 +452,7 @@ Page({
   },
 
   onReportTap() {
-    if (!this.data.reportUnlocked) {
+    if (!this.data.reportUnlocked && !studyReportService.hasLatestReportRenderCache()) {
       wx.showToast({
         title: '集齐全部暗号后解锁研学报告',
         icon: 'none',

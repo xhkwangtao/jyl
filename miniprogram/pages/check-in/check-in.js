@@ -14,6 +14,13 @@ const {
   GUIDE_MAP_PAGE
 } = require('../../utils/guide-routes')
 const studyReportService = require('../../services/study-report-service')
+const {
+  POSTER_CANVAS_WIDTH,
+  POSTER_CANVAS_HEIGHT,
+  POSTER_EXPORT_WIDTH,
+  POSTER_EXPORT_HEIGHT,
+  renderStudyReportPoster
+} = require('../../utils/study-report-poster')
 
 const GENERATED_REPORT_PDF_FILE_NAME = '研学报告.pdf'
 const GENERATED_REPORT_PREVIEW_DIR_NAME = 'study-report-preview'
@@ -83,6 +90,15 @@ function buildStudyDateText() {
 
 function buildPdfFileName() {
   return GENERATED_REPORT_PDF_FILE_NAME
+}
+
+function buildReportPosterCacheKey(reportRenderCache = {}) {
+  return [
+    Number(reportRenderCache?.recordId || 0),
+    Number(reportRenderCache?.cachedAt || 0),
+    String(reportRenderCache?.title || '').trim(),
+    String(reportRenderCache?.studentCode || '').trim()
+  ].join('::')
 }
 
 function isCancelError(error) {
@@ -401,18 +417,18 @@ function resolveStudyReportLoadingTitle(payload = {}) {
 }
 
 function buildWorksheetScanTip({
-  hasCachedPdf = false,
+  hasCachedReport = false,
   hasRequested = false
 } = {}) {
-  if (hasCachedPdf) {
-    return '答题卡已扫描，研学报告 PDF 已缓存，可前往“我的档案”查看。'
+  if (hasCachedReport) {
+    return '答题卡已扫描，研学报告已生成，可前往“我的档案”查看。'
   }
 
   if (hasRequested) {
     return '答题卡已提交，请勿重复扫描；稍后可在“我的档案”查看研学报告。'
   }
 
-  return '填写学员信息后拍摄答题卡，系统将自动识别并生成研学报告 PDF。'
+  return '填写学员信息后拍摄答题卡，系统将自动识别并生成研学报告。'
 }
 
 Page({
@@ -440,7 +456,7 @@ Page({
     visibleSecretList: [],
     ruleList: RULE_LIST,
     targetSecretId: '',
-    scanTip: '填写学员信息后拍摄答题卡，系统将自动识别并生成研学报告 PDF。',
+    scanTip: '填写学员信息后拍摄答题卡，系统将自动识别并生成研学报告。',
     manualCollectEnabled: ENABLE_MANUAL_SECRET_COLLECTION_FOR_TESTING,
     manualCollectTip: ENABLE_MANUAL_SECRET_COLLECTION_FOR_TESTING
       ? '当前为测试模式，列表中的“测试标记”按钮仅用于功能联调；正式使用时仍以现场收集和答题卡识别为准。'
@@ -458,7 +474,11 @@ Page({
     generatedReportPdfSavedPath: '',
     generatedReportRemotePdfUrl: '',
     generatedReportGeneratedAtText: '',
-    generatedReportWarningText: ''
+    generatedReportWarningText: '',
+    generatedReportPosterTempPath: '',
+    generatedReportPosterCacheKey: '',
+    reportPosterSaving: false,
+    reportPosterPreviewing: false
   },
 
   onLoad(options = {}) {
@@ -475,13 +495,13 @@ Page({
   noop() {},
 
   getWorksheetEntryState() {
-    const hasCachedPdf = studyReportService.hasLatestPdfUrl()
+    const hasCachedReport = studyReportService.hasLatestReportRenderCache() || studyReportService.hasLatestPdfUrl()
     const hasRequested = studyReportService.hasScanRequestRecord()
 
     return {
-      hasCachedPdf,
+      hasCachedReport,
       hasRequested,
-      blocked: hasCachedPdf || hasRequested
+      blocked: hasCachedReport || hasRequested
     }
   },
 
@@ -531,16 +551,27 @@ Page({
   },
 
   buildGeneratedReportCardState() {
+    const renderedReportCache = studyReportService.getLatestReportRenderCache()
     const cachedPdfUrl = studyReportService.getLatestPdfUrl()
     const generatedReportPdfTempPath = String(this.data.generatedReportPdfTempPath || '').trim()
     const generatedReportPdfSavedPath = String(this.data.generatedReportPdfSavedPath || '').trim()
-    const generatedReportStudentName = String(this.data.generatedReportStudentName || '').trim()
-    const generatedReportStudentCode = String(this.data.generatedReportStudentCode || '').trim()
+    const generatedReportStudentName = String(
+      this.data.generatedReportStudentName || renderedReportCache.studentName || ''
+    ).trim()
+    const generatedReportStudentCode = String(
+      this.data.generatedReportStudentCode || renderedReportCache.studentCode || ''
+    ).trim()
     const generatedReportPdfTitle = String(this.data.generatedReportPdfTitle || '').trim()
+      || String(renderedReportCache.title || '').trim()
       || normalizePdfTitle(generatedReportPdfSavedPath)
       || normalizePdfTitle(generatedReportPdfTempPath)
-      || GENERATED_REPORT_PDF_FILE_NAME
-    const generatedReportReady = !!(cachedPdfUrl || generatedReportPdfTempPath || generatedReportPdfSavedPath)
+      || '九眼楼AI研学报告'
+    const generatedReportReady = !!(
+      renderedReportCache.hasContent
+      || cachedPdfUrl
+      || generatedReportPdfTempPath
+      || generatedReportPdfSavedPath
+    )
 
     if (!generatedReportReady) {
       return {
@@ -550,6 +581,8 @@ Page({
         generatedReportPdfTitle: '',
         generatedReportPdfSavedPath: '',
         generatedReportPdfTempPath: '',
+        generatedReportPosterTempPath: '',
+        generatedReportPosterCacheKey: '',
         generatedReportGeneratedAtText: '',
         generatedReportWarningText: ''
       }
@@ -802,23 +835,24 @@ Page({
         }
       })
 
-      const pdfTempFilePath = await this.prepareGeneratedPdfFile(result?.pdfDescriptor)
-
       const warningText = Array.isArray(result?.payload?.warnings) && result.payload.warnings.length
         ? result.payload.warnings.join('；')
         : ''
       const generatedReportGeneratedAtText = formatDateTimeText(result?.payload?.generated_at || '')
-      const generatedReportPdfTitle = buildPdfFileName(worksheetStudentName, worksheetStudentCode)
+      const generatedReportPdfTitle = String(studyReportService.getLatestReportRenderCache().title || '').trim()
+        || '九眼楼AI研学报告'
 
       this.setData({
         generatedReportReady: true,
         generatedReportStudentName: worksheetStudentName,
         generatedReportStudentCode: worksheetStudentCode,
         generatedReportDescText: buildGeneratedReportDescText(worksheetStudentName, worksheetStudentCode),
-        generatedReportPdfTitle: generatedReportPdfTitle || normalizePdfTitle(pdfTempFilePath),
-        generatedReportPdfTempPath: pdfTempFilePath,
+        generatedReportPdfTitle: generatedReportPdfTitle,
+        generatedReportPdfTempPath: '',
         generatedReportPdfSavedPath: '',
-        generatedReportRemotePdfUrl: studyReportService.getLatestPdfUrl(),
+        generatedReportRemotePdfUrl: '',
+        generatedReportPosterTempPath: '',
+        generatedReportPosterCacheKey: '',
         generatedReportGeneratedAtText,
         generatedReportWarningText: warningText
       })
@@ -830,8 +864,6 @@ Page({
         icon: 'success',
         duration: 1800
       })
-
-      this.previewGeneratedPdfFile(pdfTempFilePath)
     } catch (error) {
       this.refreshPageState()
       wx.showToast({
@@ -900,6 +932,139 @@ Page({
     })
   },
 
+  getStudyReportPosterCanvasNode() {
+    if (this.studyReportPosterCanvasPromise) {
+      return this.studyReportPosterCanvasPromise
+    }
+
+    this.studyReportPosterCanvasPromise = new Promise((resolve, reject) => {
+      const query = this.createSelectorQuery()
+      query.select('#study-report-poster-canvas').fields({
+        node: true,
+        size: true
+      }).exec((resultList) => {
+        const canvasResult = Array.isArray(resultList) ? resultList[0] : null
+        const canvasNode = canvasResult?.node || null
+
+        if (!canvasNode) {
+          this.studyReportPosterCanvasPromise = null
+          reject(new Error('研学报告画布初始化失败'))
+          return
+        }
+
+        const systemInfo = wx.getSystemInfoSync()
+        const pixelRatio = Number(systemInfo?.pixelRatio) || 1
+        const context2d = canvasNode.getContext('2d')
+
+        canvasNode.width = POSTER_CANVAS_WIDTH * pixelRatio
+        canvasNode.height = POSTER_CANVAS_HEIGHT * pixelRatio
+
+        this.studyReportPosterCanvasInfo = {
+          canvasNode,
+          context2d,
+          pixelRatio
+        }
+
+        resolve(this.studyReportPosterCanvasInfo)
+      })
+    })
+
+    return this.studyReportPosterCanvasPromise
+  },
+
+  async generateStudyReportPosterTempFile(reportRenderCache) {
+    const canvasInfo = await this.getStudyReportPosterCanvasNode()
+    const canvasNode = canvasInfo?.canvasNode
+    const context2d = canvasInfo?.context2d
+    const pixelRatio = Number(canvasInfo?.pixelRatio) || 1
+    const exportWidth = Math.round(POSTER_EXPORT_WIDTH * pixelRatio)
+    const exportHeight = Math.round(POSTER_EXPORT_HEIGHT * pixelRatio)
+
+    if (!canvasNode || !context2d) {
+      throw new Error('研学报告画布初始化失败')
+    }
+
+    if (typeof context2d.setTransform === 'function') {
+      context2d.setTransform(1, 0, 0, 1, 0, 0)
+    }
+    context2d.clearRect(0, 0, canvasNode.width, canvasNode.height)
+    context2d.scale(pixelRatio, pixelRatio)
+
+    renderStudyReportPoster(context2d, reportRenderCache)
+
+    return new Promise((resolve, reject) => {
+      wx.canvasToTempFilePath({
+        canvas: canvasNode,
+        x: 0,
+        y: 0,
+        width: POSTER_CANVAS_WIDTH,
+        height: POSTER_CANVAS_HEIGHT,
+        destWidth: exportWidth,
+        destHeight: exportHeight,
+        fileType: 'png',
+        quality: 1,
+        success: (res) => {
+          resolve(res.tempFilePath)
+        },
+        fail: (error) => {
+          reject(new Error(error?.errMsg || '研学报告图片生成失败'))
+        }
+      }, this)
+    })
+  },
+
+  savePosterImageToAlbum(filePath) {
+    return new Promise((resolve, reject) => {
+      wx.saveImageToPhotosAlbum({
+        filePath,
+        success: resolve,
+        fail: reject
+      })
+    })
+  },
+
+  previewPosterImage(filePath) {
+    const normalizedFilePath = String(filePath || '').trim()
+
+    if (!normalizedFilePath) {
+      return Promise.reject(new Error('当前没有可查看的研学报告'))
+    }
+
+    return new Promise((resolve, reject) => {
+      wx.previewImage({
+        current: normalizedFilePath,
+        urls: [normalizedFilePath],
+        showmenu: true,
+        success: resolve,
+        fail: (error) => reject(new Error(error?.errMsg || '报告预览失败'))
+      })
+    })
+  },
+
+  async ensureGeneratedReportPosterTempFile(reportRenderCache) {
+    if (!reportRenderCache?.hasContent) {
+      throw new Error('当前没有可查看的研学报告')
+    }
+
+    const posterCacheKey = buildReportPosterCacheKey(reportRenderCache)
+    const cachedPosterPath = String(this.data.generatedReportPosterTempPath || '').trim()
+
+    if (cachedPosterPath && this.data.generatedReportPosterCacheKey === posterCacheKey) {
+      try {
+        await accessFileSystemPath(cachedPosterPath)
+        return cachedPosterPath
+      } catch (error) {}
+    }
+
+    const tempFilePath = await this.generateStudyReportPosterTempFile(reportRenderCache)
+    this.setData({
+      generatedReportPosterTempPath: tempFilePath,
+      generatedReportPosterCacheKey: posterCacheKey
+    })
+
+    return tempFilePath
+  },
+
   async ensureGeneratedReportPdfFile() {
     const localPathCandidates = [
       String(this.data.generatedReportPdfSavedPath || '').trim(),
@@ -959,83 +1124,116 @@ Page({
   },
 
   async onPreviewGeneratedReportTap() {
-    try {
-      const filePath = await this.ensureGeneratedReportPdfFile()
-      this.previewGeneratedPdfFile(filePath)
-    } catch (error) {
-      wx.showToast({
-        title: error?.message || 'PDF 预览失败',
-        icon: 'none',
-        duration: 1800
-      })
+    if (this.data.reportPosterPreviewing) {
+      return
     }
-  },
 
-  async onSaveGeneratedReportTap() {
-    let tempFilePath = ''
-
-    try {
-      const existingSavedPath = String(this.data.generatedReportPdfSavedPath || '').trim()
-      if (existingSavedPath) {
-        try {
-          await accessFileSystemPath(existingSavedPath)
-          wx.showToast({
-            title: '报告已保存到本地',
-            icon: 'success',
-            duration: 1600
-          })
-          return
-        } catch (error) {
-          this.setData({
-            generatedReportPdfSavedPath: ''
-          })
-        }
-      }
-
-      tempFilePath = await this.ensureGeneratedReportPdfFile()
-    } catch (error) {
+    const reportRenderCache = studyReportService.getLatestReportRenderCache()
+    if (!reportRenderCache.hasContent) {
       wx.showToast({
-        title: error?.message || '当前没有可保存的报告',
+        title: '当前没有可查看的研学报告',
         icon: 'none',
         duration: 1800
       })
       return
     }
 
-    const savedFilePath = buildGeneratedReportSavedFilePath()
+    this.setData({
+      reportPosterPreviewing: true
+    })
+
+    wx.showLoading({
+      title: '加载报告中...',
+      mask: true
+    })
 
     try {
-      if (tempFilePath === savedFilePath) {
-        this.setData({
-          generatedReportPdfTitle: GENERATED_REPORT_PDF_FILE_NAME,
-          generatedReportPdfSavedPath: savedFilePath
-        })
-
-        wx.showToast({
-          title: '报告已保存到本地',
-          icon: 'success',
-          duration: 1600
-        })
-        return
-      }
-
-      const finalFilePath = await copyLocalFileToPath(tempFilePath, savedFilePath)
-      this.setData({
-        generatedReportPdfTitle: GENERATED_REPORT_PDF_FILE_NAME,
-        generatedReportPdfTempPath: finalFilePath,
-        generatedReportPdfSavedPath: finalFilePath
-      })
-
-      wx.showToast({
-        title: '报告已保存',
-        icon: 'success',
-        duration: 1600
-      })
+      const tempFilePath = await this.ensureGeneratedReportPosterTempFile(reportRenderCache)
+      wx.hideLoading()
+      await this.previewPosterImage(tempFilePath)
     } catch (error) {
+      wx.hideLoading()
       wx.showToast({
-        title: 'PDF 保存失败',
+        title: error?.message || '报告预览失败',
         icon: 'none',
         duration: 1800
+      })
+    } finally {
+      this.setData({
+        reportPosterPreviewing: false
+      })
+    }
+  },
+
+  async onSaveGeneratedReportTap() {
+    if (!studyReportService.hasLatestReportRenderCache()) {
+      wx.showToast({
+        title: '当前没有可查看的研学报告',
+        icon: 'none',
+        duration: 1800
+      })
+      return
+    }
+
+    if (this.data.reportPosterSaving) {
+      return
+    }
+
+    const reportRenderCache = studyReportService.getLatestReportRenderCache()
+    if (!reportRenderCache.hasContent) {
+      wx.showToast({
+        title: '当前没有可保存的研学报告',
+        icon: 'none',
+        duration: 1800
+      })
+      return
+    }
+
+    this.setData({
+      reportPosterSaving: true
+    })
+
+    wx.showLoading({
+      title: '生成报告中...',
+      mask: true
+    })
+
+    try {
+      const tempFilePath = await this.ensureGeneratedReportPosterTempFile(reportRenderCache)
+      await this.savePosterImageToAlbum(tempFilePath)
+
+      wx.showToast({
+        title: '报告已保存到相册',
+        icon: 'success',
+        duration: 1800
+      })
+    } catch (error) {
+      const errorMessage = String(error?.errMsg || error?.message || '')
+
+      if (/auth deny|auth denied|authorize no response/i.test(errorMessage)) {
+        wx.showModal({
+          title: '需要相册权限',
+          content: '保存研学报告图片需要访问相册，请在设置中允许后重试。',
+          confirmText: '去设置',
+          success: (modalResult) => {
+            if (modalResult.confirm) {
+              wx.openSetting({
+                fail: () => {}
+              })
+            }
+          }
+        })
+      } else {
+        wx.showToast({
+          title: error?.message || '保存报告失败',
+          icon: 'none',
+          duration: 2000
+        })
+      }
+    } finally {
+      wx.hideLoading()
+      this.setData({
+        reportPosterSaving: false
       })
     }
   },

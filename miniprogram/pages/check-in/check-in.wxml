@@ -68,7 +68,7 @@
 
     <view class="generated-report-card" wx:if="{{generatedReportReady}}">
       <view class="generated-report-chip">
-        <text class="generated-report-chip-text">PDF 已生成</text>
+        <text class="generated-report-chip-text">研学报告已生成</text>
       </view>
       <text class="generated-report-title">{{generatedReportPdfTitle}}</text>
       <text class="generated-report-desc">{{generatedReportDescText}}</text>
@@ -77,10 +77,10 @@
 
       <view class="generated-report-actions">
         <view class="generated-report-action generated-report-action-primary" bindtap="onPreviewGeneratedReportTap">
-          <text class="generated-report-action-text generated-report-action-text-primary">预览PDF</text>
+          <text class="generated-report-action-text generated-report-action-text-primary">查看报告</text>
         </view>
         <view class="generated-report-action generated-report-action-secondary" bindtap="onSaveGeneratedReportTap">
-          <text class="generated-report-action-text generated-report-action-text-secondary">{{generatedReportPdfSavedPath ? '已保存' : '保存PDF'}}</text>
+          <text class="generated-report-action-text generated-report-action-text-secondary">{{reportPosterSaving ? '生成中...' : '保存报告'}}</text>
         </view>
       </view>
     </view>
@@ -225,4 +225,11 @@
       </view>
     </view>
   </view>
+
+  <canvas
+    id="study-report-poster-canvas"
+    type="2d"
+    class="report-poster-canvas"
+    style="width: 1192px; height: 1680px;"
+  />
 </view>
