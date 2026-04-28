@@ -4,9 +4,13 @@ const {
   LOCAL_API_BASE_URL
 } = require('../utils/api-config')
 
+const STUDY_REPORT_UPLOAD_PATH = '/client/study-reports/upload'
 const STUDY_REPORT_GENERATE_PATH = '/client/study-reports/generate'
+const STUDY_REPORT_JOB_PATH = '/client/study-reports/jobs'
 const STUDY_REPORT_LATEST_PATH = '/client/study-reports/latest'
 const LATEST_STUDY_REPORT_STORAGE_KEY = 'latestStudyReport'
+const DEFAULT_STUDY_REPORT_POLL_INTERVAL_MS = 2000
+const DEFAULT_STUDY_REPORT_POLL_TIMEOUT_MS = 120000
 
 function getStorageValue(key) {
   try {
@@ -92,6 +96,12 @@ function normalizeIdList(value) {
     .filter(Boolean)
 }
 
+function sleep(timeoutMs) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, Math.max(Number(timeoutMs) || 0, 0))
+  })
+}
+
 function normalizePdfUrl(url = '') {
   const normalizedUrl = String(url || '').trim()
   if (!normalizedUrl) {
@@ -99,6 +109,24 @@ function normalizePdfUrl(url = '') {
   }
 
   return buildUrl(normalizedUrl)
+}
+
+function normalizeJobStatus(value = '') {
+  return String(value || '').trim().toLowerCase()
+}
+
+function extractWorksheetImageUrl(payload = {}) {
+  if (!payload || typeof payload !== 'object') {
+    return ''
+  }
+
+  return String(
+    payload.worksheet_image_url
+      || payload.worksheetImageUrl
+      || payload.data?.worksheet_image_url
+      || payload.result?.worksheet_image_url
+      || ''
+  ).trim()
 }
 
 function extractPdfDescriptor(payload = {}) {
@@ -240,6 +268,90 @@ class StudyReportService {
     return this.extractFilledCells(payload)
   }
 
+  requestStudyReportJob({ token, recordId }) {
+    return new Promise((resolve, reject) => {
+      wx.request({
+        url: buildUrl(`${STUDY_REPORT_JOB_PATH}/${recordId}`),
+        method: 'GET',
+        timeout: 15000,
+        header: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: token ? `Bearer ${token}` : ''
+        },
+        success: (res) => {
+          const payload = res.data
+
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            reject(buildRequestError(payload?.statusCode || res.statusCode, payload, `研学报告状态查询失败 (${res.statusCode})`))
+            return
+          }
+
+          resolve(payload)
+        },
+        fail: (error) => {
+          reject(new Error(error?.errMsg || '研学报告状态查询失败'))
+        }
+      })
+    })
+  }
+
+  async pollStudyReportJob({
+    token,
+    recordId,
+    intervalMs = DEFAULT_STUDY_REPORT_POLL_INTERVAL_MS,
+    timeoutMs = DEFAULT_STUDY_REPORT_POLL_TIMEOUT_MS,
+    onProgress
+  } = {}) {
+    const normalizedRecordId = Number(recordId)
+
+    if (!Number.isFinite(normalizedRecordId) || normalizedRecordId <= 0) {
+      throw new Error('接口未返回有效的任务记录 ID')
+    }
+
+    const deadlineAt = Date.now() + Math.max(Number(timeoutMs) || 0, 10000)
+
+    while (Date.now() <= deadlineAt) {
+      const payload = await this.requestStudyReportJob({
+        token,
+        recordId: normalizedRecordId
+      })
+      const status = normalizeJobStatus(payload?.status)
+
+      if (typeof onProgress === 'function') {
+        onProgress(payload)
+      }
+
+      if (!status && payload?.report) {
+        const cachePayload = this.persistLatestReport(payload)
+
+        return {
+          payload,
+          cachePayload,
+          pdfDescriptor: extractPdfDescriptor(payload || {})
+        }
+      }
+
+      if (status === 'generated') {
+        const cachePayload = this.persistLatestReport(payload)
+
+        return {
+          payload,
+          cachePayload,
+          pdfDescriptor: extractPdfDescriptor(payload || {})
+        }
+      }
+
+      if (status === 'failed') {
+        throw new Error(extractErrorMessage(payload?.last_error || payload, '研学报告生成失败'))
+      }
+
+      await sleep(intervalMs)
+    }
+
+    throw new Error('研学报告生成超时，请稍后到“我的档案”查看结果')
+  }
+
   async getLatestReport({ token } = {}) {
     return new Promise((resolve, reject) => {
       wx.request({
@@ -274,35 +386,21 @@ class StudyReportService {
     })
   }
 
-  async generateReport({
-    token,
-    filePath,
-    studentName,
-    studentCode,
-    studyDate,
-    durationMinutes,
-    scene,
-    clientRequestId
-  }) {
+  uploadWorksheetImage({ token, filePath, onProgress } = {}) {
     return new Promise((resolve, reject) => {
-      const uploadUrl = buildUrl(STUDY_REPORT_GENERATE_PATH)
-      const uploadFormData = {
-        student_name: studentName || '',
-        student_code: studentCode || '',
-        study_date: studyDate || '',
-        duration_minutes: durationMinutes === undefined || durationMinutes === null || durationMinutes === ''
-          ? ''
-          : String(durationMinutes),
-        scene: scene || 'qrcode:study-report',
-        client_request_id: clientRequestId || ''
+      if (typeof onProgress === 'function') {
+        onProgress({
+          phase: 'uploading'
+        })
       }
 
-      console.log('[study-report] upload payload', {
+      const uploadUrl = buildUrl(STUDY_REPORT_UPLOAD_PATH)
+
+      console.log('[study-report] upload worksheet image', {
         url: uploadUrl,
         fileFieldName: 'worksheet_image',
         filePath,
-        hasToken: !!token,
-        formData: uploadFormData
+        hasToken: !!token
       })
 
       wx.uploadFile({
@@ -314,30 +412,145 @@ class StudyReportService {
           Accept: 'application/json',
           Authorization: token ? `Bearer ${token}` : ''
         },
-        formData: uploadFormData,
         success: (res) => {
           const parsedPayload = safeParseJson(res.data)
           const payload = parsedPayload || res.data
 
           if (res.statusCode < 200 || res.statusCode >= 300) {
-            reject(buildRequestError(payload?.statusCode || res.statusCode, payload, `研学报告生成失败 (${res.statusCode})`))
+            reject(buildRequestError(payload?.statusCode || res.statusCode, payload, `答题卡图片上传失败 (${res.statusCode})`))
             return
           }
 
-          const cachePayload = parsedPayload && typeof parsedPayload === 'object'
-            ? this.persistLatestReport(parsedPayload)
-            : null
+          const worksheetImageUrl = extractWorksheetImageUrl(payload)
+          if (!worksheetImageUrl) {
+            reject(new Error('上传成功，但接口未返回答题卡图片地址'))
+            return
+          }
 
           resolve({
-            payload,
-            cachePayload,
-            pdfDescriptor: extractPdfDescriptor(parsedPayload || {})
+            payload: parsedPayload || payload || {},
+            worksheetImageUrl
           })
         },
         fail: (error) => {
-          reject(new Error(error?.errMsg || '研学报告上传失败'))
+          reject(new Error(error?.errMsg || '答题卡图片上传失败'))
         }
       })
+    })
+  }
+
+  requestGenerateStudyReport({
+    token,
+    worksheetImageUrl,
+    studentName,
+    studentCode,
+    studyDate,
+    durationMinutes,
+    onProgress
+  } = {}) {
+    return new Promise((resolve, reject) => {
+      if (typeof onProgress === 'function') {
+        onProgress({
+          phase: 'submitting'
+        })
+      }
+
+      const payload = {
+        worksheet_image_url: worksheetImageUrl,
+        student_name: studentName ? String(studentName).trim() : null,
+        student_code: studentCode ? String(studentCode).trim() : null,
+        study_date: studyDate ? String(studyDate).trim() : null,
+        duration_minutes: Number.isFinite(Number(durationMinutes))
+          ? Math.max(Math.floor(Number(durationMinutes)), 0)
+          : null
+      }
+
+      console.log('[study-report] submit generate payload', {
+        url: buildUrl(STUDY_REPORT_GENERATE_PATH),
+        hasToken: !!token,
+        payload
+      })
+
+      wx.request({
+        url: buildUrl(STUDY_REPORT_GENERATE_PATH),
+        method: 'POST',
+        timeout: 30000,
+        header: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: token ? `Bearer ${token}` : ''
+        },
+        data: payload,
+        success: (res) => {
+          const responsePayload = res.data
+
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            reject(buildRequestError(responsePayload?.statusCode || res.statusCode, responsePayload, `研学报告提交失败 (${res.statusCode})`))
+            return
+          }
+
+          resolve(responsePayload || {})
+        },
+        fail: (error) => {
+          reject(new Error(error?.errMsg || '研学报告提交失败'))
+        }
+      })
+    })
+  }
+
+  async generateReport({
+    token,
+    filePath,
+    studentName,
+    studentCode,
+    studyDate,
+    durationMinutes,
+    pollIntervalMs,
+    pollTimeoutMs,
+    onProgress
+  }) {
+    const uploadResult = await this.uploadWorksheetImage({
+      token,
+      filePath,
+      onProgress
+    })
+    const submitPayload = await this.requestGenerateStudyReport({
+      token,
+      worksheetImageUrl: uploadResult.worksheetImageUrl,
+      studentName,
+      studentCode,
+      studyDate,
+      durationMinutes,
+      onProgress
+    })
+
+    const submitStatus = normalizeJobStatus(submitPayload?.status)
+    const submitRecordId = Number(submitPayload?.record_id || 0) || 0
+
+    if (typeof onProgress === 'function') {
+      onProgress(submitPayload)
+    }
+
+    if ((!submitStatus && submitPayload?.report) || submitStatus === 'generated') {
+      const cachePayload = this.persistLatestReport(submitPayload)
+
+      return {
+        payload: submitPayload,
+        cachePayload,
+        pdfDescriptor: extractPdfDescriptor(submitPayload || {})
+      }
+    }
+
+    if (submitStatus === 'failed') {
+      throw new Error(extractErrorMessage(submitPayload?.last_error || submitPayload, '研学报告生成失败'))
+    }
+
+    return this.pollStudyReportJob({
+      token,
+      recordId: submitRecordId,
+      intervalMs: pollIntervalMs,
+      timeoutMs: pollTimeoutMs,
+      onProgress
     })
   }
 }

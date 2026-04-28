@@ -78,10 +78,6 @@ function buildStudyDateText() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
-function buildClientRequestId() {
-  return `jyl-study-report-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
-}
-
 function buildPdfFileName(studentName, studentCode) {
   const normalizeText = (value, fallbackValue) => {
     const rawText = String(value || '').trim().replace(/[\\/:*?"<>|]/g, '-')
@@ -124,6 +120,33 @@ function formatDateTimeText(value) {
 function isPersistentLocalFile(filePath = '') {
   const normalizedPath = String(filePath || '').trim()
   return !!normalizedPath && normalizedPath.startsWith(`${wx.env.USER_DATA_PATH}/`)
+}
+
+function resolveStudyReportLoadingTitle(payload = {}) {
+  const phase = String(payload?.phase || '').trim().toLowerCase()
+  const status = String(payload?.status || '').trim().toLowerCase()
+
+  if (phase === 'uploading') {
+    return '上传图片中...'
+  }
+
+  if (phase === 'submitting') {
+    return '正在提交...'
+  }
+
+  if (status === 'queued') {
+    return '任务排队中...'
+  }
+
+  if (status === 'processing') {
+    return 'AI识别中...'
+  }
+
+  if (status === 'generated') {
+    return '报告生成中...'
+  }
+
+  return 'AI识别中...'
 }
 
 Page({
@@ -409,8 +432,23 @@ Page({
       worksheetTaskRunning: true
     })
 
+    let currentLoadingTitle = '上传图片中...'
+    const showTaskLoading = (title) => {
+      const nextTitle = String(title || '').trim() || 'AI识别中...'
+
+      if (nextTitle === currentLoadingTitle) {
+        return
+      }
+
+      currentLoadingTitle = nextTitle
+      wx.showLoading({
+        title: currentLoadingTitle,
+        mask: true
+      })
+    }
+
     wx.showLoading({
-      title: 'AI识别中...',
+      title: currentLoadingTitle,
       mask: true
     })
 
@@ -431,8 +469,9 @@ Page({
         studentName: worksheetStudentName,
         studentCode: worksheetStudentCode,
         studyDate: buildStudyDateText(),
-        scene: 'qrcode:study-report',
-        clientRequestId: buildClientRequestId()
+        onProgress: (payload) => {
+          showTaskLoading(resolveStudyReportLoadingTitle(payload))
+        }
       })
 
       const pdfTempFilePath = await this.prepareGeneratedPdfFile(
