@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "九眼楼小程序研学报告接口",
-    "version": "2.0.0",
-    "description": "小程序端通过 JWT 提交答题卡图片 URL，异步生成研学报告，并通过轮询接口获取正式报告、writer_payload 和 PDF URL。"
+    "version": "2.1.0",
+    "description": "小程序端可先上传答题卡图片，再通过 JWT 提交异步研学报告任务，并轮询获取正式报告、writer_payload 和 PDF URL。"
   },
   "servers": [
     {
@@ -22,11 +22,69 @@
     }
   ],
   "paths": {
+    "/client/study-reports/upload": {
+      "post": {
+        "tags": ["client-study-reports"],
+        "summary": "上传答题卡图片",
+        "description": "小程序上传答题卡图片文件，后端完成存储并返回 `worksheet_image_url`。这个接口只上传图片，不生成报告。",
+        "operationId": "clientUploadStudyReportWorksheet",
+        "security": [{"ClientBearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["worksheet_image"],
+                "properties": {
+                  "worksheet_image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "答题卡图片文件"
+                  }
+                }
+              },
+              "encoding": {
+                "worksheet_image": {
+                  "contentType": "image/jpeg, image/png, image/webp"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "上传成功",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ClientStudyReportUploadResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "图片格式或大小不合法",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或 JWT 无效",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
     "/client/study-reports/generate": {
       "post": {
         "tags": ["client-study-reports"],
         "summary": "提交答题卡识别任务",
-        "description": "小程序先自行上传图片到 COS，再把 `worksheet_image_url` 提交给后端。后端依赖 `get_current_client_user` 从 JWT 解析普通用户身份，立即落一条研学记录并返回任务状态。",
+        "description": "先调用上传接口拿到 `worksheet_image_url`，再把这个 URL 提交给后端。后端依赖 `get_current_client_user` 从 JWT 解析普通用户身份，立即落一条研学记录并返回任务状态。",
         "operationId": "clientSubmitStudyReportJob",
         "security": [{"ClientBearerAuth": []}],
         "requestBody": {
@@ -207,13 +265,25 @@
       }
     },
     "schemas": {
+      "ClientStudyReportUploadResponse": {
+        "type": "object",
+        "required": ["storage_resource_id", "worksheet_image_url", "provider", "object_key", "content_type", "size_bytes"],
+        "properties": {
+          "storage_resource_id": {"type": "integer", "minimum": 1},
+          "worksheet_image_url": {"type": "string"},
+          "provider": {"type": "string"},
+          "object_key": {"type": "string"},
+          "content_type": {"type": "string"},
+          "size_bytes": {"type": "integer", "minimum": 0}
+        }
+      },
       "ClientStudyReportGenerateRequest": {
         "type": "object",
         "required": ["worksheet_image_url"],
         "properties": {
           "worksheet_image_url": {
             "type": "string",
-            "description": "小程序上传到 COS 后的答题卡图片 URL，后端必须可访问"
+            "description": "上传接口返回的答题卡图片 URL，后端必须可访问"
           },
           "student_name": {"type": ["string", "null"]},
           "student_code": {"type": ["string", "null"]},
@@ -230,16 +300,12 @@
             "type": "string",
             "enum": ["queued", "processing", "generated", "failed"]
           },
-          "worksheet_image_url": {
-            "type": "string",
-            "description": "小程序提交的原始答题卡图片 URL"
-          },
+          "worksheet_image_url": {"type": "string"},
           "pdf_url": {"type": ["string", "null"]},
           "last_error": {"type": ["string", "null"]},
           "writer_payload": {
             "type": "object",
-            "additionalProperties": true,
-            "description": "第二个模型返回的研学报告原始 JSON；任务未完成时为空对象"
+            "additionalProperties": true
           },
           "report": {
             "oneOf": [
@@ -258,33 +324,17 @@
           "pdf_url": {"type": "string"},
           "writer_payload": {
             "type": "object",
-            "additionalProperties": true,
-            "description": "第二个模型返回的研学报告原始 JSON"
+            "additionalProperties": true
           },
           "report": {"$ref": "#/components/schemas/StudyReportGenerateResponse"}
         }
       },
       "StudyReportGenerateResponse": {
         "type": "object",
-        "required": [
-          "heading",
-          "subheading",
-          "hidden_symbol_summary",
-          "question_results",
-          "question_summary",
-          "overall_accuracy_percent",
-          "overall_comment",
-          "cipher_analysis",
-          "poem_analysis",
-          "badge_title",
-          "badge_description",
-          "final_comment",
-          "current_model",
-          "provider"
-        ],
+        "required": ["heading", "subheading", "hidden_symbol_summary", "question_results", "question_summary", "overall_accuracy_percent", "overall_comment", "cipher_analysis", "poem_analysis", "badge_title", "badge_description", "final_comment", "current_model", "provider"],
         "properties": {
           "student_name": {"type": ["string", "null"]},
-          "student_code": {"type": ["string", "null"], "description": "优先来自答题卡编号识别结果"},
+          "student_code": {"type": ["string", "null"]},
           "study_date": {"type": ["string", "null"]},
           "duration_minutes": {"type": ["integer", "null"], "minimum": 0},
           "heading": {"type": "string"},
@@ -311,7 +361,7 @@
           "filled_count": {"type": "integer", "minimum": 0},
           "matched_symbols": {"type": "array", "items": {"$ref": "#/components/schemas/HiddenSymbolMatch"}},
           "matched_count": {"type": "integer", "minimum": 0},
-          "total_cells": {"type": "integer", "example": 19},
+          "total_cells": {"type": "integer"},
           "accuracy_percent": {"type": "integer", "minimum": 0, "maximum": 100}
         }
       },
@@ -319,18 +369,18 @@
         "type": "object",
         "required": ["symbol_code", "symbol_name"],
         "properties": {
-          "symbol_code": {"type": "string", "example": "13"},
-          "symbol_name": {"type": "string", "example": "13:军防-战鼓"}
+          "symbol_code": {"type": "string"},
+          "symbol_name": {"type": "string"}
         }
       },
       "QuestionResult": {
         "type": "object",
         "required": ["question_number", "prompt", "is_correct"],
         "properties": {
-          "question_number": {"type": "integer", "minimum": 1, "maximum": 4},
+          "question_number": {"type": "integer"},
           "prompt": {"type": "string"},
-          "selected_option": {"type": ["string", "null"], "enum": ["A", "B", "C", null]},
-          "correct_option": {"type": ["string", "null"], "enum": ["A", "B", "C", null]},
+          "selected_option": {"type": ["string", "null"]},
+          "correct_option": {"type": ["string", "null"]},
           "selected_title": {"type": ["string", "null"]},
           "correct_title": {"type": ["string", "null"]},
           "is_correct": {"type": "boolean"}
@@ -341,7 +391,7 @@
         "required": ["correct_count", "total_questions", "accuracy_percent"],
         "properties": {
           "correct_count": {"type": "integer", "minimum": 0},
-          "total_questions": {"type": "integer", "example": 4},
+          "total_questions": {"type": "integer"},
           "accuracy_percent": {"type": "integer", "minimum": 0, "maximum": 100}
         }
       },
@@ -357,6 +407,7 @@
   "x-implementation": {
     "backendRoute": "backend/app/api/v1/endpoints/client/study_reports.py",
     "recordTable": "study_report_records",
+    "storageTable": "storage_resources",
     "worker": "backend/app/services/study_report_worker.py"
   }
 }
