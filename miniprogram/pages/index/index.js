@@ -24,6 +24,7 @@ const AI_CHAT_SUCCESS_REDIRECT_URL = GUIDE_AI_CHAT_PAGE
 const CHECK_IN_CARD_TITLE = '守城认证中心'
 const CHECK_IN_CARD_DESCRIPTION = '提交你的边关答卷，生成专属AI研学报告\n看看六百年后，你将成为怎样的守城人。'
 const CHECK_IN_CARD_ACTION = '点击上传答题卡'
+const STAFF_STUDY_REPORT_PAGE = '/pages/staff-study-report/staff-study-report'
 const STATUS_BAR_GUEST_NAME = '游客'
 const STATUS_BAR_GUEST_AVATAR_SRC = '/images/icons/user.svg'
 const STATUS_BAR_USER_AVATAR_SRC = '/images/xiaojiu.png'
@@ -52,6 +53,7 @@ Page({
 
   onLoad(options = {}) {
     this.pendingLandingRedirect = false
+    this.syncingCurrentUserProfile = false
     this.syncingLatestStudyReport = false
 
     if (this.handleLandingRedirect(options)) {
@@ -81,10 +83,12 @@ Page({
           return
         }
 
-        return this.syncLatestStudyReport().then(() => {
-          this.syncStatusBarUser()
-          this.syncCheckInEntry()
-        })
+        return this.syncCurrentUserProfile()
+          .then(() => this.syncLatestStudyReport())
+          .then(() => {
+            this.syncStatusBarUser()
+            this.syncCheckInEntry()
+          })
       })
       .finally(() => {
         this.setData({
@@ -113,9 +117,14 @@ Page({
   },
 
   onPullDownRefresh() {
-    setTimeout(() => {
+    Promise.allSettled([
+      this.syncCurrentUserProfile(),
+      this.syncLatestStudyReport()
+    ]).finally(() => {
+      this.syncStatusBarUser()
+      this.syncCheckInEntry()
       wx.stopPullDownRefresh()
-    }, 250)
+    })
   },
 
   initializePage() {
@@ -229,6 +238,26 @@ Page({
   },
 
   onCheckInTap() {
+    const currentUserProfile = auth.getCachedCurrentUserProfile()
+    const userInfo = auth.getUserInfo() || {}
+    const userType = String(
+      currentUserProfile?.user_type
+      || userInfo?.user_type
+      || ''
+    ).trim().toLowerCase()
+
+    if (userType === 'staff') {
+      wx.navigateTo({
+        url: STAFF_STUDY_REPORT_PAGE,
+        fail: () => {
+          wx.redirectTo({
+            url: STAFF_STUDY_REPORT_PAGE
+          })
+        }
+      })
+      return
+    }
+
     const targetUrl = this.data.checkInCompletedCount >= this.data.checkInTotalCount
       ? '/pages/my-page/my-page'
       : '/pages/check-in/check-in'
@@ -376,6 +405,26 @@ Page({
       }
     } finally {
       this.syncingLatestStudyReport = false
+    }
+  },
+
+  async syncCurrentUserProfile() {
+    if (this.syncingCurrentUserProfile) {
+      return
+    }
+
+    if (!auth.isLoggedIn()) {
+      return
+    }
+
+    this.syncingCurrentUserProfile = true
+
+    try {
+      await auth.syncCurrentUserProfile()
+    } catch (error) {
+      console.warn('current user profile request failed:', error?.message || error)
+    } finally {
+      this.syncingCurrentUserProfile = false
     }
   },
 

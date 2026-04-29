@@ -4,7 +4,8 @@
     "pages/landing/index",
     "pages/my-page/my-page",
     "pages/study-report/study-report",
-    "pages/check-in/check-in"
+    "pages/check-in/check-in",
+    "pages/staff-study-report/staff-study-report"
   ],
   "subpackages": [
     {

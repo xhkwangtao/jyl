@@ -3,11 +3,14 @@ const {
   ONLINE_API_BASE_URL,
   LOCAL_API_BASE_URL
 } = require('./api-config')
+const request = require('./request')
 
 const DEFAULT_WX_LOGIN_TIMEOUT_MS = 2500
 const DEFAULT_LOGIN_REQUEST_TIMEOUT_MS = 5000
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000
 const WECHAT_LOGIN_PATH = '/client/users/wechat-login'
+const CURRENT_USER_PATH = '/client/users/me'
+const CURRENT_USER_CACHE_STORAGE_KEY = 'currentUserProfile'
 
 function getStorageValue(key) {
   try {
@@ -169,6 +172,7 @@ class Auth {
     wx.setStorageSync('loginTime', now)
     wx.setStorageSync('userInfo', userInfo)
     wx.setStorageSync('clientUser', userInfo)
+    wx.removeStorageSync(CURRENT_USER_CACHE_STORAGE_KEY)
 
     return {
       token: loginPayload.token,
@@ -178,6 +182,19 @@ class Auth {
       userInfo,
       user: userInfo
     }
+  }
+
+  persistUserInfo(userInfo = {}) {
+    const existingUserInfo = normalizeUserInfo(this.getUserInfo() || {})
+    const normalizedUserInfo = normalizeUserInfo({
+      ...existingUserInfo,
+      ...userInfo
+    })
+
+    wx.setStorageSync('userInfo', normalizedUserInfo)
+    wx.setStorageSync('clientUser', normalizedUserInfo)
+
+    return normalizedUserInfo
   }
 
   async wxLogin(options = {}) {
@@ -211,6 +228,21 @@ class Auth {
     return Number.isFinite(tokenExpiresAt) ? tokenExpiresAt : 0
   }
 
+  getCachedCurrentUserProfile() {
+    const cachedProfile = getStorageValue(CURRENT_USER_CACHE_STORAGE_KEY)
+    if (!cachedProfile || typeof cachedProfile !== 'object') {
+      return null
+    }
+
+    return normalizeUserInfo(cachedProfile)
+  }
+
+  persistCurrentUserProfileCache(userInfo = {}) {
+    const normalizedUserInfo = normalizeUserInfo(userInfo)
+    wx.setStorageSync(CURRENT_USER_CACHE_STORAGE_KEY, normalizedUserInfo)
+    return normalizedUserInfo
+  }
+
   hasValidToken(bufferMs = TOKEN_EXPIRY_BUFFER_MS) {
     const token = this.getToken()
     if (!token) {
@@ -238,6 +270,16 @@ class Auth {
     return getStorageValue('userInfo') || null
   }
 
+  async syncCurrentUserProfile() {
+    if (!this.isLoggedIn()) {
+      return this.getUserInfo()
+    }
+
+    const userProfile = await request.get(CURRENT_USER_PATH)
+    this.persistCurrentUserProfileCache(userProfile)
+    return this.persistUserInfo(userProfile)
+  }
+
   logout() {
     wx.removeStorageSync('token')
     wx.removeStorageSync('tokenType')
@@ -245,6 +287,7 @@ class Auth {
     wx.removeStorageSync('userInfo')
     wx.removeStorageSync('clientUser')
     wx.removeStorageSync('loginTime')
+    wx.removeStorageSync(CURRENT_USER_CACHE_STORAGE_KEY)
   }
 
   debugAuthStatus() {

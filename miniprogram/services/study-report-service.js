@@ -12,6 +12,7 @@ const STUDY_REPORT_UPLOAD_PATH = '/client/study-reports/upload'
 const STUDY_REPORT_GENERATE_PATH = '/client/study-reports/generate'
 const STUDY_REPORT_JOB_PATH = '/client/study-reports/jobs'
 const STUDY_REPORT_LATEST_PATH = '/client/study-reports/latest'
+const STUDY_GROUP_ACTIVE_PATH = '/client/study-groups/active'
 const LATEST_STUDY_REPORT_STORAGE_KEY = 'latestStudyReport'
 const LATEST_STUDY_REPORT_RENDER_CACHE_STORAGE_KEY = 'latestStudyReportRenderCache'
 const STUDY_REPORT_SCAN_REQUEST_STORAGE_KEY = 'studyReportScanRequestState'
@@ -120,6 +121,26 @@ function normalizePdfUrl(url = '') {
 
 function normalizeJobStatus(value = '') {
   return String(value || '').trim().toLowerCase()
+}
+
+function buildStudyGroupProgressPath(groupId) {
+  return `/client/study-groups/${groupId}/progress`
+}
+
+function buildStudyGroupStudentsPath(groupId) {
+  return `/client/study-groups/${groupId}/students`
+}
+
+function buildStudyGroupStudentPath(groupId, cardCode) {
+  return `/client/study-groups/${groupId}/students/${encodeURIComponent(String(cardCode || '').trim())}`
+}
+
+function buildStudyGroupStudentReportJobPath(groupId, cardCode) {
+  return `${buildStudyGroupStudentPath(groupId, cardCode)}/study-report-job`
+}
+
+function buildStudyGroupStudentReportJobsPath(groupId, cardCode) {
+  return `${buildStudyGroupStudentPath(groupId, cardCode)}/study-report-jobs`
 }
 
 function extractWorksheetImageUrl(payload = {}) {
@@ -417,12 +438,20 @@ class StudyReportService {
     } catch (error) {}
   }
 
-  requestStudyReportJob({ token, recordId }) {
+  requestJson({
+    token,
+    url,
+    method = 'GET',
+    timeout = 15000,
+    data,
+    fallbackMessage = '请求失败'
+  } = {}) {
     return new Promise((resolve, reject) => {
       wx.request({
-        url: buildUrl(`${STUDY_REPORT_JOB_PATH}/${recordId}`),
-        method: 'GET',
-        timeout: 15000,
+        url: buildUrl(url),
+        method,
+        timeout,
+        data,
         header: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
@@ -432,16 +461,24 @@ class StudyReportService {
           const payload = res.data
 
           if (res.statusCode < 200 || res.statusCode >= 300) {
-            reject(buildRequestError(payload?.statusCode || res.statusCode, payload, `研学报告状态查询失败 (${res.statusCode})`))
+            reject(buildRequestError(payload?.statusCode || res.statusCode, payload, `${fallbackMessage} (${res.statusCode})`))
             return
           }
 
           resolve(payload)
         },
         fail: (error) => {
-          reject(new Error(error?.errMsg || '研学报告状态查询失败'))
+          reject(new Error(error?.errMsg || fallbackMessage))
         }
       })
+    })
+  }
+
+  requestStudyReportJob({ token, recordId }) {
+    return this.requestJson({
+      token,
+      url: `${STUDY_REPORT_JOB_PATH}/${recordId}`,
+      fallbackMessage: '研学报告状态查询失败'
     })
   }
 
@@ -507,37 +544,197 @@ class StudyReportService {
   }
 
   async getLatestReport({ token } = {}) {
+    const payload = await this.requestJson({
+      token,
+      url: STUDY_REPORT_LATEST_PATH,
+      fallbackMessage: '研学报告查询失败'
+    })
+    const cachePayload = this.persistLatestReport(payload)
+
+    return {
+      payload,
+      cachePayload,
+      pdfDescriptor: extractPdfDescriptor(payload || {})
+    }
+  }
+
+  async listActiveStudyGroups({ token, offset = 0, limit = 50 } = {}) {
+    const payload = await this.requestJson({
+      token,
+      url: STUDY_GROUP_ACTIVE_PATH,
+      data: {
+        offset: Math.max(Number(offset) || 0, 0),
+        limit: Math.max(Number(limit) || 50, 1)
+      },
+      fallbackMessage: '研学团查询失败'
+    })
+
+    return {
+      payload,
+      items: Array.isArray(payload?.items) ? payload.items : [],
+      total: Number(payload?.total || 0) || 0
+    }
+  }
+
+  async getStudyGroupProgress({ token, groupId } = {}) {
+    return this.requestJson({
+      token,
+      url: buildStudyGroupProgressPath(groupId),
+      fallbackMessage: '研学团进度查询失败'
+    })
+  }
+
+  async listStudyGroupStudents({
+    token,
+    groupId,
+    offset = 0,
+    limit = 200,
+    keyword = '',
+    reportStatus = ''
+  } = {}) {
+    const requestData = {
+      offset: Math.max(Number(offset) || 0, 0),
+      limit: Math.max(Number(limit) || 200, 1)
+    }
+    const normalizedKeyword = String(keyword || '').trim()
+    const normalizedReportStatus = String(reportStatus || '').trim()
+
+    if (normalizedKeyword) {
+      requestData.keyword = normalizedKeyword
+    }
+
+    if (normalizedReportStatus) {
+      requestData.report_status = normalizedReportStatus
+    }
+
+    const payload = await this.requestJson({
+      token,
+      url: buildStudyGroupStudentsPath(groupId),
+      data: requestData,
+      fallbackMessage: '学生列表查询失败'
+    })
+
+    return {
+      payload,
+      items: Array.isArray(payload?.items) ? payload.items : [],
+      total: Number(payload?.total || 0) || 0
+    }
+  }
+
+  async getStudyGroupStudentByCardCode({ token, groupId, cardCode } = {}) {
+    return this.requestJson({
+      token,
+      url: buildStudyGroupStudentPath(groupId, cardCode),
+      fallbackMessage: '学生信息查询失败'
+    })
+  }
+
+  async getStudyGroupStudentReportJob({ token, groupId, cardCode } = {}) {
+    return this.requestJson({
+      token,
+      url: buildStudyGroupStudentReportJobPath(groupId, cardCode),
+      fallbackMessage: '学生报告状态查询失败'
+    })
+  }
+
+  requestGenerateStudyGroupStudentReport({
+    token,
+    groupId,
+    cardCode,
+    worksheetImageUrl,
+    studyDate,
+    durationMinutes,
+    onProgress
+  } = {}) {
     return new Promise((resolve, reject) => {
+      if (typeof onProgress === 'function') {
+        onProgress({
+          phase: 'submitting'
+        })
+      }
+
+      const payload = {
+        worksheet_image_url: worksheetImageUrl,
+        study_date: studyDate ? String(studyDate).trim() : null,
+        duration_minutes: Number.isFinite(Number(durationMinutes))
+          ? Math.max(Math.floor(Number(durationMinutes)), 0)
+          : null
+      }
+
       wx.request({
-        url: buildUrl(STUDY_REPORT_LATEST_PATH),
-        method: 'GET',
-        timeout: 15000,
+        url: buildUrl(buildStudyGroupStudentReportJobsPath(groupId, cardCode)),
+        method: 'POST',
+        timeout: 30000,
         header: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
           Authorization: token ? `Bearer ${token}` : ''
         },
+        data: payload,
         success: (res) => {
-          const payload = res.data
+          const responsePayload = res.data
 
           if (res.statusCode < 200 || res.statusCode >= 300) {
-            reject(buildRequestError(payload?.statusCode || res.statusCode, payload, `研学报告查询失败 (${res.statusCode})`))
+            reject(buildRequestError(responsePayload?.statusCode || res.statusCode, responsePayload, `团体研学报告提交失败 (${res.statusCode})`))
             return
           }
 
-          const cachePayload = this.persistLatestReport(payload)
-
-          resolve({
-            payload,
-            cachePayload,
-            pdfDescriptor: extractPdfDescriptor(payload || {})
-          })
+          resolve(responsePayload || {})
         },
         fail: (error) => {
-          reject(new Error(error?.errMsg || '研学报告查询失败'))
+          reject(new Error(error?.errMsg || '团体研学报告提交失败'))
         }
       })
     })
+  }
+
+  async pollStudyGroupStudentReportJob({
+    token,
+    groupId,
+    cardCode,
+    intervalMs = DEFAULT_STUDY_REPORT_POLL_INTERVAL_MS,
+    timeoutMs = DEFAULT_STUDY_REPORT_POLL_TIMEOUT_MS,
+    onProgress
+  } = {}) {
+    const normalizedGroupId = Number(groupId)
+    const normalizedCardCode = String(cardCode || '').trim()
+
+    if (!Number.isFinite(normalizedGroupId) || normalizedGroupId <= 0 || !normalizedCardCode) {
+      throw new Error('缺少有效的研学团或答题卡编号')
+    }
+
+    const deadlineAt = Date.now() + Math.max(Number(timeoutMs) || 0, 10000)
+
+    while (Date.now() <= deadlineAt) {
+      const payload = await this.getStudyGroupStudentReportJob({
+        token,
+        groupId: normalizedGroupId,
+        cardCode: normalizedCardCode
+      })
+      const status = normalizeJobStatus(payload?.status)
+
+      if (typeof onProgress === 'function') {
+        onProgress(payload)
+      }
+
+      if ((!status && payload?.report) || status === 'generated') {
+        const cachePayload = this.persistLatestReport(payload)
+
+        return {
+          payload,
+          cachePayload,
+          pdfDescriptor: extractPdfDescriptor(payload || {})
+        }
+      }
+
+      if (status === 'failed') {
+        throw new Error(extractErrorMessage(payload?.last_error || payload, '团体研学报告生成失败'))
+      }
+
+      await sleep(intervalMs)
+    }
+
+    throw new Error('团体研学报告生成超时，请稍后刷新状态')
   }
 
   uploadWorksheetImage({ token, filePath, onProgress } = {}) {
@@ -718,6 +915,71 @@ class StudyReportService {
     return this.pollStudyReportJob({
       token,
       recordId: submitRecordId,
+      intervalMs: pollIntervalMs,
+      timeoutMs: pollTimeoutMs,
+      onProgress
+    })
+  }
+
+  async generateStudyGroupStudentReport({
+    token,
+    groupId,
+    cardCode,
+    filePath,
+    studyDate,
+    durationMinutes,
+    deferPollingOnPending = false,
+    pollIntervalMs,
+    pollTimeoutMs,
+    onProgress
+  } = {}) {
+    const uploadResult = await this.uploadWorksheetImage({
+      token,
+      filePath,
+      onProgress
+    })
+    const submitPayload = await this.requestGenerateStudyGroupStudentReport({
+      token,
+      groupId,
+      cardCode,
+      worksheetImageUrl: uploadResult.worksheetImageUrl,
+      studyDate,
+      durationMinutes,
+      onProgress
+    })
+    const submitStatus = normalizeJobStatus(submitPayload?.status)
+
+    if (typeof onProgress === 'function') {
+      onProgress(submitPayload)
+    }
+
+    if ((!submitStatus && submitPayload?.report) || submitStatus === 'generated') {
+      const cachePayload = this.persistLatestReport(submitPayload)
+
+      return {
+        payload: submitPayload,
+        cachePayload,
+        pdfDescriptor: extractPdfDescriptor(submitPayload || {})
+      }
+    }
+
+    if (submitStatus === 'failed') {
+      throw new Error(extractErrorMessage(submitPayload?.last_error || submitPayload, '团体研学报告生成失败'))
+    }
+
+    if (deferPollingOnPending) {
+      return {
+        payload: submitPayload,
+        cachePayload: null,
+        pdfDescriptor: extractPdfDescriptor(submitPayload || {}),
+        pending: true
+      }
+    }
+
+    return this.pollStudyGroupStudentReportJob({
+      token,
+      groupId,
+      cardCode,
       intervalMs: pollIntervalMs,
       timeoutMs: pollTimeoutMs,
       onProgress
