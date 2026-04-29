@@ -148,8 +148,14 @@ Page({
   },
 
   onLoad(options = {}) {
+    this.pendingSilentLoginPromise = null
+    this.ensureSilentLogin()
     this.parseOptions(options)
     this.loadProductPrice()
+  },
+
+  onShow() {
+    this.ensureSilentLogin()
   },
 
   parseOptions(options = {}) {
@@ -181,6 +187,32 @@ Page({
       currency: safeDecode(options.currency) || DEFAULT_CURRENCY,
       successRedirectUrl: safeDecode(options.successRedirect)
     })
+  },
+
+  ensureSilentLogin() {
+    if (this.pendingSilentLoginPromise) {
+      return this.pendingSilentLoginPromise
+    }
+
+    this.pendingSilentLoginPromise = this.silentLogin().finally(() => {
+      this.pendingSilentLoginPromise = null
+    })
+
+    return this.pendingSilentLoginPromise
+  },
+
+  async silentLogin() {
+    try {
+      const hasLogin = await auth.checkAndAutoLogin(2500)
+      if (!hasLogin || !auth.getToken()) {
+        return false
+      }
+
+      await auth.syncCurrentUserProfile().catch(() => null)
+      return true
+    } catch (error) {
+      return false
+    }
   },
 
   async loadProductPrice() {

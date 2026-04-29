@@ -85,9 +85,11 @@ Page({
   },
 
   async onLoad(options = {}) {
+    this.pendingSilentLoginPromise = null
     this.updateBadgeEntranceClass()
     const landingOptions = persistLandingContext(options)
 
+    this.ensureSilentLogin()
     this.parseUrlParams(landingOptions)
     this.initSystemInfo()
     this.initUIEnhancements()
@@ -95,6 +97,7 @@ Page({
   },
 
   onShow() {
+    this.ensureSilentLogin()
     this.playEntranceAnimation()
   },
 
@@ -231,6 +234,32 @@ Page({
     return requestedSourceCode === responseSourceCode
   },
 
+  ensureSilentLogin() {
+    if (this.pendingSilentLoginPromise) {
+      return this.pendingSilentLoginPromise
+    }
+
+    this.pendingSilentLoginPromise = this.silentLogin().finally(() => {
+      this.pendingSilentLoginPromise = null
+    })
+
+    return this.pendingSilentLoginPromise
+  },
+
+  async silentLogin() {
+    try {
+      const hasLogin = await auth.checkAndAutoLogin(2500)
+      if (!hasLogin || !auth.getToken()) {
+        return false
+      }
+
+      await auth.syncCurrentUserProfile().catch(() => null)
+      return true
+    } catch (error) {
+      return false
+    }
+  },
+
   async ensureScenicVideoAccess() {
     const accessResult = await checkCurrentLocationInScenicArea()
     if (accessResult.allowed) {
@@ -248,6 +277,8 @@ Page({
   },
 
   async isVipActive() {
+    await this.ensureSilentLogin()
+
     if (!auth.getToken()) {
       return isFeaturePaid(VIP_FEATURE_KEY)
     }
