@@ -134,7 +134,7 @@
 
     <view class="bottom-actions">
       <view class="bottom-action bottom-action-primary" bindtap="onOpenCollectionPage">
-        <text class="bottom-action-text bottom-action-text-primary">{{reportUnlocked ? '回看收集点' : '去收集暗号'}}</text>
+        <text class="bottom-action-text bottom-action-text-primary">收集暗号</text>
       </view>
       <view class="bottom-action bottom-action-secondary" bindtap="onOpenMapPage">
         <text class="bottom-action-text bottom-action-text-secondary">打开地图</text>
