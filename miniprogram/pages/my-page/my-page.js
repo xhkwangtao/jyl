@@ -451,6 +451,10 @@ Page({
     navigateToPage('/subpackages/guide/pages/map/map')
   },
 
+  onOpenOrderCenter() {
+    navigateToPage('/pages/order-center/index')
+  },
+
   onReportTap() {
     if (!this.data.reportUnlocked && !studyReportService.hasLatestReportRenderCache()) {
       wx.showToast({

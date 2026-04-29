@@ -415,6 +415,44 @@
   gap: 14rpx;
 }
 
+.order-entry-card {
+  margin-top: 18rpx;
+  padding: 26rpx 28rpx;
+  border-radius: 28rpx;
+  border: 1px solid rgba(36, 72, 92, 0.08);
+  background: rgba(255, 251, 246, 0.94);
+  box-shadow: 0 18rpx 44rpx rgba(31, 58, 74, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.order-entry-title,
+.order-entry-desc {
+  display: block;
+}
+
+.order-entry-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2d35;
+}
+
+.order-entry-desc {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  line-height: 1.7;
+  color: #5c6d74;
+}
+
+.order-entry-arrow {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #245f6d;
+}
+
 .report-actions {
   margin-top: 22rpx;
 }

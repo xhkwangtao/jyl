@@ -1,5 +1,6 @@
 const auth = require('../../../../../utils/auth')
 const paymentService = require('../../../../../services/payment-service')
+const orderService = require('../../../../../services/order-service')
 const entitlementService = require('../../../../../services/entitlement-service')
 const { setFeaturePaid } = require('../../../../../utils/audio-access.js')
 const {
@@ -411,10 +412,12 @@ Page({
         quantity: 1,
         featureKey: this.data.featureKey
       })
+      orderService.recordPendingOrder(paymentOrder)
 
       if (!paymentOrder.dry_run) {
         await requestWxPayment(paymentOrder.payment_params || {})
       }
+      orderService.markOrderPaid(paymentOrder)
 
       grantPaidAccess(this.data.featureKey)
 

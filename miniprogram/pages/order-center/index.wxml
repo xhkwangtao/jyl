@@ -1,0 +1,126 @@
+<view class="order-center-page">
+  <view class="background-layer">
+    <image class="background-svg" src="/images/ai-chat-bg.svg" mode="aspectFill"></image>
+  </view>
+
+  <view class="page-header">
+    <universal-navigation
+      title="订单中心"
+      show-back="{{true}}"
+      showHomeButton="{{true}}"
+      background-color="rgba(255, 255, 255, 0.16)"
+      title-color="#2c2823"
+      showUserAvatar="{{false}}"
+      useCapsuleStyle="{{false}}"
+      useDefaultBack="{{false}}"
+      bind:back="onBackTap"
+      bind:home="onHomeTap"
+    />
+  </view>
+
+  <view class="content-layer">
+    <view class="hero-card">
+      <text class="hero-kicker">ORDER CENTER</text>
+      <text class="hero-title">我的订单</text>
+      <text class="hero-desc">查看 VIP 开通记录、支付状态与订单详情。</text>
+      <text class="fallback-tip" wx:if="{{fallbackSourceText}}">{{fallbackSourceText}}</text>
+    </view>
+
+    <scroll-view class="status-tabs" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view class="status-tabs-inner">
+        <view
+          wx:for="{{tabs}}"
+          wx:key="key"
+          class="status-tab {{item.key === activeStatus ? 'status-tab-active' : ''}}"
+          data-status="{{item.key}}"
+          bindtap="onTabChange"
+        >
+          <text class="status-tab-text">{{item.title}}</text>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="loading-card" wx:if="{{loading && !initialized}}">
+      <text class="loading-title">订单加载中</text>
+      <text class="loading-desc">正在同步你的支付记录与权益状态。</text>
+    </view>
+
+    <block wx:elif="{{orders.length}}">
+      <view
+        class="order-card"
+        wx:for="{{orders}}"
+        wx:key="orderKey"
+      >
+        <view class="order-card-top">
+          <view class="merchant-pill">
+            <text class="merchant-dot"></text>
+            <text class="merchant-name">九眼楼景区</text>
+          </view>
+          <text class="order-status order-status-{{item.statusClass}}">{{item.statusText}}</text>
+        </view>
+
+        <view class="product-row">
+          <image class="product-image" src="/images/badges/vip-card.svg" mode="aspectFit"></image>
+          <view class="product-copy">
+            <text class="product-title">{{item.productName}}</text>
+            <text class="product-desc">有效期：购买后立即生效</text>
+            <text class="product-desc" wx:if="{{item.vipStatusText}}">{{item.vipStatusText}}</text>
+            <view class="product-bottom">
+              <text class="product-quantity">{{item.quantityText}}</text>
+              <text class="product-price">¥{{item.amountText}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="meta-section">
+          <view class="meta-row">
+            <text class="meta-label">订单编号</text>
+            <text class="meta-value">{{item.orderNo || '待生成'}}</text>
+          </view>
+          <view class="meta-row">
+            <text class="meta-label">下单时间</text>
+            <text class="meta-value">{{item.createdAtText || '刚刚创建'}}</text>
+          </view>
+          <view class="meta-row" wx:if="{{item.paidAtText}}">
+            <text class="meta-label">支付时间</text>
+            <text class="meta-value">{{item.paidAtText}}</text>
+          </view>
+        </view>
+
+        <view class="order-actions">
+          <view
+            wx:if="{{item.canContinuePay}}"
+            class="order-action order-action-secondary"
+            data-index="{{index}}"
+            bindtap="onContinuePay"
+          >
+            <text class="order-action-text order-action-text-secondary">继续支付</text>
+          </view>
+          <view
+            class="order-action order-action-primary"
+            data-order-id="{{item.orderId}}"
+            data-order-no="{{item.orderNo}}"
+            bindtap="viewDetail"
+          >
+            <text class="order-action-text order-action-text-primary">订单详情</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="list-status" wx:if="{{loading || !hasMore}}">
+        <text class="list-status-text">{{loading ? '加载更多中...' : '暂无更多订单'}}</text>
+      </view>
+    </block>
+
+    <view class="empty-state" wx:else>
+      <view class="empty-icon-shell">
+        <image class="empty-icon" src="/images/badges/vip-card.svg" mode="aspectFit"></image>
+      </view>
+      <text class="empty-title">暂无{{activeStatusText}}订单</text>
+      <text class="empty-desc">开通后你的 VIP 订单会显示在这里。</text>
+      <view class="empty-action" bindtap="onGoSubscribe">
+        <text class="empty-action-text">去购买</text>
+      </view>
+    </view>
+  </view>
+</view>

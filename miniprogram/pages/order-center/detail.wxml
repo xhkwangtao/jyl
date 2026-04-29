@@ -1,0 +1,113 @@
+<view class="order-detail-page">
+  <view class="background-layer">
+    <image class="background-svg" src="/images/ai-chat-bg.svg" mode="aspectFill"></image>
+  </view>
+
+  <view class="page-header">
+    <universal-navigation
+      title="订单详情"
+      show-back="{{true}}"
+      showHomeButton="{{true}}"
+      background-color="rgba(255, 255, 255, 0.16)"
+      title-color="#2c2823"
+      showUserAvatar="{{false}}"
+      useCapsuleStyle="{{false}}"
+      useDefaultBack="{{false}}"
+      bind:back="onBackTap"
+      bind:home="onHomeTap"
+    />
+  </view>
+
+  <view class="content-layer">
+    <view wx:if="{{loading}}" class="state-card">
+      <text class="state-title">订单加载中</text>
+      <text class="state-desc">正在同步当前订单详情。</text>
+    </view>
+
+    <view wx:elif="{{errorMessage}}" class="state-card">
+      <text class="state-title">加载失败</text>
+      <text class="state-desc">{{errorMessage}}</text>
+      <view class="state-action" bindtap="refreshOrder">
+        <text class="state-action-text">重新加载</text>
+      </view>
+    </view>
+
+    <view wx:else class="detail-card">
+      <view class="section">
+        <view class="section-top">
+          <text class="section-title">{{order.productName}}</text>
+          <text class="order-status order-status-{{order.status}}">{{order.statusText}}</text>
+        </view>
+        <text class="section-subtitle">订单编号：{{order.orderNo || '待生成'}}</text>
+        <view class="copy-action" bindtap="copyOrderNo">
+          <text class="copy-action-text">复制订单号</text>
+        </view>
+      </view>
+
+      <view class="section">
+        <view class="info-row">
+          <text class="info-label">支付金额</text>
+          <text class="info-value info-value-strong">¥{{order.amountText}} {{order.currency}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">待支付金额</text>
+          <text class="info-value">¥{{order.amountPayableText}}</text>
+        </view>
+        <view class="info-row" wx:if="{{order.vipStatusText}}">
+          <text class="info-label">权益状态</text>
+          <text class="info-value info-value-highlight">{{order.vipStatusText}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">支付渠道</text>
+          <text class="info-value">{{order.paymentChannel || '微信支付'}}</text>
+        </view>
+        <view class="info-row" wx:if="{{order.createdAtText}}">
+          <text class="info-label">下单时间</text>
+          <text class="info-value">{{order.createdAtText}}</text>
+        </view>
+        <view class="info-row" wx:if="{{order.paidAtText}}">
+          <text class="info-label">支付时间</text>
+          <text class="info-value">{{order.paidAtText}}</text>
+        </view>
+        <view class="info-row" wx:if="{{order.vipExpiresAtText}}">
+          <text class="info-label">权益到期</text>
+          <text class="info-value">{{order.vipExpiresAtText}}</text>
+        </view>
+      </view>
+
+      <view class="section" wx:if="{{order.items && order.items.length}}">
+        <text class="section-heading">商品信息</text>
+        <view class="item-row" wx:for="{{order.items}}" wx:key="index">
+          <view>
+            <text class="item-title">{{item.title}}</text>
+            <text class="item-meta">数量 {{item.quantity}}</text>
+          </view>
+          <text class="item-price">¥{{item.totalAmountText}}</text>
+        </view>
+      </view>
+
+      <view class="section" wx:if="{{order.transactions && order.transactions.length}}">
+        <text class="section-heading">支付记录</text>
+        <view class="transaction-card" wx:for="{{order.transactions}}" wx:key="transactionId">
+          <text class="transaction-state">{{item.tradeState}}</text>
+          <text class="transaction-line">金额：¥{{item.amountText}}</text>
+          <text class="transaction-line" wx:if="{{item.payTimeText}}">完成时间：{{item.payTimeText}}</text>
+          <text class="transaction-line" wx:if="{{item.transactionId}}">交易号：{{item.transactionId}}</text>
+        </view>
+      </view>
+
+      <view class="detail-actions">
+        <view
+          wx:if="{{order.canContinuePay}}"
+          class="detail-action detail-action-secondary"
+          bindtap="continuePay"
+        >
+          <text class="detail-action-text detail-action-text-secondary">继续支付</text>
+        </view>
+        <view class="detail-action detail-action-primary" bindtap="refreshOrder">
+          <text class="detail-action-text detail-action-text-primary">刷新状态</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

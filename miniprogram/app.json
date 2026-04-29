@@ -3,6 +3,8 @@
     "pages/index/index",
     "pages/landing/index",
     "pages/my-page/my-page",
+    "pages/order-center/index",
+    "pages/order-center/detail",
     "pages/study-report/study-report",
     "pages/check-in/check-in",
     "pages/staff-study-report/staff-study-report"

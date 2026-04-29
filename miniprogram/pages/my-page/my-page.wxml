@@ -140,5 +140,13 @@
         <text class="bottom-action-text bottom-action-text-secondary">打开地图</text>
       </view>
     </view>
+
+    <view class="order-entry-card" bindtap="onOpenOrderCenter">
+      <view>
+        <text class="order-entry-title">订单中心</text>
+        <text class="order-entry-desc">查看 VIP 开通记录、支付状态与订单详情</text>
+      </view>
+      <text class="order-entry-arrow">查看</text>
+    </view>
   </view>
 </view>
