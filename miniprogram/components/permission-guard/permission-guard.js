@@ -1,8 +1,18 @@
 const auth = require('../../utils/auth')
 const entitlementService = require('../../services/entitlement-service')
 
+const PERMISSION_AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+
 function normalizeText(value = '') {
   return String(value || '').trim()
+}
+
+function normalizeFeatureKey(featureKey = '') {
+  return entitlementService.normalizeFeatureKey(featureKey)
+}
+
+function normalizeEntitlementKey(entitlementKey = '') {
+  return normalizeText(entitlementKey)
 }
 
 function navigateToPage(url = '') {
@@ -47,7 +57,167 @@ Component({
     virtualHost: true
   },
 
+  lifetimes: {
+    attached() {
+      this.pageVisible = true
+      this.trackedFeatureKeySet = new Set()
+      this.trackedEntitlementKeySet = new Set()
+      this.permissionAutoRefreshTimer = null
+      this.permissionRefreshPromise = null
+      this.startPermissionAutoRefresh()
+    },
+
+    detached() {
+      this.stopPermissionAutoRefresh()
+      this.permissionRefreshPromise = null
+      this.trackedFeatureKeySet = null
+      this.trackedEntitlementKeySet = null
+    }
+  },
+
+  pageLifetimes: {
+    show() {
+      this.pageVisible = true
+      this.startPermissionAutoRefresh()
+      this.refreshTrackedPermissions({
+        reason: 'page_show'
+      }).catch(() => {})
+    },
+
+    hide() {
+      this.pageVisible = false
+      this.stopPermissionAutoRefresh()
+    }
+  },
+
   methods: {
+    trackFeatureKeys(featureKeyList = []) {
+      if (!(this.trackedFeatureKeySet instanceof Set)) {
+        this.trackedFeatureKeySet = new Set()
+      }
+
+      ;(Array.isArray(featureKeyList) ? featureKeyList : [featureKeyList]).forEach((featureKey) => {
+        const normalizedFeatureKey = normalizeFeatureKey(featureKey)
+        if (normalizedFeatureKey) {
+          this.trackedFeatureKeySet.add(normalizedFeatureKey)
+        }
+      })
+
+      this.startPermissionAutoRefresh()
+    },
+
+    trackEntitlementKeys(entitlementKeyList = []) {
+      if (!(this.trackedEntitlementKeySet instanceof Set)) {
+        this.trackedEntitlementKeySet = new Set()
+      }
+
+      ;(Array.isArray(entitlementKeyList) ? entitlementKeyList : [entitlementKeyList]).forEach((entitlementKey) => {
+        const normalizedEntitlementKey = normalizeEntitlementKey(entitlementKey)
+        if (normalizedEntitlementKey) {
+          this.trackedEntitlementKeySet.add(normalizedEntitlementKey)
+        }
+      })
+
+      this.startPermissionAutoRefresh()
+    },
+
+    getTrackedFeatureKeyList() {
+      return this.trackedFeatureKeySet instanceof Set
+        ? Array.from(this.trackedFeatureKeySet).filter(Boolean)
+        : []
+    },
+
+    getTrackedEntitlementKeyList() {
+      return this.trackedEntitlementKeySet instanceof Set
+        ? Array.from(this.trackedEntitlementKeySet).filter(Boolean)
+        : []
+    },
+
+    shouldRunPermissionAutoRefresh() {
+      return this.pageVisible !== false
+        && !!auth.getToken()
+        && (
+          this.getTrackedFeatureKeyList().length > 0
+          || this.getTrackedEntitlementKeyList().length > 0
+        )
+    },
+
+    startPermissionAutoRefresh() {
+      if (!this.shouldRunPermissionAutoRefresh() || this.permissionAutoRefreshTimer) {
+        return
+      }
+
+      this.permissionAutoRefreshTimer = setInterval(() => {
+        this.refreshTrackedPermissions({
+          reason: 'interval'
+        })
+      }, PERMISSION_AUTO_REFRESH_INTERVAL_MS)
+    },
+
+    stopPermissionAutoRefresh() {
+      if (!this.permissionAutoRefreshTimer) {
+        return
+      }
+
+      clearInterval(this.permissionAutoRefreshTimer)
+      this.permissionAutoRefreshTimer = null
+    },
+
+    async refreshTrackedPermissions(options = {}) {
+      if (this.permissionRefreshPromise) {
+        return this.permissionRefreshPromise
+      }
+
+      const featureKeyList = this.getTrackedFeatureKeyList()
+      const entitlementKeyList = this.getTrackedEntitlementKeyList()
+
+      if ((!featureKeyList.length && !entitlementKeyList.length) || !auth.getToken()) {
+        this.stopPermissionAutoRefresh()
+        return {
+          featureAccessMap: {},
+          entitlementAccessMap: {}
+        }
+      }
+
+      this.startPermissionAutoRefresh()
+
+      this.permissionRefreshPromise = (async () => {
+        const refreshOptions = {
+          ...options,
+          ensureLogin: false,
+          forceRefresh: true
+        }
+
+        const [featureAccessMap, entitlementAccessMap] = await Promise.all([
+          featureKeyList.length
+            ? entitlementService.prefetchFeatureAccessList(featureKeyList, refreshOptions)
+            : Promise.resolve({}),
+          entitlementKeyList.length
+            ? entitlementService.prefetchEntitlementList(entitlementKeyList, refreshOptions)
+            : Promise.resolve({})
+        ])
+
+        const detail = {
+          reason: normalizeText(options.reason) || 'manual',
+          featureKeyList,
+          entitlementKeyList,
+          featureAccessMap,
+          entitlementAccessMap
+        }
+
+        this.triggerEvent('permissionrefresh', detail)
+        return detail
+      })().finally(() => {
+        this.permissionRefreshPromise = null
+
+        if (!this.shouldRunPermissionAutoRefresh()) {
+          this.stopPermissionAutoRefresh()
+        }
+      })
+
+      return this.permissionRefreshPromise
+    },
+
     getCurrentUserProfile() {
       return auth.getCachedCurrentUserProfile() || auth.getUserInfo() || null
     },
@@ -104,6 +274,8 @@ Component({
     },
 
     async checkEntitlement(entitlementKey = '', options = {}) {
+      this.trackEntitlementKeys(entitlementKey)
+
       const hasLogin = await this.ensureLogin({
         ...options,
         showLoginToast: options.showLoginToast === true
@@ -117,10 +289,13 @@ Component({
         }
       }
 
+      this.startPermissionAutoRefresh()
       return entitlementService.checkEntitlement(entitlementKey, options)
     },
 
     async checkFeatureAccess(featureKey = '', options = {}) {
+      this.trackFeatureKeys(featureKey)
+
       const hasLogin = await this.ensureLogin({
         ...options,
         showLoginToast: options.showLoginToast === true
@@ -135,6 +310,7 @@ Component({
         }
       }
 
+      this.startPermissionAutoRefresh()
       return entitlementService.checkFeatureAccess(featureKey, options)
     },
 
@@ -296,6 +472,8 @@ Component({
     },
 
     async prefetchFeatureAccessList(featureKeyList = [], options = {}) {
+      this.trackFeatureKeys(featureKeyList)
+
       if (options.ensureLogin !== false && !auth.getToken()) {
         const hasLogin = await this.ensureLogin({
           ...options,
@@ -307,13 +485,17 @@ Component({
       }
 
       if (!auth.getToken()) {
+        this.stopPermissionAutoRefresh()
         return {}
       }
 
+      this.startPermissionAutoRefresh()
       return entitlementService.prefetchFeatureAccessList(featureKeyList, options)
     },
 
     async prefetchEntitlementList(entitlementKeyList = [], options = {}) {
+      this.trackEntitlementKeys(entitlementKeyList)
+
       if (options.ensureLogin !== false && !auth.getToken()) {
         const hasLogin = await this.ensureLogin({
           ...options,
@@ -325,9 +507,11 @@ Component({
       }
 
       if (!auth.getToken()) {
+        this.stopPermissionAutoRefresh()
         return {}
       }
 
+      this.startPermissionAutoRefresh()
       return entitlementService.prefetchEntitlementList(entitlementKeyList, options)
     }
   }
