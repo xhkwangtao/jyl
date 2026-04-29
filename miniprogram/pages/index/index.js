@@ -15,6 +15,10 @@ const studyReportService = require('../../services/study-report-service')
 const {
   PAID_FEATURE_KEYS
 } = require('../../services/entitlement-service')
+const {
+  checkCurrentLocationInScenicArea,
+  buildScenicVideoAccessDeniedMessage
+} = require('../../utils/scenic-location')
 
 const AI_CHAT_PAYMENT_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
 const STUDY_REPORT_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE
@@ -232,7 +236,19 @@ Page({
     })
   },
 
-  onPhotoSpotsTap() {
+  async onPhotoSpotsTap() {
+    const accessResult = await checkCurrentLocationInScenicArea()
+    if (!accessResult.allowed) {
+      const deniedMessage = buildScenicVideoAccessDeniedMessage(accessResult)
+      wx.showModal({
+        title: deniedMessage.title,
+        content: deniedMessage.content,
+        showCancel: false,
+        confirmText: '知道了'
+      })
+      return
+    }
+
     this.openFeatureVideo()
   },
 

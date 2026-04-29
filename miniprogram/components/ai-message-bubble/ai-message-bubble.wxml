@@ -84,6 +84,7 @@
             class="video-card"
           >
             <video
+              id="video-card-{{segmentIndex}}"
               class="video-card-media"
               src="{{item.videoCard.videoUrl}}"
               poster="{{item.videoCard.coverUrl}}"
@@ -91,6 +92,8 @@
               show-center-play-btn="{{true}}"
               enable-progress-gesture="{{true}}"
               object-fit="cover"
+              data-segment-index="{{segmentIndex}}"
+              bindplay="onVideoPlay"
             ></video>
             <view class="video-card-body">
               <view class="video-card-heading">

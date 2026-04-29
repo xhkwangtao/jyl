@@ -1,4 +1,8 @@
 const markdownRichText = require('../../utils/markdown-rich-text')
+const {
+  checkCurrentLocationInScenicArea,
+  buildScenicVideoAccessDeniedMessage
+} = require('../../utils/scenic-location')
 
 function buildRenderSegments(message) {
   const segments = Array.isArray(message?.segments)
@@ -83,6 +87,30 @@ Component({
       wx.previewImage({
         current,
         urls
+      })
+    },
+
+    async onVideoPlay(event) {
+      const segmentIndex = Number(event?.currentTarget?.dataset?.segmentIndex)
+      const accessResult = await checkCurrentLocationInScenicArea()
+      if (accessResult.allowed) {
+        return
+      }
+
+      try {
+        const videoContext = wx.createVideoContext(`video-card-${segmentIndex}`, this)
+        if (videoContext) {
+          videoContext.pause()
+          videoContext.seek(0)
+        }
+      } catch (error) {}
+
+      const deniedMessage = buildScenicVideoAccessDeniedMessage(accessResult)
+      wx.showModal({
+        title: deniedMessage.title,
+        content: deniedMessage.content,
+        showCancel: false,
+        confirmText: '知道了'
       })
     }
   }

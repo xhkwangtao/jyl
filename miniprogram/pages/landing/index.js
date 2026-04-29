@@ -10,6 +10,10 @@ const {
   GUIDE_SUBSCRIBE_PAGE
 } = require('../../utils/guide-routes')
 const landingService = require('../../services/landing-service')
+const {
+  checkCurrentLocationInScenicArea,
+  buildScenicVideoAccessDeniedMessage
+} = require('../../utils/scenic-location')
 
 const HOME_PAGE_URL = '/pages/index/index'
 const MY_PAGE_URL = '/pages/my-page/my-page'
@@ -127,6 +131,13 @@ Page({
 
       if (config && config.enabled && config.redirectUrl) {
         if (config.action === 'video') {
+          if (!await this.ensureScenicVideoAccess()) {
+            this.showLandingPage({
+              hideLoading: !!serialNumber
+            })
+            return
+          }
+
           const isVip = await this.isVipActive()
           const viewCount = this.getVideoViewCount()
 
@@ -170,6 +181,13 @@ Page({
     }
 
     if (config.action === 'video') {
+      if (!await this.ensureScenicVideoAccess()) {
+        this.showLandingPage({
+          hideLoading: true
+        })
+        return true
+      }
+
       const isVip = await this.isVipActive()
       const viewCount = this.getVideoViewCount()
 
@@ -211,6 +229,22 @@ Page({
     }
 
     return requestedSourceCode === responseSourceCode
+  },
+
+  async ensureScenicVideoAccess() {
+    const accessResult = await checkCurrentLocationInScenicArea()
+    if (accessResult.allowed) {
+      return true
+    }
+
+    const deniedMessage = buildScenicVideoAccessDeniedMessage(accessResult)
+    wx.showModal({
+      title: deniedMessage.title,
+      content: deniedMessage.content,
+      showCancel: false,
+      confirmText: '知道了'
+    })
+    return false
   },
 
   async isVipActive() {

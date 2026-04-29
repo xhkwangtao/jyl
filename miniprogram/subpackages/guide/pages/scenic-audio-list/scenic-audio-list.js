@@ -1,4 +1,8 @@
 const mapRuntimeService = require('../../../../services/map-runtime-service')
+const {
+  checkCurrentLocationInScenicArea,
+  buildScenicVideoAccessDeniedMessage
+} = require('../../../../utils/scenic-location')
 
 const DEFAULT_COVER_IMAGE = '/images/poi-detail/1.png'
 const DEFAULT_POINT_ICON = '/images/poi/icons/scenic-spot.png'
@@ -708,6 +712,29 @@ Page({
     wx.previewImage({
       current: currentUrl,
       urls
+    })
+  },
+
+  async onPoiVideoPlay() {
+    const accessResult = await checkCurrentLocationInScenicArea()
+    if (accessResult.allowed) {
+      return
+    }
+
+    try {
+      const videoContext = wx.createVideoContext('poiVideoPlayer', this)
+      if (videoContext) {
+        videoContext.pause()
+        videoContext.seek(0)
+      }
+    } catch (error) {}
+
+    const deniedMessage = buildScenicVideoAccessDeniedMessage(accessResult)
+    wx.showModal({
+      title: deniedMessage.title,
+      content: deniedMessage.content,
+      showCancel: false,
+      confirmText: '知道了'
     })
   }
 })

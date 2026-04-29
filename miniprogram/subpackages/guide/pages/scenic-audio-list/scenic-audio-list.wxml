@@ -95,6 +95,7 @@
               <text class="block-caption">{{currentPoi.videoUrls.length}} 段</text>
             </view>
             <video
+              id="poiVideoPlayer"
               class="poi-video"
               src="{{currentPoi.videoUrl}}"
               poster="{{currentPoi.coverImage}}"
@@ -102,6 +103,7 @@
               show-center-play-btn="{{true}}"
               show-fullscreen-btn="{{true}}"
               object-fit="cover"
+              bindplay="onPoiVideoPlay"
             ></video>
           </view>
 
