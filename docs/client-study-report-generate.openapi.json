@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "九眼楼小程序研学报告接口",
-    "version": "2.1.0",
-    "description": "小程序端可先上传答题卡图片，再通过 JWT 提交异步研学报告任务，并轮询获取正式报告、writer_payload 和 PDF URL。"
+    "version": "1.4.0",
+    "description": "小程序端可先上传答题卡图片，再通过 JWT 提交异步研学报告任务；工作人员还可以选择研学团、按答题卡编号查询学生并提交团体研学报告任务。"
   },
   "servers": [
     {
@@ -19,23 +19,35 @@
     {
       "name": "client-study-reports",
       "description": "小程序答题卡识别与研学报告生成"
+    },
+    {
+      "name": "client-study-groups",
+      "description": "小程序工作人员研学团扫码与团体报告生成"
     }
   ],
   "paths": {
     "/client/study-reports/upload": {
       "post": {
-        "tags": ["client-study-reports"],
+        "tags": [
+          "client-study-reports"
+        ],
         "summary": "上传答题卡图片",
         "description": "小程序上传答题卡图片文件，后端完成存储并返回 `worksheet_image_url`。这个接口只上传图片，不生成报告。",
         "operationId": "clientUploadStudyReportWorksheet",
-        "security": [{"ClientBearerAuth": []}],
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["worksheet_image"],
+                "required": [
+                  "worksheet_image"
+                ],
                 "properties": {
                   "worksheet_image": {
                     "type": "string",
@@ -57,7 +69,9 @@
             "description": "上传成功",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ClientStudyReportUploadResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportUploadResponse"
+                }
               }
             }
           },
@@ -65,7 +79,9 @@
             "description": "图片格式或大小不合法",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -73,7 +89,9 @@
             "description": "未登录或 JWT 无效",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -82,16 +100,24 @@
     },
     "/client/study-reports/generate": {
       "post": {
-        "tags": ["client-study-reports"],
+        "tags": [
+          "client-study-reports"
+        ],
         "summary": "提交答题卡识别任务",
         "description": "先调用上传接口拿到 `worksheet_image_url`，再把这个 URL 提交给后端。后端依赖 `get_current_client_user` 从 JWT 解析普通用户身份，立即落一条研学记录并返回任务状态。",
         "operationId": "clientSubmitStudyReportJob",
-        "security": [{"ClientBearerAuth": []}],
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {"$ref": "#/components/schemas/ClientStudyReportGenerateRequest"}
+              "schema": {
+                "$ref": "#/components/schemas/ClientStudyReportGenerateRequest"
+              }
             }
           }
         },
@@ -100,7 +126,9 @@
             "description": "任务已受理",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ClientStudyReportJobResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportJobResponse"
+                }
               }
             }
           },
@@ -108,7 +136,9 @@
             "description": "图片 URL 或业务参数错误",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -116,7 +146,9 @@
             "description": "未登录或 JWT 无效",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -125,17 +157,26 @@
     },
     "/client/study-reports/jobs/{record_id}": {
       "get": {
-        "tags": ["client-study-reports"],
+        "tags": [
+          "client-study-reports"
+        ],
         "summary": "轮询研学报告任务状态",
-        "description": "查询当前用户自己的一条研学报告任务状态。`generated` 时返回正式报告、writer_payload 和 PDF URL；`failed` 时返回失败原因。",
+        "description": "查询当前用户自己的一条研学报告任务状态。`generated` 时返回 report_html、正式报告和 writer_payload；`failed` 时返回失败原因。",
         "operationId": "clientPollStudyReportJob",
-        "security": [{"ClientBearerAuth": []}],
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "record_id",
             "in": "path",
             "required": true,
-            "schema": {"type": "integer", "minimum": 1},
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
             "description": "研学报告记录 ID"
           }
         ],
@@ -144,7 +185,9 @@
             "description": "查询成功",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ClientStudyReportJobResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportJobResponse"
+                }
               }
             }
           },
@@ -152,7 +195,9 @@
             "description": "未登录或 JWT 无效",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -160,7 +205,9 @@
             "description": "记录不存在或不属于当前用户",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -169,17 +216,25 @@
     },
     "/client/study-reports/latest": {
       "get": {
-        "tags": ["client-study-reports"],
+        "tags": [
+          "client-study-reports"
+        ],
         "summary": "获取当前用户最近一条正式研学报告",
         "description": "只返回当前用户最近一条 `status=generated` 的正式研学报告，不重新调用模型。",
         "operationId": "clientGetLatestStudyReport",
-        "security": [{"ClientBearerAuth": []}],
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "查询成功",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ClientStudyReportGenerateResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportGenerateResponse"
+                }
               }
             }
           },
@@ -187,7 +242,9 @@
             "description": "未登录或 JWT 无效",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -195,7 +252,9 @@
             "description": "当前用户没有已生成的研学报告",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -204,17 +263,26 @@
     },
     "/client/study-reports/{record_id}": {
       "get": {
-        "tags": ["client-study-reports"],
+        "tags": [
+          "client-study-reports"
+        ],
         "summary": "获取当前用户指定一条正式研学报告",
         "description": "只返回当前用户自己的正式报告。若该记录尚未生成完成，返回冲突错误，提示前端改用轮询接口。",
         "operationId": "clientGetStudyReportByRecordId",
-        "security": [{"ClientBearerAuth": []}],
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "record_id",
             "in": "path",
             "required": true,
-            "schema": {"type": "integer", "minimum": 1},
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
             "description": "当前用户自己的研学报告记录 ID"
           }
         ],
@@ -223,7 +291,9 @@
             "description": "查询成功",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ClientStudyReportGenerateResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportGenerateResponse"
+                }
               }
             }
           },
@@ -231,7 +301,9 @@
             "description": "未登录或 JWT 无效",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -239,7 +311,9 @@
             "description": "记录不存在或不属于当前用户",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           },
@@ -247,7 +321,597 @@
             "description": "记录尚未生成完成",
             "content": {
               "application/json": {
-                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/study-groups/active": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "工作人员查询可操作研学团",
+        "description": "小程序工作人员进入团体扫码页面时调用。只返回 status=active 的研学团，并带学生数、已扫码数、已生成数等统计。普通用户会返回 403。",
+        "operationId": "clientListActiveStudyGroups",
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyGroupListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或 JWT 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前用户不是工作人员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/study-groups/{group_id}": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "工作人员查询研学团详情",
+        "description": "返回指定 active 研学团的基础信息和进度统计，用于小程序确认当前选择的团体。",
+        "operationId": "clientGetStudyGroup",
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyGroupRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或 JWT 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前用户不是工作人员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "研学团不存在或不可操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/study-groups/{group_id}/progress": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "工作人员查询研学团进度",
+        "description": "返回指定研学团的学生数、已扫码数、已生成报告数、失败数、已打印数。当前响应结构与研学团详情一致。",
+        "operationId": "clientGetStudyGroupProgress",
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyGroupRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或 JWT 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前用户不是工作人员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "研学团不存在或不可操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/study-groups/{group_id}/students": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "工作人员查询研学团学生列表",
+        "description": "用于现场查看本团学生名单，可按姓名、班级、答题卡编号模糊查询，也可按 report_status 筛选。",
+        "operationId": "clientListStudyGroupStudents",
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 200,
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "姓名、班级或答题卡编号"
+          },
+          {
+            "name": "report_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "not_started",
+                "queued",
+                "processing",
+                "generated",
+                "failed"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyGroupStudentListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或 JWT 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前用户不是工作人员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "研学团不存在或不可操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/study-groups/{group_id}/students/{card_code}": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "工作人员按答题卡编号查询学生",
+        "description": "扫码或输入 1-3 位数字后调用。后端会把 1 规范为 001，用 group_id + card_code 定位学生。",
+        "operationId": "clientGetStudyGroupStudentByCardCode",
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "card_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "1-3 位数字，例如 1、001、128"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyGroupStudentRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "答题卡编号格式不正确",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或 JWT 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前用户不是工作人员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "学生不存在或研学团不可操作",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/study-groups/{group_id}/students/{card_code}/study-report-job": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "工作人员查询学生当前报告任务",
+        "description": "用于小程序返回学生详情页时恢复当前报告任务状态。若学生尚未提交报告任务，返回 404。",
+        "operationId": "clientGetStudyGroupStudentReportJob",
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "card_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "答题卡编号格式不正确",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或 JWT 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前用户不是工作人员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "学生或报告任务不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client/study-groups/{group_id}/students/{card_code}/study-report-jobs": {
+      "post": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "工作人员提交团体学生报告任务",
+        "description": "工作人员上传答题卡图片后，用 group_id + card_code 提交团体学生报告任务。学生姓名和编号以后端名单为准。",
+        "operationId": "clientSubmitStudyGroupStudentReportJob",
+        "security": [
+          {
+            "ClientBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "card_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientStudyReportGenerateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "任务已提交",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "答题卡编号或请求参数不合法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或 JWT 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前用户不是工作人员",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "研学团或学生不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
               }
             }
           }
@@ -267,139 +931,594 @@
     "schemas": {
       "ClientStudyReportUploadResponse": {
         "type": "object",
-        "required": ["storage_resource_id", "worksheet_image_url", "provider", "object_key", "content_type", "size_bytes"],
+        "required": [
+          "storage_resource_id",
+          "worksheet_image_url",
+          "provider",
+          "object_key",
+          "content_type",
+          "size_bytes"
+        ],
         "properties": {
-          "storage_resource_id": {"type": "integer", "minimum": 1},
-          "worksheet_image_url": {"type": "string"},
-          "provider": {"type": "string"},
-          "object_key": {"type": "string"},
-          "content_type": {"type": "string"},
-          "size_bytes": {"type": "integer", "minimum": 0}
+          "storage_resource_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "worksheet_image_url": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "object_key": {
+            "type": "string"
+          },
+          "content_type": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       },
       "ClientStudyReportGenerateRequest": {
         "type": "object",
-        "required": ["worksheet_image_url"],
+        "required": [
+          "worksheet_image_url"
+        ],
         "properties": {
           "worksheet_image_url": {
             "type": "string",
             "description": "上传接口返回的答题卡图片 URL，后端必须可访问"
           },
-          "student_name": {"type": ["string", "null"]},
-          "student_code": {"type": ["string", "null"]},
-          "study_date": {"type": ["string", "null"]},
-          "duration_minutes": {"type": ["integer", "null"], "minimum": 0}
+          "student_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "student_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "study_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "duration_minutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
         }
       },
       "ClientStudyReportJobResponse": {
         "type": "object",
-        "required": ["record_id", "status", "worksheet_image_url", "writer_payload"],
+        "required": [
+          "record_id",
+          "status",
+          "worksheet_image_url",
+          "writer_payload"
+        ],
         "properties": {
-          "record_id": {"type": "integer", "minimum": 1},
+          "record_id": {
+            "type": "integer",
+            "minimum": 1
+          },
           "status": {
             "type": "string",
-            "enum": ["queued", "processing", "generated", "failed"]
+            "enum": [
+              "queued",
+              "processing",
+              "generated",
+              "failed"
+            ]
           },
-          "worksheet_image_url": {"type": "string"},
-          "pdf_url": {"type": ["string", "null"]},
-          "last_error": {"type": ["string", "null"]},
+          "worksheet_image_url": {
+            "type": "string"
+          },
+          "pdf_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "deprecated": true,
+            "description": "兼容旧版本字段，新任务不再生成 PDF，通常为 null"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "writer_payload": {
             "type": "object",
             "additionalProperties": true
           },
           "report": {
             "oneOf": [
-              {"$ref": "#/components/schemas/StudyReportGenerateResponse"},
-              {"type": "null"}
+              {
+                "$ref": "#/components/schemas/StudyReportGenerateResponse"
+              },
+              {
+                "type": "null"
+              }
             ]
+          },
+          "report_html": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "生成完成后的 HTML 报告，可直接用于小程序 web-view 或富文本容器渲染"
           }
         }
       },
       "ClientStudyReportGenerateResponse": {
         "type": "object",
-        "required": ["record_id", "worksheet_image_url", "pdf_url", "writer_payload", "report"],
+        "required": [
+          "record_id",
+          "worksheet_image_url",
+          "report_html",
+          "writer_payload",
+          "report"
+        ],
         "properties": {
-          "record_id": {"type": "integer", "minimum": 1},
-          "worksheet_image_url": {"type": "string"},
-          "pdf_url": {"type": "string"},
+          "record_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "worksheet_image_url": {
+            "type": "string"
+          },
+          "pdf_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "deprecated": true,
+            "description": "兼容旧版本字段，新任务不再生成 PDF，通常为 null"
+          },
           "writer_payload": {
             "type": "object",
             "additionalProperties": true
           },
-          "report": {"$ref": "#/components/schemas/StudyReportGenerateResponse"}
+          "report": {
+            "$ref": "#/components/schemas/StudyReportGenerateResponse"
+          },
+          "report_html": {
+            "type": "string",
+            "description": "HTML 研学报告内容"
+          }
         }
       },
       "StudyReportGenerateResponse": {
         "type": "object",
-        "required": ["heading", "subheading", "hidden_symbol_summary", "question_results", "question_summary", "overall_accuracy_percent", "overall_comment", "cipher_analysis", "poem_analysis", "badge_title", "badge_description", "final_comment", "current_model", "provider"],
+        "required": [
+          "heading",
+          "subheading",
+          "hidden_symbol_summary",
+          "question_results",
+          "question_summary",
+          "overall_accuracy_percent",
+          "overall_comment",
+          "cipher_analysis",
+          "poem_analysis",
+          "badge_title",
+          "badge_description",
+          "final_comment",
+          "current_model",
+          "provider"
+        ],
         "properties": {
-          "student_name": {"type": ["string", "null"]},
-          "student_code": {"type": ["string", "null"]},
-          "study_date": {"type": ["string", "null"]},
-          "duration_minutes": {"type": ["integer", "null"], "minimum": 0},
-          "heading": {"type": "string"},
-          "subheading": {"type": "string"},
-          "hidden_symbol_summary": {"$ref": "#/components/schemas/HiddenSymbolSummary"},
-          "question_results": {"type": "array", "items": {"$ref": "#/components/schemas/QuestionResult"}},
-          "question_summary": {"$ref": "#/components/schemas/QuestionSummary"},
-          "overall_accuracy_percent": {"type": "integer", "minimum": 0, "maximum": 100},
-          "overall_comment": {"type": "string"},
-          "cipher_analysis": {"type": "string"},
-          "poem_analysis": {"type": "string"},
-          "badge_title": {"type": "string"},
-          "badge_description": {"type": "string"},
-          "final_comment": {"type": "string"},
-          "current_model": {"type": "string", "example": "qwen3.6-plus"},
-          "provider": {"type": "string"}
+          "student_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "student_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "study_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "duration_minutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "heading": {
+            "type": "string"
+          },
+          "subheading": {
+            "type": "string"
+          },
+          "hidden_symbol_summary": {
+            "$ref": "#/components/schemas/HiddenSymbolSummary"
+          },
+          "question_results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionResult"
+            }
+          },
+          "question_summary": {
+            "$ref": "#/components/schemas/QuestionSummary"
+          },
+          "overall_accuracy_percent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "overall_comment": {
+            "type": "string"
+          },
+          "cipher_analysis": {
+            "type": "string"
+          },
+          "poem_analysis": {
+            "type": "string"
+          },
+          "badge_title": {
+            "type": "string"
+          },
+          "badge_description": {
+            "type": "string"
+          },
+          "final_comment": {
+            "type": "string"
+          },
+          "current_model": {
+            "type": "string",
+            "example": "qwen3.6-plus"
+          },
+          "provider": {
+            "type": "string"
+          }
         }
       },
       "HiddenSymbolSummary": {
         "type": "object",
-        "required": ["filled_cells", "filled_count", "matched_symbols", "matched_count", "total_cells", "accuracy_percent"],
+        "required": [
+          "filled_cells",
+          "filled_count",
+          "matched_symbols",
+          "matched_count",
+          "total_cells",
+          "accuracy_percent"
+        ],
         "properties": {
-          "filled_cells": {"type": "array", "items": {"type": "integer"}},
-          "filled_count": {"type": "integer", "minimum": 0},
-          "matched_symbols": {"type": "array", "items": {"$ref": "#/components/schemas/HiddenSymbolMatch"}},
-          "matched_count": {"type": "integer", "minimum": 0},
-          "total_cells": {"type": "integer"},
-          "accuracy_percent": {"type": "integer", "minimum": 0, "maximum": 100}
+          "filled_cells": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "filled_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "matched_symbols": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HiddenSymbolMatch"
+            }
+          },
+          "matched_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_cells": {
+            "type": "integer"
+          },
+          "accuracy_percent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
         }
       },
       "HiddenSymbolMatch": {
         "type": "object",
-        "required": ["symbol_code", "symbol_name"],
+        "required": [
+          "symbol_code",
+          "symbol_name"
+        ],
         "properties": {
-          "symbol_code": {"type": "string"},
-          "symbol_name": {"type": "string"}
+          "symbol_code": {
+            "type": "string"
+          },
+          "symbol_name": {
+            "type": "string"
+          }
         }
       },
       "QuestionResult": {
         "type": "object",
-        "required": ["question_number", "prompt", "is_correct"],
+        "required": [
+          "question_number",
+          "prompt",
+          "is_correct"
+        ],
         "properties": {
-          "question_number": {"type": "integer"},
-          "prompt": {"type": "string"},
-          "selected_option": {"type": ["string", "null"]},
-          "correct_option": {"type": ["string", "null"]},
-          "selected_title": {"type": ["string", "null"]},
-          "correct_title": {"type": ["string", "null"]},
-          "is_correct": {"type": "boolean"}
+          "question_number": {
+            "type": "integer"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "selected_option": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correct_option": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "selected_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correct_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_correct": {
+            "type": "boolean"
+          }
         }
       },
       "QuestionSummary": {
         "type": "object",
-        "required": ["correct_count", "total_questions", "accuracy_percent"],
+        "required": [
+          "correct_count",
+          "total_questions",
+          "accuracy_percent"
+        ],
         "properties": {
-          "correct_count": {"type": "integer", "minimum": 0},
-          "total_questions": {"type": "integer"},
-          "accuracy_percent": {"type": "integer", "minimum": 0, "maximum": 100}
+          "correct_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_questions": {
+            "type": "integer"
+          },
+          "accuracy_percent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
         }
       },
       "ErrorResponse": {
         "type": "object",
         "properties": {
-          "detail": {"type": "string"},
-          "code": {"type": "string"}
+          "detail": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "StudyGroupRead": {
+        "type": "object",
+        "required": [
+          "id",
+          "group_name",
+          "school_name",
+          "status",
+          "student_count",
+          "scanned_count",
+          "generated_count",
+          "failed_count",
+          "printed_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "group_name": {
+            "type": "string"
+          },
+          "school_name": {
+            "type": "string"
+          },
+          "visit_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "status": {
+            "type": "string"
+          },
+          "student_count": {
+            "type": "integer"
+          },
+          "scanned_count": {
+            "type": "integer"
+          },
+          "generated_count": {
+            "type": "integer"
+          },
+          "failed_count": {
+            "type": "integer"
+          },
+          "printed_count": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StudyGroupListResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudyGroupRead"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        }
+      },
+      "StudyGroupStudentRead": {
+        "type": "object",
+        "required": [
+          "id",
+          "study_group_id",
+          "student_name",
+          "card_code",
+          "scan_status",
+          "report_status",
+          "print_status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "study_group_id": {
+            "type": "integer"
+          },
+          "student_name": {
+            "type": "string"
+          },
+          "class_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "card_code": {
+            "type": "string",
+            "description": "三位答题卡编号，例如 001"
+          },
+          "scan_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "scanned"
+            ]
+          },
+          "report_status": {
+            "type": "string",
+            "enum": [
+              "not_started",
+              "queued",
+              "processing",
+              "generated",
+              "failed"
+            ]
+          },
+          "print_status": {
+            "type": "string",
+            "enum": [
+              "not_printed",
+              "printed"
+            ]
+          },
+          "operator_client_user_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "study_report_record_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "scanned_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "report_generated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "printed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StudyGroupStudentListResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudyGroupStudentRead"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
         }
       }
     }
@@ -408,6 +1527,12 @@
     "backendRoute": "backend/app/api/v1/endpoints/client/study_reports.py",
     "recordTable": "study_report_records",
     "storageTable": "storage_resources",
-    "worker": "backend/app/services/study_report_worker.py"
+    "worker": "backend/app/services/study_report_worker.py",
+    "studyGroupBackendRoute": "backend/app/api/v1/endpoints/client/study_groups.py",
+    "studyGroupTables": [
+      "study_groups",
+      "study_group_students",
+      "study_report_records"
+    ]
   }
 }
