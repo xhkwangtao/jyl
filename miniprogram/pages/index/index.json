@@ -3,6 +3,7 @@
   "navigationStyle": "custom",
   "enablePullDownRefresh": true,
   "usingComponents": {
+    "announcement-modal": "/components/announcement-modal/announcement-modal",
     "custom-status-bar": "/components/custom-status-bar/custom-status-bar",
     "map-recommend-card": "/components/map-recommend-card/map-recommend-card",
     "explanation-cards-container": "/components/explanation-card/explanation-cards-container",

@@ -24,6 +24,9 @@ const {
   GUIDE_SUBSCRIBE_PAGE
 } = require('../../../../utils/guide-routes')
 const {
+  withPageAnalytics
+} = require('../../../../utils/with-page-analytics')
+const {
   JYL_CUSTOM_TILE_LAYER_CONFIG,
   JYL_GROUND_TILE_OVERLAY_CONFIG
 } = require('../../../../config/jyl-custom-tile-layer.js')
@@ -3085,7 +3088,7 @@ function buildNearbyAudioPoiList(anchorPoint, options = {}) {
   return result.length ? result : [buildAudioPoi(anchorPoint)]
 }
 
-Page({
+Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
   data: {
     navigationBarTotalHeight: 64,
     mapCtx: null,
@@ -6979,4 +6982,4 @@ Page({
   goToUserPage() {
     navigateToPage('/pages/my-page/my-page')
   }
-})
+}))

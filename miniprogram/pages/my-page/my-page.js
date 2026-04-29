@@ -5,6 +5,9 @@ const {
   buildAiOfficerState
 } = require('../../utils/ai-officer')
 const studyReportService = require('../../services/study-report-service')
+const {
+  withPageAnalytics
+} = require('../../utils/with-page-analytics')
 
 const PAGE_STYLE = 'background: #f6f1e8;'
 const UNLOCK_ANIMATION_DURATION_MS = 1800
@@ -260,7 +263,7 @@ function decorateSecretWallList(secretList = [], options = {}) {
   })
 }
 
-Page({
+Page(withPageAnalytics('/pages/my-page/my-page', {
   data: {
     pageReady: false,
     pageStyle: PAGE_STYLE,
@@ -476,4 +479,4 @@ Page({
       return
     }
   }
-})
+}))

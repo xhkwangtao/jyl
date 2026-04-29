@@ -4,10 +4,13 @@ const orderService = require('../../../../../services/order-service')
 const entitlementService = require('../../../../../services/entitlement-service')
 const { setFeaturePaid } = require('../../../../../utils/audio-access.js')
 const {
-  GUIDE_MAP_PAGE
+    GUIDE_MAP_PAGE
 } = require('../../../../../utils/guide-routes')
 const {
-  PAID_FEATURE_KEYS
+    withPageAnalytics
+} = require('../../../../../utils/with-page-analytics')
+const {
+    PAID_FEATURE_KEYS
 } = entitlementService
 
 const DEFAULT_PRICE = 7.8
@@ -19,267 +22,267 @@ const REMOTE_HERO_IMAGE = 'https://hyg-cdn.flexai.cc/common/xiaoyingdongzuo.png'
 const LOCAL_HERO_IMAGE = '/images/ai-assistant-xiaoying.png'
 const VIP_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.VIP
 const VIP_ENTITLED_FEATURE_KEYS = new Set([
-  PAID_FEATURE_KEYS.AI_CHAT,
-  PAID_FEATURE_KEYS.AI_CHAT_VOICE,
-  PAID_FEATURE_KEYS.MAP_AUDIO_PLAY,
-  PAID_FEATURE_KEYS.MAP_ROUTE_PLANNING,
-  PAID_FEATURE_KEYS.MAP_NAVIGATION_START,
-  PAID_FEATURE_KEYS.MAP_PHOTO_TUTORIAL,
-  PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE
+    PAID_FEATURE_KEYS.AI_CHAT,
+    PAID_FEATURE_KEYS.AI_CHAT_VOICE,
+    PAID_FEATURE_KEYS.MAP_AUDIO_PLAY,
+    PAID_FEATURE_KEYS.MAP_ROUTE_PLANNING,
+    PAID_FEATURE_KEYS.MAP_NAVIGATION_START,
+    PAID_FEATURE_KEYS.MAP_PHOTO_TUTORIAL,
+    PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE
 ])
 
 const FEATURE_CONFIG = {
-  [PAID_FEATURE_KEYS.AI_CHAT]: {
-    title: 'AI智能对话',
-    description: '体验AI智能导览对话需要VIP权限'
-  },
-  [PAID_FEATURE_KEYS.AI_CHAT_VOICE]: {
-    title: 'AI语音对话',
-    description: '体验AI语音对话功能需要VIP权限'
-  },
-  [PAID_FEATURE_KEYS.MAP_AUDIO_PLAY]: {
-    title: '景点语音讲解',
-    description: '解锁景点语音讲解与沉浸式导览体验'
-  },
-  [PAID_FEATURE_KEYS.MAP_ROUTE_PLANNING]: {
-    title: '智能路线规划',
-    description: '解锁 AI 推荐路线与游览规划能力'
-  },
-  [PAID_FEATURE_KEYS.MAP_NAVIGATION_START]: {
-    title: '景点导航',
-    description: '解锁前往景点的智能导航能力'
-  },
-  [PAID_FEATURE_KEYS.MAP_PHOTO_TUTORIAL]: {
-    title: '拍照打卡指引',
-    description: '查看拍照打卡指引需要VIP权限'
-  },
-  [PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE]: {
-    title: 'AI研学报告',
-    description: '生成专属AI研学报告需要开通权益'
-  },
-  [PAID_FEATURE_KEYS.VIP]: {
-    title: DEFAULT_FEATURE_NAME,
-    description: '开通后即可体验小九的完整智能陪游服务'
-  }
+    [PAID_FEATURE_KEYS.AI_CHAT]: {
+        title: 'AI智能对话',
+        description: '体验AI智能导览对话需要VIP权限'
+    },
+    [PAID_FEATURE_KEYS.AI_CHAT_VOICE]: {
+        title: 'AI语音对话',
+        description: '体验AI语音对话功能需要VIP权限'
+    },
+    [PAID_FEATURE_KEYS.MAP_AUDIO_PLAY]: {
+        title: '景点语音讲解',
+        description: '解锁景点语音讲解与沉浸式导览体验'
+    },
+    [PAID_FEATURE_KEYS.MAP_ROUTE_PLANNING]: {
+        title: '智能路线规划',
+        description: '解锁 AI 推荐路线与游览规划能力'
+    },
+    [PAID_FEATURE_KEYS.MAP_NAVIGATION_START]: {
+        title: '景点导航',
+        description: '解锁前往景点的智能导航能力'
+    },
+    [PAID_FEATURE_KEYS.MAP_PHOTO_TUTORIAL]: {
+        title: '拍照打卡指引',
+        description: '查看拍照打卡指引需要VIP权限'
+    },
+    [PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE]: {
+        title: 'AI研学报告',
+        description: '生成专属AI研学报告需要开通权益'
+    },
+    [PAID_FEATURE_KEYS.VIP]: {
+        title: DEFAULT_FEATURE_NAME,
+        description: '开通后即可体验小九的完整智能陪游服务'
+    }
 }
 
 function safeDecode(value) {
-  if (!value || typeof value !== 'string') {
-    return ''
-  }
+    if (!value || typeof value !== 'string') {
+        return ''
+    }
 
-  try {
-    return decodeURIComponent(value)
-  } catch (error) {
-    return value
-  }
+    try {
+        return decodeURIComponent(value)
+    } catch (error) {
+        return value
+    }
 }
 
 function centsToYuan(amountCents) {
-  const numeric = Number(amountCents)
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    return DEFAULT_PRICE
-  }
+    const numeric = Number(amountCents)
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return DEFAULT_PRICE
+    }
 
-  return numeric / 100
+    return numeric / 100
 }
 
 function formatAmount(amount) {
-  const numeric = Number(amount)
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    return DEFAULT_PRICE.toFixed(2)
-  }
+    const numeric = Number(amount)
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return DEFAULT_PRICE.toFixed(2)
+    }
 
-  return numeric.toFixed(2)
+    return numeric.toFixed(2)
 }
 
 function grantPaidAccess(featureKey = '') {
-  const normalizedFeatureKey = entitlementService.normalizeFeatureKey(featureKey)
+    const normalizedFeatureKey = entitlementService.normalizeFeatureKey(featureKey)
 
-  if (!normalizedFeatureKey) {
-    return
-  }
+    if (!normalizedFeatureKey) {
+        return
+    }
 
-  setFeaturePaid(normalizedFeatureKey, true)
+    setFeaturePaid(normalizedFeatureKey, true)
 
-  if (
-    normalizedFeatureKey === VIP_ACCESS_FEATURE_KEY
-    || VIP_ENTITLED_FEATURE_KEYS.has(normalizedFeatureKey)
-  ) {
-    setFeaturePaid(VIP_ACCESS_FEATURE_KEY, true)
-  }
+    if (
+        normalizedFeatureKey === VIP_ACCESS_FEATURE_KEY
+        || VIP_ENTITLED_FEATURE_KEYS.has(normalizedFeatureKey)
+    ) {
+        setFeaturePaid(VIP_ACCESS_FEATURE_KEY, true)
+    }
 }
 
 function requestWxPayment(paymentParams = {}) {
-  const timeStamp = String(paymentParams.timeStamp || paymentParams.time_stamp || '')
-  const nonceStr = String(paymentParams.nonceStr || paymentParams.nonce_str || '')
-  const packageValue = String(paymentParams.package || paymentParams.packageValue || '')
-  const signType = String(paymentParams.signType || paymentParams.sign_type || 'RSA')
-  const paySign = String(paymentParams.paySign || paymentParams.pay_sign || '')
+    const timeStamp = String(paymentParams.timeStamp || paymentParams.time_stamp || '')
+    const nonceStr = String(paymentParams.nonceStr || paymentParams.nonce_str || '')
+    const packageValue = String(paymentParams.package || paymentParams.packageValue || '')
+    const signType = String(paymentParams.signType || paymentParams.sign_type || 'RSA')
+    const paySign = String(paymentParams.paySign || paymentParams.pay_sign || '')
 
-  return new Promise((resolve, reject) => {
-    wx.requestPayment({
-      timeStamp,
-      nonceStr,
-      package: packageValue,
-      signType,
-      paySign,
-      success: resolve,
-      fail: reject
+    return new Promise((resolve, reject) => {
+        wx.requestPayment({
+            timeStamp,
+            nonceStr,
+            package: packageValue,
+            signType,
+            paySign,
+            success: resolve,
+            fail: reject
+        })
     })
-  })
 }
 
-Page({
-  data: {
-    productCode: 'vip',
-    featureKey: 'vip',
-    featureName: DEFAULT_FEATURE_NAME,
-    description: DEFAULT_DESCRIPTION,
-    amount: DEFAULT_PRICE,
-    displayAmount: formatAmount(DEFAULT_PRICE),
-    displayOriginalPrice: DEFAULT_ORIGINAL_PRICE.toFixed(2),
-    currency: DEFAULT_CURRENCY,
-    heroImageSrc: REMOTE_HERO_IMAGE,
-    agreed: true,
-    priceLoaded: false,
-    loading: false,
-    paymentError: '',
-    successRedirectUrl: ''
-  },
+Page(withPageAnalytics('/subpackages/guide/pages/payment/subscribe/subscribe', {
+    data: {
+        productCode: 'vip',
+        featureKey: 'vip',
+        featureName: DEFAULT_FEATURE_NAME,
+        description: DEFAULT_DESCRIPTION,
+        amount: DEFAULT_PRICE,
+        displayAmount: formatAmount(DEFAULT_PRICE),
+        displayOriginalPrice: DEFAULT_ORIGINAL_PRICE.toFixed(2),
+        currency: DEFAULT_CURRENCY,
+        heroImageSrc: REMOTE_HERO_IMAGE,
+        agreed: true,
+        priceLoaded: false,
+        loading: false,
+        paymentError: '',
+        successRedirectUrl: ''
+    },
 
-  onLoad(options = {}) {
-    this.pendingSilentLoginPromise = null
-    this.ensureSilentLogin()
-    this.parseOptions(options)
-    this.loadProductPrice()
-  },
+    onLoad(options = {}) {
+        this.pendingSilentLoginPromise = null
+        this.ensureSilentLogin()
+        this.parseOptions(options)
+        this.loadProductPrice()
+    },
 
-  onShow() {
-    this.ensureSilentLogin()
-  },
+    onShow() {
+        this.ensureSilentLogin()
+    },
 
-  parseOptions(options = {}) {
-    const featureKey = entitlementService.normalizeFeatureKey(
-      safeDecode(options.feature) || VIP_ACCESS_FEATURE_KEY
-    ) || VIP_ACCESS_FEATURE_KEY
-    const productCode = safeDecode(options.productCode)
-      || safeDecode(options.product_code)
-      || VIP_ACCESS_FEATURE_KEY
-    const featureConfig = FEATURE_CONFIG[featureKey] || FEATURE_CONFIG[VIP_ACCESS_FEATURE_KEY]
-    const amount = Number(options.amount)
-    const originalPrice = Number(options.originalPrice)
-    const featureName = safeDecode(options.featureName)
-      || safeDecode(options.productName)
-      || featureConfig.title
-      || DEFAULT_FEATURE_NAME
-    const description = safeDecode(options.description)
-      || featureConfig.description
-      || DEFAULT_DESCRIPTION
+    parseOptions(options = {}) {
+        const featureKey = entitlementService.normalizeFeatureKey(
+            safeDecode(options.feature) || VIP_ACCESS_FEATURE_KEY
+        ) || VIP_ACCESS_FEATURE_KEY
+        const productCode = safeDecode(options.productCode)
+            || safeDecode(options.product_code)
+            || VIP_ACCESS_FEATURE_KEY
+        const featureConfig = FEATURE_CONFIG[featureKey] || FEATURE_CONFIG[VIP_ACCESS_FEATURE_KEY]
+        const amount = Number(options.amount)
+        const originalPrice = Number(options.originalPrice)
+        const featureName = safeDecode(options.featureName)
+            || safeDecode(options.productName)
+            || featureConfig.title
+            || DEFAULT_FEATURE_NAME
+        const description = safeDecode(options.description)
+            || featureConfig.description
+            || DEFAULT_DESCRIPTION
 
-    this.setData({
-      productCode,
-      featureKey,
-      featureName,
-      description,
-      amount: Number.isFinite(amount) && amount > 0 ? amount : DEFAULT_PRICE,
-      displayAmount: formatAmount(amount),
-      displayOriginalPrice: formatAmount(originalPrice > 0 ? originalPrice : DEFAULT_ORIGINAL_PRICE),
-      currency: safeDecode(options.currency) || DEFAULT_CURRENCY,
-      successRedirectUrl: safeDecode(options.successRedirect)
-    })
-  },
-
-  ensureSilentLogin() {
-    if (this.pendingSilentLoginPromise) {
-      return this.pendingSilentLoginPromise
-    }
-
-    this.pendingSilentLoginPromise = this.silentLogin().finally(() => {
-      this.pendingSilentLoginPromise = null
-    })
-
-    return this.pendingSilentLoginPromise
-  },
-
-  async silentLogin() {
-    try {
-      const hasLogin = await auth.checkAndAutoLogin(2500)
-      if (!hasLogin || !auth.getToken()) {
-        return false
-      }
-
-      await auth.syncCurrentUserProfile().catch(() => null)
-      return true
-    } catch (error) {
-      return false
-    }
-  },
-
-  async loadProductPrice() {
-    const productCode = String(this.data.productCode || '').trim() || 'vip'
-
-    try {
-      const pricePayload = await paymentService.getProductPrice(productCode)
-      const currentAmount = centsToYuan(pricePayload.current_amount_cents)
-      const originalAmount = centsToYuan(pricePayload.original_amount_cents)
-      const remoteProductName = safeDecode(pricePayload.product_name)
-      const remoteDescription = safeDecode(pricePayload.description)
-      const currentFeatureName = String(this.data.featureName || '').trim()
-      const currentDescription = String(this.data.description || '').trim()
-      const shouldUseRemoteFeatureName = !currentFeatureName || currentFeatureName === DEFAULT_FEATURE_NAME
-      const shouldUseRemoteDescription = !currentDescription || currentDescription === DEFAULT_DESCRIPTION
-
-      this.setData({
-        priceLoaded: true,
-        amount: currentAmount,
-        displayAmount: formatAmount(currentAmount),
-        displayOriginalPrice: formatAmount(originalAmount > 0 ? originalAmount : currentAmount),
-        currency: safeDecode(pricePayload.currency) || DEFAULT_CURRENCY,
-        featureName: shouldUseRemoteFeatureName
-          ? (remoteProductName || currentFeatureName || DEFAULT_FEATURE_NAME)
-          : currentFeatureName,
-        description: shouldUseRemoteDescription
-          ? (remoteDescription || currentDescription || DEFAULT_DESCRIPTION)
-          : currentDescription
-      })
-    } catch (error) {
-      console.warn('[subscribe] load product price failed', error)
-      this.setData({
-        priceLoaded: false
-      })
-    }
-  },
-
-  onGoHome() {
-    wx.reLaunch({
-      url: '/pages/index/index',
-      fail: () => {
-        wx.redirectTo({
-          url: '/pages/index/index'
+        this.setData({
+            productCode,
+            featureKey,
+            featureName,
+            description,
+            amount: Number.isFinite(amount) && amount > 0 ? amount : DEFAULT_PRICE,
+            displayAmount: formatAmount(amount),
+            displayOriginalPrice: formatAmount(originalPrice > 0 ? originalPrice : DEFAULT_ORIGINAL_PRICE),
+            currency: safeDecode(options.currency) || DEFAULT_CURRENCY,
+            successRedirectUrl: safeDecode(options.successRedirect)
         })
-      }
-    })
-  },
+    },
 
-  toggleAgreement() {
-    this.setData({
-      agreed: !this.data.agreed
-    })
-  },
+    ensureSilentLogin() {
+        if (this.pendingSilentLoginPromise) {
+            return this.pendingSilentLoginPromise
+        }
 
-  onHeroImageError() {
-    if (this.data.heroImageSrc === LOCAL_HERO_IMAGE) {
-      return
-    }
+        this.pendingSilentLoginPromise = this.silentLogin().finally(() => {
+            this.pendingSilentLoginPromise = null
+        })
 
-    this.setData({
-      heroImageSrc: LOCAL_HERO_IMAGE
-    })
-  },
+        return this.pendingSilentLoginPromise
+    },
 
-  showServiceAgreement() {
-    const content = `九眼楼AI伴游助手服务协议
+    async silentLogin() {
+        try {
+            const hasLogin = await auth.checkAndAutoLogin(2500)
+            if (!hasLogin || !auth.getToken()) {
+                return false
+            }
+
+            await auth.syncCurrentUserProfile().catch(() => null)
+            return true
+        } catch (error) {
+            return false
+        }
+    },
+
+    async loadProductPrice() {
+        const productCode = String(this.data.productCode || '').trim() || 'vip'
+
+        try {
+            const pricePayload = await paymentService.getProductPrice(productCode)
+            const currentAmount = centsToYuan(pricePayload.current_amount_cents)
+            const originalAmount = centsToYuan(pricePayload.original_amount_cents)
+            const remoteProductName = safeDecode(pricePayload.product_name)
+            const remoteDescription = safeDecode(pricePayload.description)
+            const currentFeatureName = String(this.data.featureName || '').trim()
+            const currentDescription = String(this.data.description || '').trim()
+            const shouldUseRemoteFeatureName = !currentFeatureName || currentFeatureName === DEFAULT_FEATURE_NAME
+            const shouldUseRemoteDescription = !currentDescription || currentDescription === DEFAULT_DESCRIPTION
+
+            this.setData({
+                priceLoaded: true,
+                amount: currentAmount,
+                displayAmount: formatAmount(currentAmount),
+                displayOriginalPrice: formatAmount(originalAmount > 0 ? originalAmount : currentAmount),
+                currency: safeDecode(pricePayload.currency) || DEFAULT_CURRENCY,
+                featureName: shouldUseRemoteFeatureName
+                    ? (remoteProductName || currentFeatureName || DEFAULT_FEATURE_NAME)
+                    : currentFeatureName,
+                description: shouldUseRemoteDescription
+                    ? (remoteDescription || currentDescription || DEFAULT_DESCRIPTION)
+                    : currentDescription
+            })
+        } catch (error) {
+            console.warn('[subscribe] load product price failed', error)
+            this.setData({
+                priceLoaded: false
+            })
+        }
+    },
+
+    onGoHome() {
+        wx.reLaunch({
+            url: '/pages/index/index',
+            fail: () => {
+                wx.redirectTo({
+                    url: '/pages/index/index'
+                })
+            }
+        })
+    },
+
+    toggleAgreement() {
+        this.setData({
+            agreed: !this.data.agreed
+        })
+    },
+
+    onHeroImageError() {
+        if (this.data.heroImageSrc === LOCAL_HERO_IMAGE) {
+            return
+        }
+
+        this.setData({
+            heroImageSrc: LOCAL_HERO_IMAGE
+        })
+    },
+
+    showServiceAgreement() {
+        const content = `九眼楼AI伴游助手服务协议
 
 一、服务说明
 本协议是您与九眼楼AI伴游助手之间关于使用VIP会员服务的协议。购买VIP会员后，您将享有以下权益：
@@ -314,17 +317,17 @@ Page({
 
 联系我们：如有疑问请联系客服`
 
-    wx.showModal({
-      title: '服务协议',
-      content,
-      showCancel: true,
-      cancelText: '返回',
-      confirmText: '我知道了'
-    })
-  },
+        wx.showModal({
+            title: '服务协议',
+            content,
+            showCancel: true,
+            cancelText: '返回',
+            confirmText: '我知道了'
+        })
+    },
 
-  showPrivacyPolicy() {
-    const content = `九眼楼AI伴游助手隐私政策
+    showPrivacyPolicy() {
+        const content = `九眼楼AI伴游助手隐私政策
 
 我们深知个人信息对您的重要性，将严格保护您的隐私安全。本政策说明我们如何收集、使用、存储您的个人信息。
 
@@ -373,118 +376,118 @@ Page({
 如对隐私政策有疑问，请通过客服联系我们。
 我们将在收到请求后尽快处理。`
 
-    wx.showModal({
-      title: '隐私政策',
-      content,
-      showCancel: true,
-      cancelText: '返回',
-      confirmText: '我知道了'
-    })
-  },
+        wx.showModal({
+            title: '隐私政策',
+            content,
+            showCancel: true,
+            cancelText: '返回',
+            confirmText: '我知道了'
+        })
+    },
 
-  async handlePay() {
-    if (this.data.loading) {
-      return
-    }
+    async handlePay() {
+        if (this.data.loading) {
+            return
+        }
 
-    if (!this.data.agreed) {
-      wx.showToast({
-        title: '请先同意服务协议和隐私政策',
-        icon: 'none',
-        duration: 2000
-      })
-      return
-    }
+        if (!this.data.agreed) {
+            wx.showToast({
+                title: '请先同意服务协议和隐私政策',
+                icon: 'none',
+                duration: 2000
+            })
+            return
+        }
 
-    this.setData({
-      loading: true,
-      paymentError: ''
-    })
+        this.setData({
+            loading: true,
+            paymentError: ''
+        })
 
-    try {
-      const loginReady = await auth.checkAndAutoLogin(3000)
-      if (!loginReady || !auth.getToken()) {
-        throw new Error('登录失败，请稍后重试')
-      }
-
-      const paymentOrder = await paymentService.createJsapiPrepay({
-        productCode: this.data.productCode || 'vip',
-        quantity: 1,
-        featureKey: this.data.featureKey
-      })
-      orderService.recordPendingOrder(paymentOrder)
-
-      if (!paymentOrder.dry_run) {
-        await requestWxPayment(paymentOrder.payment_params || {})
-      }
-      orderService.markOrderPaid(paymentOrder)
-
-      grantPaidAccess(this.data.featureKey)
-
-      this.setData({
-        loading: false
-      })
-
-      wx.showToast({
-        title: `已开通${this.data.featureName}`,
-        icon: 'success',
-        duration: 1400
-      })
-
-      setTimeout(() => {
-        this.navigateAfterPayment()
-      }, 500)
-    } catch (error) {
-      const message = error?.errMsg || error?.message || '支付未完成，请稍后重试'
-      this.setData({
-        loading: false,
-        paymentError: /cancel/i.test(message) ? '支付已取消' : message
-      })
-
-      wx.showToast({
-        title: /cancel/i.test(message) ? '支付已取消' : '支付失败',
-        icon: 'none',
-        duration: 1800
-      })
-    }
-  },
-
-  navigateAfterPayment() {
-    const successRedirectUrl = String(this.data.successRedirectUrl || '').trim()
-
-    if (successRedirectUrl) {
-      wx.redirectTo({
-        url: successRedirectUrl,
-        fail: () => {
-          wx.navigateTo({
-            url: successRedirectUrl,
-            fail: () => {
-              this.navigateToDefaultTarget()
+        try {
+            const loginReady = await auth.checkAndAutoLogin(3000)
+            if (!loginReady || !auth.getToken()) {
+                throw new Error('登录失败，请稍后重试')
             }
-          })
+
+            const paymentOrder = await paymentService.createJsapiPrepay({
+                productCode: this.data.productCode || 'vip',
+                quantity: 1,
+                featureKey: this.data.featureKey
+            })
+            orderService.recordPendingOrder(paymentOrder)
+
+            if (!paymentOrder.dry_run) {
+                await requestWxPayment(paymentOrder.payment_params || {})
+            }
+            orderService.markOrderPaid(paymentOrder)
+
+            grantPaidAccess(this.data.featureKey)
+
+            this.setData({
+                loading: false
+            })
+
+            wx.showToast({
+                title: `已开通${this.data.featureName}`,
+                icon: 'success',
+                duration: 1400
+            })
+
+            setTimeout(() => {
+                this.navigateAfterPayment()
+            }, 500)
+        } catch (error) {
+            const message = error?.errMsg || error?.message || '支付未完成，请稍后重试'
+            this.setData({
+                loading: false,
+                paymentError: /cancel/i.test(message) ? '支付已取消' : message
+            })
+
+            wx.showToast({
+                title: /cancel/i.test(message) ? '支付已取消' : '支付失败',
+                icon: 'none',
+                duration: 1800
+            })
         }
-      })
-      return
-    }
+    },
 
-    this.navigateToDefaultTarget()
-  },
+    navigateAfterPayment() {
+        const successRedirectUrl = String(this.data.successRedirectUrl || '').trim()
 
-  navigateToDefaultTarget() {
-    if (getCurrentPages().length > 1) {
-      wx.navigateBack({
-        delta: 1,
-        fail: () => {
-          wx.redirectTo({
+        if (successRedirectUrl) {
+            wx.redirectTo({
+                url: successRedirectUrl,
+                fail: () => {
+                    wx.navigateTo({
+                        url: successRedirectUrl,
+                        fail: () => {
+                            this.navigateToDefaultTarget()
+                        }
+                    })
+                }
+            })
+            return
+        }
+
+        this.navigateToDefaultTarget()
+    },
+
+    navigateToDefaultTarget() {
+        if (getCurrentPages().length > 1) {
+            wx.navigateBack({
+                delta: 1,
+                fail: () => {
+                    wx.redirectTo({
+                        url: GUIDE_MAP_PAGE
+                    })
+                }
+            })
+            return
+        }
+
+        wx.redirectTo({
             url: GUIDE_MAP_PAGE
-          })
-        }
-      })
-      return
+        })
     }
-
-    wx.redirectTo({
-      url: GUIDE_MAP_PAGE
-    })
-  }
-})
+}))

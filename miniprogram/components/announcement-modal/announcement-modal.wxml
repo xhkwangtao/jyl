@@ -1,0 +1,59 @@
+<view class="announcement-modal" wx:if="{{visible}}">
+  <view class="announcement-modal__mask" bindtap="onCloseTap"></view>
+
+  <view class="announcement-modal__panel" catchtap="noop">
+    <view class="announcement-modal__close" bindtap="onCloseTap">
+      <text class="announcement-modal__close-text">x</text>
+    </view>
+
+    <scroll-view class="announcement-modal__content" scroll-y>
+      <block wx:for="{{renderBlocks}}" wx:key="id">
+        <view
+          wx:if="{{item.type === 'image'}}"
+          class="announcement-modal__block announcement-modal__image-shell {{item.tappable ? 'is-tappable' : ''}}"
+          bindtap="onBlockTap"
+          data-block-index="{{index}}"
+        >
+          <view class="announcement-modal__image-frame" style="padding-top: {{item.imagePaddingTop}};">
+            <image
+              class="announcement-modal__image"
+              src="{{item.imageUrl}}"
+              mode="{{item.imageMode}}"
+            ></image>
+          </view>
+        </view>
+
+        <view
+          wx:elif="{{item.type === 'heading'}}"
+          class="announcement-modal__block announcement-modal__heading {{item.tappable ? 'is-tappable' : ''}}"
+          bindtap="onBlockTap"
+          data-block-index="{{index}}"
+        >
+          <text>{{item.text}}</text>
+        </view>
+
+        <view
+          wx:elif="{{item.type === 'paragraph'}}"
+          class="announcement-modal__block announcement-modal__paragraph {{item.tappable ? 'is-tappable' : ''}}"
+          bindtap="onBlockTap"
+          data-block-index="{{index}}"
+        >
+          <text>{{item.text}}</text>
+        </view>
+
+        <view
+          wx:elif="{{item.type === 'button'}}"
+          class="announcement-modal__block announcement-modal__button-row"
+        >
+          <button
+            class="announcement-modal__button {{item.tappable ? 'is-tappable' : ''}}"
+            bindtap="onBlockTap"
+            data-block-index="{{index}}"
+          >
+            {{item.text}}
+          </button>
+        </view>
+      </block>
+    </scroll-view>
+  </view>
+</view>

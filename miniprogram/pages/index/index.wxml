@@ -78,5 +78,13 @@
     </view>
   </view>
 
+  <announcement-modal
+    visible="{{announcementModalVisible}}"
+    announcement="{{activeAnnouncement}}"
+    blocks="{{activeAnnouncementBlocks}}"
+    bind:close="onAnnouncementModalClose"
+    bind:linktap="onAnnouncementLinkTap"
+  ></announcement-modal>
+
   <view class="safe-area-bottom" style="height: {{safeAreaBottom}}px;"></view>
 </view>

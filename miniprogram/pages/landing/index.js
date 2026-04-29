@@ -14,6 +14,9 @@ const {
   checkCurrentLocationInScenicArea,
   buildScenicVideoAccessDeniedMessage
 } = require('../../utils/scenic-location')
+const {
+  withPageAnalytics
+} = require('../../utils/with-page-analytics')
 
 const HOME_PAGE_URL = '/pages/index/index'
 const MY_PAGE_URL = '/pages/my-page/my-page'
@@ -60,7 +63,7 @@ function buildNavigationMetrics() {
   }
 }
 
-Page({
+Page(withPageAnalytics('/pages/landing/index', {
   data: {
     statusBarHeight: 0,
     navigationBarTotalHeight: 0,
@@ -600,4 +603,4 @@ Page({
     videoContext.seek(0)
     videoContext.play()
   }
-})
+}))

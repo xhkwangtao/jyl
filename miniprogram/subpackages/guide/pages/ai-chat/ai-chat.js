@@ -8,6 +8,9 @@ const {
   isFeaturePaid
 } = require('../../../../utils/audio-access.js')
 const {
+  withPageAnalytics
+} = require('../../../../utils/with-page-analytics')
+const {
   GUIDE_MAP_PAGE,
   GUIDE_MAP_ROUTE,
   GUIDE_AI_CHAT_PAGE,
@@ -537,7 +540,7 @@ function buildRouteIntroMessage(routeInfo) {
   return lines.join('\n\n')
 }
 
-Page({
+Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
   data: {
     pageReady: false,
     navHeight: 84,
@@ -1323,4 +1326,4 @@ Page({
       this.sendMessage(presetMessage)
     }
   }
-})
+}))

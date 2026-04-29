@@ -1,5 +1,8 @@
 const auth = require('../../utils/auth')
 const orderService = require('../../services/order-service')
+const {
+  withPageAnalytics
+} = require('../../utils/with-page-analytics')
 
 const SUBSCRIBE_PAGE_ROOT = '/subpackages/guide/pages/payment/subscribe/subscribe'
 
@@ -72,7 +75,7 @@ function buildSubscribeUrl(order = {}) {
   return `${SUBSCRIBE_PAGE_ROOT}?${queryList.join('&')}`
 }
 
-Page({
+Page(withPageAnalytics('/pages/order-center/detail', {
   data: {
     orderId: '',
     orderNo: '',
@@ -274,4 +277,4 @@ Page({
       }
     })
   }
-})
+}))

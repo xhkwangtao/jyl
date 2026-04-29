@@ -3,6 +3,9 @@ const {
   checkCurrentLocationInScenicArea,
   buildScenicVideoAccessDeniedMessage
 } = require('../../../../utils/scenic-location')
+const {
+  withPageAnalytics
+} = require('../../../../utils/with-page-analytics')
 
 const DEFAULT_COVER_IMAGE = '/images/poi-detail/1.png'
 const DEFAULT_POINT_ICON = '/images/poi/icons/scenic-spot.png'
@@ -267,7 +270,7 @@ function pickScenicPoiList(mapData = {}) {
     .filter(Boolean)
 }
 
-Page({
+Page(withPageAnalytics('/subpackages/guide/pages/scenic-audio-list/scenic-audio-list', {
   data: {
     pageTitle: '景点讲解详情',
     locationText: '景点讲解',
@@ -737,4 +740,4 @@ Page({
       confirmText: '知道了'
     })
   }
-})
+}))

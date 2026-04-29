@@ -1,0 +1,126 @@
+.announcement-modal {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1003;
+}
+
+.announcement-modal__mask {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(10, 18, 25, 0.42);
+}
+
+.announcement-modal__panel {
+  position: absolute;
+  top: 50%;
+  left: 40rpx;
+  right: 40rpx;
+  transform: translateY(-50%);
+  max-height: 78vh;
+  border-radius: 36rpx;
+  background: #ffffff;
+  box-shadow: 0 24rpx 80rpx rgba(12, 37, 48, 0.22);
+  overflow: hidden;
+}
+
+.announcement-modal__close {
+  position: absolute;
+  top: 24rpx;
+  right: 24rpx;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: rgba(15, 62, 73, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.announcement-modal__close-text {
+  font-size: 26rpx;
+  line-height: 1;
+  color: #4f6570;
+  text-transform: uppercase;
+}
+
+.announcement-modal__content {
+  max-height: 78vh;
+  padding: 96rpx 32rpx 40rpx;
+  box-sizing: border-box;
+}
+
+.announcement-modal__block {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.announcement-modal__block + .announcement-modal__block {
+  margin-top: 24rpx;
+}
+
+.announcement-modal__image-shell.is-tappable:active,
+.announcement-modal__heading.is-tappable:active,
+.announcement-modal__paragraph.is-tappable:active,
+.announcement-modal__button.is-tappable:active {
+  opacity: 0.88;
+}
+
+.announcement-modal__image-frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 24rpx;
+  background: #eef3f5;
+}
+
+.announcement-modal__image {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.announcement-modal__heading {
+  color: #10242b;
+  font-size: 38rpx;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.announcement-modal__paragraph {
+  color: #3d4f57;
+  font-size: 28rpx;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.announcement-modal__button-row {
+  margin-top: 32rpx;
+}
+
+.announcement-modal__button {
+  width: 100%;
+  min-height: 88rpx;
+  border: 0;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #0f3e49 0%, #27626f 100%);
+  color: #ffffff;
+  font-size: 28rpx;
+  line-height: 88rpx;
+  font-weight: 700;
+  padding: 0 24rpx;
+}
+
+.announcement-modal__button::after {
+  border: 0;
+}

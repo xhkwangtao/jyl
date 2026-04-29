@@ -23,6 +23,9 @@ const {
   POSTER_EXPORT_HEIGHT,
   renderStudyReportPoster
 } = require('../../utils/study-report-poster')
+const {
+  withPageAnalytics
+} = require('../../utils/with-page-analytics')
 
 const GENERATED_REPORT_PDF_FILE_NAME = '研学报告.pdf'
 const GENERATED_REPORT_PREVIEW_DIR_NAME = 'study-report-preview'
@@ -473,7 +476,7 @@ function buildWorksheetScanTip({
   return '完成答题卡后填写编号和姓名并拍摄上传，系统将自动识别并生成研学报告。'
 }
 
-Page({
+Page(withPageAnalytics('/pages/check-in/check-in', {
   data: {
     pageTitle: '暗号收集',
     navFadeHeight: 50,
@@ -1577,4 +1580,4 @@ Page({
       }
     })
   }
-})
+}))

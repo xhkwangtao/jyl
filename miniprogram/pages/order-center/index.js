@@ -1,5 +1,8 @@
 const auth = require('../../utils/auth')
 const orderService = require('../../services/order-service')
+const {
+  withPageAnalytics
+} = require('../../utils/with-page-analytics')
 
 const SUBSCRIBE_PAGE_ROOT = '/subpackages/guide/pages/payment/subscribe/subscribe'
 const STATUS_TABS = [
@@ -78,7 +81,7 @@ function buildSubscribeUrl(order = {}) {
   return `${SUBSCRIBE_PAGE_ROOT}?${queryList.join('&')}`
 }
 
-Page({
+Page(withPageAnalytics('/pages/order-center/index', {
   data: {
     tabs: STATUS_TABS,
     activeStatus: 'all',
@@ -279,4 +282,4 @@ Page({
 
     navigateToPage(`/pages/order-center/detail?${query}`)
   }
-})
+}))

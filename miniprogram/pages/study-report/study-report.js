@@ -7,6 +7,9 @@ const {
   POSTER_EXPORT_HEIGHT,
   renderStudyReportPoster
 } = require('../../utils/study-report-poster')
+const {
+  withPageAnalytics
+} = require('../../utils/with-page-analytics')
 
 const PAGE_STYLE = 'background: #e8edf3;'
 
@@ -63,7 +66,7 @@ function buildPosterPreviewCacheKey(reportRenderCache = {}) {
   ].join('::')
 }
 
-Page({
+Page(withPageAnalytics('/pages/study-report/study-report', {
   data: {
     pageStyle: PAGE_STYLE,
     pageReady: false,
@@ -307,4 +310,4 @@ Page({
   onOpenCollectionPage() {
     navigateToPage('/pages/check-in/check-in')
   }
-})
+}))

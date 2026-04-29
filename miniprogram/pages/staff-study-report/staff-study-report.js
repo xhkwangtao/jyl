@@ -1,5 +1,8 @@
 const auth = require('../../utils/auth')
 const studyReportService = require('../../services/study-report-service')
+const {
+  withPageAnalytics
+} = require('../../utils/with-page-analytics')
 
 const PAGE_STYLE = 'background: #eef3f5;'
 
@@ -207,7 +210,7 @@ function sortStudentList(studentList = []) {
   })
 }
 
-Page({
+Page(withPageAnalytics('/pages/staff-study-report/staff-study-report', {
   data: {
     pageStyle: PAGE_STYLE,
     pageTitle: '工作人员答题卡',
@@ -858,4 +861,4 @@ Page({
       url: '/pages/index/index'
     })
   }
-})
+}))

@@ -6,6 +6,13 @@ const {
   hasLandingPayload,
   buildLandingPageUrl
 } = require('../../utils/landing-redirect')
+const announcementService = require('../../services/announcement-service')
+const {
+  handleAnnouncementLink
+} = require('../../utils/announcement-link')
+const {
+  buildAnnouncementFingerprint
+} = require('../../utils/announcement-utils')
 const {
   GUIDE_MAP_PAGE,
   GUIDE_AI_CHAT_PAGE,
@@ -19,6 +26,9 @@ const {
   checkCurrentLocationInScenicArea,
   buildScenicVideoAccessDeniedMessage
 } = require('../../utils/scenic-location')
+const {
+  withPageAnalytics
+} = require('../../utils/with-page-analytics')
 
 const AI_CHAT_PAYMENT_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
 const STUDY_REPORT_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE
@@ -32,8 +42,9 @@ const STATUS_BAR_GUEST_NAME = '游客'
 const STATUS_BAR_GUEST_AVATAR_SRC = '/images/icons/user.svg'
 const STATUS_BAR_USER_AVATAR_SRC = '/images/xiaojiu.png'
 const HOME_PHOTO_CARD_VIDEO_URL = 'https://jyl-cdn.flexai.cc/assets/video/e166e877ce3348e786489c122add3aef.mp4'
+const HOME_ANNOUNCEMENT_DISMISSED_FINGERPRINT_STORAGE_KEY = 'homeAnnouncementDismissedFingerprint'
 
-Page({
+Page(withPageAnalytics('/pages/index/index', {
   data: {
     safeAreaBottom: 34,
     isLoggingIn: false,
@@ -51,13 +62,17 @@ Page({
     featureVideoSrc: '',
     checkInTotalCount: 19,
     checkInCompletedCount: 0,
-    checkInDisplayCompletedCount: 0
+    checkInDisplayCompletedCount: 0,
+    announcementModalVisible: false,
+    activeAnnouncement: {},
+    activeAnnouncementBlocks: []
   },
 
   onLoad(options = {}) {
     this.pendingLandingRedirect = false
     this.syncingCurrentUserProfile = false
     this.syncingLatestStudyReport = false
+    this.announcementRequestSequence = 0
 
     if (this.handleLandingRedirect(options)) {
       return
@@ -75,6 +90,7 @@ Page({
       return
     }
 
+    this.syncHomeAnnouncementModal()
     this.syncStatusBarUser()
     this.syncCheckInEntry()
     this.pendingAIChatNavigation = false
@@ -117,6 +133,7 @@ Page({
     })
     this.pendingAIChatNavigation = false
     this.pendingLandingRedirect = false
+    this.announcementRequestSequence = (this.announcementRequestSequence || 0) + 1
   },
 
   onHide() {
@@ -168,6 +185,89 @@ Page({
     })
 
     return true
+  },
+
+  getDismissedAnnouncementFingerprint() {
+    try {
+      return String(wx.getStorageSync(HOME_ANNOUNCEMENT_DISMISSED_FINGERPRINT_STORAGE_KEY) || '').trim()
+    } catch (error) {
+      return ''
+    }
+  },
+
+  persistDismissedAnnouncementFingerprint(fingerprint = '') {
+    const normalizedFingerprint = String(fingerprint || '').trim()
+    if (!normalizedFingerprint) {
+      return
+    }
+
+    try {
+      wx.setStorageSync(
+        HOME_ANNOUNCEMENT_DISMISSED_FINGERPRINT_STORAGE_KEY,
+        normalizedFingerprint
+      )
+    } catch (error) {}
+  },
+
+  clearAnnouncementModalState() {
+    this.setData({
+      announcementModalVisible: false,
+      activeAnnouncement: {},
+      activeAnnouncementBlocks: []
+    })
+  },
+
+  async syncHomeAnnouncementModal() {
+    const requestSequence = (this.announcementRequestSequence || 0) + 1
+    this.announcementRequestSequence = requestSequence
+
+    const announcement = await announcementService.getHomeModalAnnouncement(
+      this.getDismissedAnnouncementFingerprint()
+    )
+
+    if (requestSequence !== this.announcementRequestSequence) {
+      return
+    }
+
+    if (!announcement) {
+      this.clearAnnouncementModalState()
+      return
+    }
+
+    this.setData({
+      announcementModalVisible: true,
+      activeAnnouncement: announcement,
+      activeAnnouncementBlocks: Array.isArray(announcement.normalizedBlocks)
+        ? announcement.normalizedBlocks
+        : []
+    })
+  },
+
+  hideAnnouncementModal() {
+    this.setData({
+      announcementModalVisible: false,
+      activeAnnouncement: {},
+      activeAnnouncementBlocks: []
+    })
+  },
+
+  getActiveAnnouncementFingerprint() {
+    return buildAnnouncementFingerprint(this.data.activeAnnouncement || {})
+  },
+
+  onAnnouncementModalClose() {
+    const fingerprint = this.getActiveAnnouncementFingerprint()
+    this.persistDismissedAnnouncementFingerprint(fingerprint)
+    this.hideAnnouncementModal()
+  },
+
+  async onAnnouncementLinkTap(event) {
+    const fingerprint = this.getActiveAnnouncementFingerprint()
+    const link = event?.detail?.link || {}
+
+    this.persistDismissedAnnouncementFingerprint(fingerprint)
+    this.hideAnnouncementModal()
+    await handleAnnouncementLink(link)
   },
 
   initLayoutMetrics() {
@@ -549,4 +649,4 @@ Page({
       duration: 1800
     })
   }
-})
+}))
