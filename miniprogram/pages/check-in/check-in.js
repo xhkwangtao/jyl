@@ -28,6 +28,8 @@ const GENERATED_REPORT_PDF_FILE_NAME = '研学报告.pdf'
 const GENERATED_REPORT_PREVIEW_DIR_NAME = 'study-report-preview'
 const STAFF_STUDY_REPORT_PAGE = '/pages/staff-study-report/staff-study-report'
 const STUDY_REPORT_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE
+const WORKSHEET_SCAN_NOTICE_TITLE = '扫描前提示'
+const WORKSHEET_SCAN_NOTICE_CONTENT = '手机上只能扫描一次答题卡；如需重新扫描，请出检票口后联系工作人员协助扫描。'
 const CHECKIN_FILTER_OPTIONS = [
   { label: '全部', value: 'all' },
   { label: '已记录', value: 'checked' },
@@ -894,15 +896,27 @@ Page({
     const worksheetEntryState = this.getWorksheetEntryState()
     if (worksheetEntryState.blocked) {
       wx.showToast({
-        title: '已经扫描过答题卡',
+        title: '您已扫描过答题卡，再次扫描请前往景区入口游客中心联系工作人员',
         icon: 'none',
-        duration: 1800
+        duration: 10000
       })
       return
     }
 
-    this.setData({
-      showWorksheetDialog: true
+    wx.showModal({
+      title: WORKSHEET_SCAN_NOTICE_TITLE,
+      content: WORKSHEET_SCAN_NOTICE_CONTENT,
+      confirmText: '继续扫描',
+      cancelText: '取消',
+      success: (res) => {
+        if (!res.confirm) {
+          return
+        }
+
+        this.setData({
+          showWorksheetDialog: true
+        })
+      }
     })
   },
 
