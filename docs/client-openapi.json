@@ -1,0 +1,4446 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Jiuyanlou API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/client/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Healthcheck",
+        "operationId": "healthcheck_api_v1_client_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/content/bootstrap": {
+      "get": {
+        "tags": [
+          "client-content"
+        ],
+        "summary": "Get Content Bootstrap",
+        "operationId": "get_content_bootstrap_api_v1_client_content_bootstrap_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientContentBootstrap"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/content/map-runtime": {
+      "get": {
+        "tags": [
+          "client-content"
+        ],
+        "summary": "Get Map Runtime",
+        "operationId": "get_map_runtime_api_v1_client_content_map_runtime_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientContentMapRuntime"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/landing-pages/config": {
+      "get": {
+        "tags": [
+          "client-landing-pages"
+        ],
+        "summary": "Get Landing Page Config",
+        "operationId": "get_landing_page_config_api_v1_client_landing_pages_config_get",
+        "parameters": [
+          {
+            "name": "s",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "S"
+            }
+          },
+          {
+            "name": "scene",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scene"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LandingPageClientConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/pois/{poi_id}": {
+      "get": {
+        "tags": [
+          "client-pois"
+        ],
+        "summary": "Get Current Poi Detail",
+        "operationId": "get_current_poi_detail_api_v1_client_pois__poi_id__get",
+        "parameters": [
+          {
+            "name": "poi_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Poi Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientPoiDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/routes/{route_id}": {
+      "get": {
+        "tags": [
+          "client-routes"
+        ],
+        "summary": "Get Current Route Detail",
+        "operationId": "get_current_route_detail_api_v1_client_routes__route_id__get",
+        "parameters": [
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Route Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientRouteDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/users/wechat-login": {
+      "post": {
+        "tags": [
+          "client-users"
+        ],
+        "summary": "Wechat Login",
+        "operationId": "wechat_login_api_v1_client_users_wechat_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientUserWechatLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientUserLoginResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/users/me": {
+      "get": {
+        "tags": [
+          "client-users"
+        ],
+        "summary": "Get Me",
+        "operationId": "get_me_api_v1_client_users_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientUserRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/client/study-reports/latest": {
+      "get": {
+        "tags": [
+          "client-study-reports"
+        ],
+        "summary": "Get Latest Client Study Report",
+        "operationId": "get_latest_client_study_report_api_v1_client_study_reports_latest_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportGenerateResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/client/study-reports/upload": {
+      "post": {
+        "tags": [
+          "client-study-reports"
+        ],
+        "summary": "Upload Client Study Report Image",
+        "operationId": "upload_client_study_report_image_api_v1_client_study_reports_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_client_study_report_image_api_v1_client_study_reports_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/client/study-reports/generate": {
+      "post": {
+        "tags": [
+          "client-study-reports"
+        ],
+        "summary": "Generate Client Study Report",
+        "operationId": "generate_client_study_report_api_v1_client_study_reports_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientStudyReportGenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/client/study-reports/jobs/{record_id}": {
+      "get": {
+        "tags": [
+          "client-study-reports"
+        ],
+        "summary": "Get Client Study Report Job",
+        "operationId": "get_client_study_report_job_api_v1_client_study_reports_jobs__record_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Record Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/study-reports/{record_id}": {
+      "get": {
+        "tags": [
+          "client-study-reports"
+        ],
+        "summary": "Get Client Study Report",
+        "operationId": "get_client_study_report_api_v1_client_study_reports__record_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Record Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportGenerateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/study-groups/active": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "List Active Study Groups",
+        "operationId": "list_active_study_groups_api_v1_client_study_groups_active_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyGroupListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/study-groups/{group_id}": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "Get Study Group",
+        "operationId": "get_study_group_api_v1_client_study_groups__group_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Group Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyGroupRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/study-groups/{group_id}/progress": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "Get Study Group Progress",
+        "operationId": "get_study_group_progress_api_v1_client_study_groups__group_id__progress_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Group Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyGroupRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/study-groups/{group_id}/students": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "List Study Group Students",
+        "operationId": "list_study_group_students_api_v1_client_study_groups__group_id__students_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Keyword"
+            }
+          },
+          {
+            "name": "report_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Report Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyGroupStudentListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/study-groups/{group_id}/students/{card_code}": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "Get Study Group Student",
+        "operationId": "get_study_group_student_api_v1_client_study_groups__group_id__students__card_code__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "card_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Card Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyGroupStudentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/study-groups/{group_id}/students/{card_code}/study-report-job": {
+      "get": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "Get Study Group Student Report Job",
+        "operationId": "get_study_group_student_report_job_api_v1_client_study_groups__group_id__students__card_code__study_report_job_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "card_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Card Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/study-groups/{group_id}/students/{card_code}/study-report-jobs": {
+      "post": {
+        "tags": [
+          "client-study-groups"
+        ],
+        "summary": "Create Study Group Student Report Job",
+        "operationId": "create_study_group_student_report_job_api_v1_client_study_groups__group_id__students__card_code__study_report_jobs_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "card_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Card Code"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientStudyReportGenerateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientStudyReportJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/ai-agent/chat/stream": {
+      "post": {
+        "tags": [
+          "client-ai-agent"
+        ],
+        "summary": "Chat Stream",
+        "operationId": "chat_stream_api_v1_client_ai_agent_chat_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiChatStreamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/ai-agent/voice-chat/stream": {
+      "post": {
+        "tags": [
+          "client-ai-agent"
+        ],
+        "summary": "Voice Chat Stream",
+        "operationId": "voice_chat_stream_api_v1_client_ai_agent_voice_chat_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiVoiceChatStreamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/payments/products/prices": {
+      "get": {
+        "tags": [
+          "client-payments"
+        ],
+        "summary": "List Client Product Prices",
+        "operationId": "list_client_product_prices_api_v1_client_payments_products_prices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientPaymentProductPriceListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/payments/products/prices/{product_code}": {
+      "get": {
+        "tags": [
+          "client-payments"
+        ],
+        "summary": "Get Client Product Price",
+        "operationId": "get_client_product_price_api_v1_client_payments_products_prices__product_code__get",
+        "parameters": [
+          {
+            "name": "product_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientPaymentProductPriceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/payments/native-prepay": {
+      "post": {
+        "tags": [
+          "client-payments"
+        ],
+        "summary": "Create Native Prepay",
+        "operationId": "create_native_prepay_api_v1_client_payments_native_prepay_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientNativePrepayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientNativePrepayResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/client/payments/jsapi-prepay": {
+      "post": {
+        "tags": [
+          "client-payments"
+        ],
+        "summary": "Create Jsapi Prepay",
+        "operationId": "create_jsapi_prepay_api_v1_client_payments_jsapi_prepay_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientJsapiPrepayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientJsapiPrepayResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/client/entitlements/features": {
+      "get": {
+        "tags": [
+          "client-entitlements"
+        ],
+        "summary": "List Entitlement Features",
+        "operationId": "list_entitlement_features_api_v1_client_entitlements_features_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntitlementFeatureListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/entitlements/features/{feature_key}": {
+      "get": {
+        "tags": [
+          "client-entitlements"
+        ],
+        "summary": "Get Feature Access",
+        "operationId": "get_feature_access_api_v1_client_entitlements_features__feature_key__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "feature_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Feature Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientEntitlementAccessRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/entitlements/{feature_key}": {
+      "get": {
+        "tags": [
+          "client-entitlements"
+        ],
+        "summary": "Get Client Entitlement",
+        "operationId": "get_client_entitlement_api_v1_client_entitlements__feature_key__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "feature_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Feature Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientEntitlementAccessRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AiChatStreamRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Message"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "scene": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Scene",
+            "default": "guide"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "AiChatStreamRequest"
+      },
+      "AiVoiceChatStreamRequest": {
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "audio_data": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Data"
+          },
+          "audio_format": {
+            "type": "string",
+            "maxLength": 20,
+            "title": "Audio Format",
+            "default": "wav"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "output_mode": {
+            "type": "string",
+            "pattern": "^(text|audio|both)$",
+            "title": "Output Mode",
+            "default": "text"
+          }
+        },
+        "type": "object",
+        "title": "AiVoiceChatStreamRequest"
+      },
+      "Body_upload_client_study_report_image_api_v1_client_study_reports_upload_post": {
+        "properties": {
+          "worksheet_image": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Worksheet Image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "worksheet_image"
+        ],
+        "title": "Body_upload_client_study_report_image_api_v1_client_study_reports_upload_post"
+      },
+      "ClientAsset": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "image",
+              "audio",
+              "video"
+            ],
+            "title": "Kind"
+          },
+          "file_url": {
+            "type": "string",
+            "title": "File Url"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "metadata_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Json"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "file_url",
+          "mime_type"
+        ],
+        "title": "ClientAsset"
+      },
+      "ClientAudioGuide": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "title": "Duration Seconds"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "asset": {
+            "$ref": "#/components/schemas/ClientAsset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "duration_seconds",
+          "asset"
+        ],
+        "title": "ClientAudioGuide"
+      },
+      "ClientContentBootstrap": {
+        "properties": {
+          "release": {
+            "$ref": "#/components/schemas/ClientReleaseInfo"
+          },
+          "map": {
+            "$ref": "#/components/schemas/MapConfigRead"
+          },
+          "pois": {
+            "items": {
+              "$ref": "#/components/schemas/ClientPoiSummary"
+            },
+            "type": "array",
+            "title": "Pois"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/ClientRouteSummary"
+            },
+            "type": "array",
+            "title": "Routes"
+          },
+          "resource_version": {
+            "type": "integer",
+            "title": "Resource Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "release",
+          "map",
+          "resource_version"
+        ],
+        "title": "ClientContentBootstrap"
+      },
+      "ClientContentMapRuntime": {
+        "properties": {
+          "release": {
+            "$ref": "#/components/schemas/ClientReleaseInfo"
+          },
+          "map": {
+            "$ref": "#/components/schemas/MapConfigRead"
+          },
+          "pois": {
+            "items": {
+              "$ref": "#/components/schemas/ClientPoiDetail"
+            },
+            "type": "array",
+            "title": "Pois"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/ClientRouteDetail"
+            },
+            "type": "array",
+            "title": "Routes"
+          },
+          "routePolylines": {
+            "items": {
+              "$ref": "#/components/schemas/ClientRoutePolyline"
+            },
+            "type": "array",
+            "title": "Routepolylines"
+          },
+          "runtimeRouteOptions": {
+            "items": {
+              "$ref": "#/components/schemas/ClientRuntimeRouteOption"
+            },
+            "type": "array",
+            "title": "Runtimerouteoptions"
+          },
+          "resource_version": {
+            "type": "integer",
+            "title": "Resource Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "release",
+          "map",
+          "resource_version"
+        ],
+        "title": "ClientContentMapRuntime"
+      },
+      "ClientEntitlementAccessRead": {
+        "properties": {
+          "feature_key": {
+            "type": "string",
+            "title": "Feature Key"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "source_product_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Product Code"
+          },
+          "source_order_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order Id"
+          },
+          "required_entitlement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Entitlement"
+          },
+          "feature_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature Name"
+          },
+          "recommended_product_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Product Code"
+          },
+          "cache_ttl_seconds": {
+            "type": "integer",
+            "title": "Cache Ttl Seconds",
+            "default": 300
+          }
+        },
+        "type": "object",
+        "required": [
+          "feature_key",
+          "available",
+          "status"
+        ],
+        "title": "ClientEntitlementAccessRead"
+      },
+      "ClientJsapiPrepayRequest": {
+        "properties": {
+          "product_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Code"
+          },
+          "openid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openid"
+          },
+          "user_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Label"
+          },
+          "product_name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Product Name",
+            "default": ""
+          },
+          "product_type": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Product Type",
+            "default": "other"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "default": 1
+          },
+          "unit_amount_cents": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Unit Amount Cents",
+            "default": 0
+          },
+          "discount_amount_cents": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Discount Amount Cents",
+            "default": 0
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 127
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "notify_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notify Url"
+          },
+          "login_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login Code"
+          },
+          "feature_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature Key"
+          }
+        },
+        "type": "object",
+        "title": "ClientJsapiPrepayRequest"
+      },
+      "ClientJsapiPrepayResponse": {
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/PaymentOrderRead"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentRecordRead"
+          },
+          "payment_params": {
+            "$ref": "#/components/schemas/RequestPaymentParams"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "order",
+          "payment",
+          "payment_params"
+        ],
+        "title": "ClientJsapiPrepayResponse"
+      },
+      "ClientNativePrepayRequest": {
+        "properties": {
+          "product_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Code"
+          },
+          "openid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openid"
+          },
+          "user_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Label"
+          },
+          "product_name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Product Name",
+            "default": ""
+          },
+          "product_type": {
+            "type": "string",
+            "maxLength": 60,
+            "title": "Product Type",
+            "default": "other"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "default": 1
+          },
+          "unit_amount_cents": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Unit Amount Cents",
+            "default": 0
+          },
+          "discount_amount_cents": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Discount Amount Cents",
+            "default": 0
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 127
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "notify_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notify Url"
+          }
+        },
+        "type": "object",
+        "title": "ClientNativePrepayRequest"
+      },
+      "ClientNativePrepayResponse": {
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/PaymentOrderRead"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentRecordRead"
+          },
+          "code_url": {
+            "type": "string",
+            "title": "Code Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order",
+          "payment",
+          "code_url"
+        ],
+        "title": "ClientNativePrepayResponse"
+      },
+      "ClientPaymentProductPriceListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClientPaymentProductPriceRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ClientPaymentProductPriceListResponse"
+      },
+      "ClientPaymentProductPriceRead": {
+        "properties": {
+          "product_code": {
+            "type": "string",
+            "title": "Product Code"
+          },
+          "product_name": {
+            "type": "string",
+            "title": "Product Name"
+          },
+          "product_type": {
+            "type": "string",
+            "title": "Product Type"
+          },
+          "original_amount_cents": {
+            "type": "integer",
+            "title": "Original Amount Cents"
+          },
+          "current_amount_cents": {
+            "type": "integer",
+            "title": "Current Amount Cents"
+          },
+          "discount_amount_cents": {
+            "type": "integer",
+            "title": "Discount Amount Cents"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "has_discount": {
+            "type": "boolean",
+            "title": "Has Discount"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "feature_key": {
+            "type": "string",
+            "title": "Feature Key"
+          },
+          "entitlement_duration_minutes": {
+            "type": "integer",
+            "title": "Entitlement Duration Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_code",
+          "product_name",
+          "product_type",
+          "original_amount_cents",
+          "current_amount_cents",
+          "discount_amount_cents",
+          "currency",
+          "has_discount",
+          "description",
+          "feature_key",
+          "entitlement_duration_minutes"
+        ],
+        "title": "ClientPaymentProductPriceRead"
+      },
+      "ClientPoiDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "cover_asset": {
+            "$ref": "#/components/schemas/ClientAsset"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "markerId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markerid"
+          },
+          "sourceName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcename"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": true
+          },
+          "cardVisible": {
+            "type": "boolean",
+            "title": "Cardvisible",
+            "default": true
+          },
+          "checkinVisible": {
+            "type": "boolean",
+            "title": "Checkinvisible",
+            "default": true
+          },
+          "themeTag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Themetag"
+          },
+          "themeTone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Themetone"
+          },
+          "triggerRadiusM": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggerradiusm"
+          },
+          "routeIndex": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routeindex"
+          },
+          "orderText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordertext"
+          },
+          "sequenceText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequencetext"
+          },
+          "iconPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iconpath"
+          },
+          "runtimeMetadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Runtimemetadata"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "stayText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Staytext"
+          },
+          "sceneLine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sceneline"
+          },
+          "guideTip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guidetip"
+          },
+          "gallery_assets": {
+            "items": {
+              "$ref": "#/components/schemas/ClientAsset"
+            },
+            "type": "array",
+            "title": "Gallery Assets"
+          },
+          "video_assets": {
+            "items": {
+              "$ref": "#/components/schemas/ClientAsset"
+            },
+            "type": "array",
+            "title": "Video Assets"
+          },
+          "audio_guide": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClientAudioGuide"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "category",
+          "longitude",
+          "latitude",
+          "cover_asset",
+          "body"
+        ],
+        "title": "ClientPoiDetail"
+      },
+      "ClientPoiSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "cover_asset": {
+            "$ref": "#/components/schemas/ClientAsset"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "markerId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markerid"
+          },
+          "sourceName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcename"
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": true
+          },
+          "cardVisible": {
+            "type": "boolean",
+            "title": "Cardvisible",
+            "default": true
+          },
+          "checkinVisible": {
+            "type": "boolean",
+            "title": "Checkinvisible",
+            "default": true
+          },
+          "themeTag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Themetag"
+          },
+          "themeTone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Themetone"
+          },
+          "triggerRadiusM": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggerradiusm"
+          },
+          "routeIndex": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routeindex"
+          },
+          "orderText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordertext"
+          },
+          "sequenceText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequencetext"
+          },
+          "iconPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iconpath"
+          },
+          "runtimeMetadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Runtimemetadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "category",
+          "longitude",
+          "latitude",
+          "cover_asset"
+        ],
+        "title": "ClientPoiSummary"
+      },
+      "ClientReleaseInfo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "published_by": {
+            "type": "string",
+            "title": "Published By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "summary",
+          "published_by",
+          "created_at"
+        ],
+        "title": "ClientReleaseInfo"
+      },
+      "ClientRouteDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "distance_meters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Meters"
+          },
+          "distanceText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancetext"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "difficulty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty"
+          },
+          "sourcePointCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcepointcount"
+          },
+          "simplifiedPointCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simplifiedpointcount"
+          },
+          "displaySegmentCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displaysegmentcount"
+          },
+          "coordinateSystem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinatesystem"
+          },
+          "runtimeMetadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Runtimemetadata"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "poi_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Poi Ids"
+          },
+          "path_points": {
+            "items": {
+              "$ref": "#/components/schemas/PathPoint"
+            },
+            "type": "array",
+            "title": "Path Points"
+          },
+          "polyline_segments": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/PathPoint"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Polyline Segments"
+          },
+          "pois": {
+            "items": {
+              "$ref": "#/components/schemas/ClientPoiSummary"
+            },
+            "type": "array",
+            "title": "Pois"
+          },
+          "audio_guide": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClientAudioGuide"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ],
+        "title": "ClientRouteDetail"
+      },
+      "ClientRoutePolyline": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/PathPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "isConnector": {
+            "type": "boolean",
+            "title": "Isconnector",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "color",
+          "width"
+        ],
+        "title": "ClientRoutePolyline"
+      },
+      "ClientRouteSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "distance_meters": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Meters"
+          },
+          "distanceText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancetext"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "difficulty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty"
+          },
+          "sourcePointCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcepointcount"
+          },
+          "simplifiedPointCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simplifiedpointcount"
+          },
+          "displaySegmentCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displaysegmentcount"
+          },
+          "coordinateSystem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinatesystem"
+          },
+          "runtimeMetadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Runtimemetadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ],
+        "title": "ClientRouteSummary"
+      },
+      "ClientRuntimeRouteOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "backendRouteId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backendrouteid"
+          },
+          "contentSlug": {
+            "type": "string",
+            "title": "Contentslug",
+            "default": ""
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "theme": {
+            "type": "string",
+            "title": "Theme"
+          },
+          "polylines": {
+            "items": {
+              "$ref": "#/components/schemas/ClientRoutePolyline"
+            },
+            "type": "array",
+            "title": "Polylines"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ClientPoiSummary"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "theme"
+        ],
+        "title": "ClientRuntimeRouteOption"
+      },
+      "ClientStudyReportGenerateRequest": {
+        "properties": {
+          "worksheet_image_url": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Worksheet Image Url"
+          },
+          "student_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Name"
+          },
+          "student_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Code"
+          },
+          "study_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Date"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "worksheet_image_url"
+        ],
+        "title": "ClientStudyReportGenerateRequest"
+      },
+      "ClientStudyReportGenerateResponse": {
+        "properties": {
+          "record_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Record Id"
+          },
+          "worksheet_image_url": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Worksheet Image Url"
+          },
+          "pdf_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdf Url"
+          },
+          "report_html": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Report Html"
+          },
+          "writer_payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Writer Payload"
+          },
+          "report": {
+            "$ref": "#/components/schemas/StudyReportGenerateResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "record_id",
+          "worksheet_image_url",
+          "report_html",
+          "report"
+        ],
+        "title": "ClientStudyReportGenerateResponse"
+      },
+      "ClientStudyReportJobResponse": {
+        "properties": {
+          "record_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Record Id"
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Status"
+          },
+          "worksheet_image_url": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Worksheet Image Url"
+          },
+          "pdf_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdf Url"
+          },
+          "report_html": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Html"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "writer_payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Writer Payload"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudyReportGenerateResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "record_id",
+          "status",
+          "worksheet_image_url"
+        ],
+        "title": "ClientStudyReportJobResponse"
+      },
+      "ClientStudyReportUploadResponse": {
+        "properties": {
+          "storage_resource_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Storage Resource Id"
+          },
+          "worksheet_image_url": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Worksheet Image Url"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "object_key": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Object Key"
+          },
+          "content_type": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Content Type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "storage_resource_id",
+          "worksheet_image_url",
+          "provider",
+          "object_key",
+          "content_type",
+          "size_bytes"
+        ],
+        "title": "ClientStudyReportUploadResponse"
+      },
+      "ClientUserLoginResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "user": {
+            "$ref": "#/components/schemas/ClientUserRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_in",
+          "user"
+        ],
+        "title": "ClientUserLoginResponse"
+      },
+      "ClientUserRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "openid": {
+            "type": "string",
+            "title": "Openid"
+          },
+          "nickname": {
+            "type": "string",
+            "title": "Nickname"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "user_type": {
+            "type": "string",
+            "title": "User Type"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "openid",
+          "nickname",
+          "status",
+          "user_type",
+          "last_login_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ClientUserRead"
+      },
+      "ClientUserWechatLoginRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "ClientUserWechatLoginRequest"
+      },
+      "EntitlementFeatureListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EntitlementFeatureRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "EntitlementFeatureListResponse"
+      },
+      "EntitlementFeatureRead": {
+        "properties": {
+          "feature_key": {
+            "type": "string",
+            "title": "Feature Key"
+          },
+          "feature_name": {
+            "type": "string",
+            "title": "Feature Name"
+          },
+          "required_entitlement": {
+            "type": "string",
+            "title": "Required Entitlement"
+          },
+          "recommended_product_code": {
+            "type": "string",
+            "title": "Recommended Product Code"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "feature_key",
+          "feature_name",
+          "required_entitlement",
+          "recommended_product_code"
+        ],
+        "title": "EntitlementFeatureRead"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "app_name": {
+            "type": "string",
+            "title": "App Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "app_name",
+          "version",
+          "environment"
+        ],
+        "title": "HealthResponse"
+      },
+      "HiddenSymbolMatch": {
+        "properties": {
+          "symbol_code": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Symbol Code"
+          },
+          "symbol_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Symbol Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol_code",
+          "symbol_name"
+        ],
+        "title": "HiddenSymbolMatch"
+      },
+      "HiddenSymbolSummary": {
+        "properties": {
+          "filled_cells": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Filled Cells"
+          },
+          "filled_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Filled Count"
+          },
+          "matched_symbols": {
+            "items": {
+              "$ref": "#/components/schemas/HiddenSymbolMatch"
+            },
+            "type": "array",
+            "title": "Matched Symbols"
+          },
+          "matched_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Matched Count"
+          },
+          "total_cells": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Total Cells"
+          },
+          "accuracy_percent": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Accuracy Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filled_count",
+          "matched_count",
+          "total_cells",
+          "accuracy_percent"
+        ],
+        "title": "HiddenSymbolSummary"
+      },
+      "LandingPageClientConfig": {
+        "properties": {
+          "sourceCode": {
+            "type": "string",
+            "title": "Sourcecode"
+          },
+          "scene": {
+            "type": "string",
+            "title": "Scene"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "redirect",
+              "video"
+            ],
+            "title": "Action"
+          },
+          "redirectUrl": {
+            "type": "string",
+            "title": "Redirecturl"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "imageUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imageurl"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "updatedAt": {
+            "type": "string",
+            "title": "Updatedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sourceCode",
+          "scene",
+          "enabled",
+          "action",
+          "redirectUrl",
+          "title",
+          "description",
+          "imageUrl",
+          "version",
+          "updatedAt"
+        ],
+        "title": "LandingPageClientConfig"
+      },
+      "MapConfigRead": {
+        "properties": {
+          "base_layer": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "satellite",
+              "custom_tiles"
+            ],
+            "title": "Base Layer"
+          },
+          "custom_tile_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Tile Url"
+          },
+          "center_longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Center Longitude"
+          },
+          "center_latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Center Latitude"
+          },
+          "default_zoom": {
+            "type": "integer",
+            "maximum": 22.0,
+            "minimum": 0.0,
+            "title": "Default Zoom"
+          },
+          "min_zoom": {
+            "type": "integer",
+            "maximum": 22.0,
+            "minimum": 0.0,
+            "title": "Min Zoom"
+          },
+          "max_zoom": {
+            "type": "integer",
+            "maximum": 22.0,
+            "minimum": 0.0,
+            "title": "Max Zoom"
+          },
+          "north_east_longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "North East Longitude"
+          },
+          "north_east_latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "North East Latitude"
+          },
+          "south_west_longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "South West Longitude"
+          },
+          "south_west_latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "South West Latitude"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_layer",
+          "center_longitude",
+          "center_latitude",
+          "default_zoom",
+          "min_zoom",
+          "max_zoom",
+          "id"
+        ],
+        "title": "MapConfigRead"
+      },
+      "PathPoint": {
+        "properties": {
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          }
+        },
+        "type": "object",
+        "required": [
+          "longitude",
+          "latitude"
+        ],
+        "title": "PathPoint"
+      },
+      "PaymentOrderRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "order_no": {
+            "type": "string",
+            "title": "Order No"
+          },
+          "client_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client User Id"
+          },
+          "user_openid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Openid"
+          },
+          "user_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Label"
+          },
+          "product_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Code"
+          },
+          "product_name": {
+            "type": "string",
+            "title": "Product Name"
+          },
+          "product_type": {
+            "type": "string",
+            "title": "Product Type"
+          },
+          "product_original_amount_cents": {
+            "type": "integer",
+            "title": "Product Original Amount Cents",
+            "default": 0
+          },
+          "product_current_amount_cents": {
+            "type": "integer",
+            "title": "Product Current Amount Cents",
+            "default": 0
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "unit_amount_cents": {
+            "type": "integer",
+            "title": "Unit Amount Cents"
+          },
+          "total_amount_cents": {
+            "type": "integer",
+            "title": "Total Amount Cents"
+          },
+          "paid_amount_cents": {
+            "type": "integer",
+            "title": "Paid Amount Cents"
+          },
+          "refunded_amount_cents": {
+            "type": "integer",
+            "title": "Refunded Amount Cents",
+            "default": 0
+          },
+          "discount_amount_cents": {
+            "type": "integer",
+            "title": "Discount Amount Cents"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "admin_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Note"
+          },
+          "refund_status": {
+            "type": "string",
+            "title": "Refund Status",
+            "default": "none"
+          },
+          "wechat_transaction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wechat Transaction Id"
+          },
+          "code_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Url"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          },
+          "refunded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refunded At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "payment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentRecordRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "order_no",
+          "user_openid",
+          "user_label",
+          "product_name",
+          "product_type",
+          "quantity",
+          "unit_amount_cents",
+          "total_amount_cents",
+          "paid_amount_cents",
+          "discount_amount_cents",
+          "currency",
+          "status",
+          "admin_note",
+          "wechat_transaction_id",
+          "code_url",
+          "created_at",
+          "updated_at",
+          "paid_at",
+          "completed_at",
+          "closed_at"
+        ],
+        "title": "PaymentOrderRead"
+      },
+      "PaymentRecordRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id"
+          },
+          "payment_method": {
+            "type": "string",
+            "title": "Payment Method"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "out_trade_no": {
+            "type": "string",
+            "title": "Out Trade No"
+          },
+          "transaction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "title": "Amount Cents"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "raw_response": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Response"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "order_id",
+          "payment_method",
+          "provider",
+          "out_trade_no",
+          "transaction_id",
+          "amount_cents",
+          "currency",
+          "status",
+          "paid_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PaymentRecordRead"
+      },
+      "RequestPaymentParams": {
+        "properties": {
+          "timeStamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "nonceStr": {
+            "type": "string",
+            "title": "Noncestr"
+          },
+          "package": {
+            "type": "string",
+            "title": "Package"
+          },
+          "signType": {
+            "type": "string",
+            "title": "Signtype"
+          },
+          "paySign": {
+            "type": "string",
+            "title": "Paysign"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timeStamp",
+          "nonceStr",
+          "package",
+          "signType",
+          "paySign"
+        ],
+        "title": "RequestPaymentParams"
+      },
+      "StudyGroupListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudyGroupRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "StudyGroupListResponse"
+      },
+      "StudyGroupRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "group_name": {
+            "type": "string",
+            "title": "Group Name"
+          },
+          "school_name": {
+            "type": "string",
+            "title": "School Name"
+          },
+          "visit_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Date"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "student_count": {
+            "type": "integer",
+            "title": "Student Count",
+            "default": 0
+          },
+          "scanned_count": {
+            "type": "integer",
+            "title": "Scanned Count",
+            "default": 0
+          },
+          "generated_count": {
+            "type": "integer",
+            "title": "Generated Count",
+            "default": 0
+          },
+          "failed_count": {
+            "type": "integer",
+            "title": "Failed Count",
+            "default": 0
+          },
+          "printed_count": {
+            "type": "integer",
+            "title": "Printed Count",
+            "default": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "group_name",
+          "school_name",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "StudyGroupRead"
+      },
+      "StudyGroupStudentListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudyGroupStudentRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "StudyGroupStudentListResponse"
+      },
+      "StudyGroupStudentRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "study_group_id": {
+            "type": "integer",
+            "title": "Study Group Id"
+          },
+          "student_name": {
+            "type": "string",
+            "title": "Student Name"
+          },
+          "class_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name"
+          },
+          "card_code": {
+            "type": "string",
+            "title": "Card Code"
+          },
+          "scan_status": {
+            "type": "string",
+            "title": "Scan Status"
+          },
+          "report_status": {
+            "type": "string",
+            "title": "Report Status"
+          },
+          "print_status": {
+            "type": "string",
+            "title": "Print Status"
+          },
+          "operator_client_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Client User Id"
+          },
+          "study_report_record_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Report Record Id"
+          },
+          "scanned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scanned At"
+          },
+          "report_generated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Generated At"
+          },
+          "printed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Printed At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "study_group_id",
+          "student_name",
+          "card_code",
+          "scan_status",
+          "report_status",
+          "print_status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "StudyGroupStudentRead"
+      },
+      "StudyReportGenerateResponse": {
+        "properties": {
+          "student_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Name"
+          },
+          "student_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Code"
+          },
+          "study_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Date"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "heading": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Heading"
+          },
+          "subheading": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Subheading"
+          },
+          "hidden_symbol_summary": {
+            "$ref": "#/components/schemas/HiddenSymbolSummary"
+          },
+          "question_results": {
+            "items": {
+              "$ref": "#/components/schemas/StudyReportQuestionResult"
+            },
+            "type": "array",
+            "title": "Question Results"
+          },
+          "question_summary": {
+            "$ref": "#/components/schemas/StudyReportQuestionSummary"
+          },
+          "overall_accuracy_percent": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Overall Accuracy Percent"
+          },
+          "overall_comment": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Overall Comment"
+          },
+          "cipher_analysis": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cipher Analysis"
+          },
+          "poem_analysis": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Poem Analysis"
+          },
+          "badge_title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Badge Title"
+          },
+          "badge_description": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Badge Description"
+          },
+          "final_comment": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Final Comment"
+          },
+          "current_model": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Current Model"
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "heading",
+          "subheading",
+          "hidden_symbol_summary",
+          "question_results",
+          "question_summary",
+          "overall_accuracy_percent",
+          "overall_comment",
+          "cipher_analysis",
+          "poem_analysis",
+          "badge_title",
+          "badge_description",
+          "final_comment",
+          "current_model",
+          "provider"
+        ],
+        "title": "StudyReportGenerateResponse"
+      },
+      "StudyReportQuestionResult": {
+        "properties": {
+          "question_number": {
+            "type": "integer",
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Question Number"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "selected_option": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B",
+                  "C"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Option"
+          },
+          "correct_option": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B",
+                  "C"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correct Option"
+          },
+          "selected_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Title"
+          },
+          "correct_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correct Title"
+          },
+          "is_correct": {
+            "type": "boolean",
+            "title": "Is Correct",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_number",
+          "prompt"
+        ],
+        "title": "StudyReportQuestionResult"
+      },
+      "StudyReportQuestionSummary": {
+        "properties": {
+          "correct_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Correct Count"
+          },
+          "total_questions": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Total Questions"
+          },
+          "accuracy_percent": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Accuracy Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "correct_count",
+          "total_questions",
+          "accuracy_percent"
+        ],
+        "title": "StudyReportQuestionSummary"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://jyl.flexai.cc",
+      "description": "production"
+    }
+  ]
+}
