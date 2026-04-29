@@ -270,6 +270,73 @@
         ]
       }
     },
+    "/api/v1/client/announcements/home": {
+      "get": {
+        "tags": [
+          "client-announcements"
+        ],
+        "summary": "List Home Announcements",
+        "operationId": "list_home_announcements_api_v1_client_announcements_home_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeAnnouncementListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/analytics/page-view": {
+      "post": {
+        "tags": [
+          "client-analytics"
+        ],
+        "summary": "Record Page View",
+        "operationId": "record_page_view_api_v1_client_analytics_page_view_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientPageViewCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientAnalyticsAck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/client/study-reports/latest": {
       "get": {
         "tags": [
@@ -1530,6 +1597,18 @@
         ],
         "title": "Body_upload_client_study_report_image_api_v1_client_study_reports_upload_post"
       },
+      "ClientAnalyticsAck": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true,
+            "title": "Ok",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "ClientAnalyticsAck"
+      },
       "ClientAsset": {
         "properties": {
           "id": {
@@ -2060,6 +2139,141 @@
           "code_url"
         ],
         "title": "ClientNativePrepayResponse"
+      },
+      "ClientPageViewCreate": {
+        "properties": {
+          "page_path": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Page Path"
+          },
+          "page_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Title"
+          },
+          "scene": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scene"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "referrer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referrer"
+          },
+          "anonymous_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anonymous Id"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
+          "wechat_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wechat Version"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "network_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network Type"
+          },
+          "extra": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page_path"
+        ],
+        "title": "ClientPageViewCreate"
       },
       "ClientPaymentProductPriceListResponse": {
         "properties": {
@@ -3495,6 +3709,137 @@
           "accuracy_percent"
         ],
         "title": "HiddenSymbolSummary"
+      },
+      "HomeAnnouncementListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HomeAnnouncementRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "HomeAnnouncementListResponse"
+      },
+      "HomeAnnouncementRead": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 5000,
+            "title": "Content",
+            "default": ""
+          },
+          "content_blocks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Content Blocks"
+          },
+          "notice_type": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Notice Type",
+            "default": "system"
+          },
+          "display_type": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Display Type",
+            "default": "banner"
+          },
+          "link_type": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Link Type",
+            "default": "none"
+          },
+          "link_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Url"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 100
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "HomeAnnouncementRead"
       },
       "LandingPageClientConfig": {
         "properties": {
