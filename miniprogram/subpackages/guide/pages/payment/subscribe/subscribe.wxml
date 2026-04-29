@@ -31,7 +31,6 @@
       <view class="feature-tag tag-1">景点讲解</view>
       <view class="feature-tag tag-2">AI聊天</view>
       <view class="feature-tag tag-3">路线规划</view>
-      <view class="feature-tag tag-4">AI拍照</view>
       <view class="feature-tag tag-5">景点导航</view>
     </view>
   </view>

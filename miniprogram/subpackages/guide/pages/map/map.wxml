@@ -26,8 +26,6 @@
       visible="{{showAudioPlayer && (!navigationActive || navigationAudioMode === 'full')}}"
       keep-playing-when-hidden="{{navigationActive && navigationAudioMode === 'mini'}}"
       current-poi="{{currentAudioPoi}}"
-      user-score="{{userScore}}"
-      user-rank-percent="{{userRankPercent}}"
       show-progress="{{showAudioProgress}}"
       bind:audioPlay="onAudioPlay"
       bind:audioPause="onAudioPause"

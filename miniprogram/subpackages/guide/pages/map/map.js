@@ -7,16 +7,10 @@ let JYL_ROUTE = localMapData.JYL_ROUTE
 let JYL_ROUTE_POLYLINES = localMapData.JYL_ROUTE_POLYLINES
 const mapRuntimeService = require('../../../../services/map-runtime-service')
 const {
-  JYL_SECRET_POINTS
-} = require('../../../../config/jyl-secret-data.js')
-const {
   AUDIO_FEATURE_KEY,
   isFeaturePaid,
   setFeaturePaid
 } = require('../../../../utils/audio-access.js')
-const {
-  isPointChecked
-} = require('../../../../utils/checkin')
 const {
   resolvePoiSourceCodeToMarkerId
 } = require('../../../../utils/poi-source-code.js')
@@ -79,15 +73,6 @@ const AI_CHAT_PAYMENT_FEATURE_KEY = 'ai.chat.send-message'
 const AI_CHAT_SUBSCRIBE_DESCRIPTION = '开通VIP后即可使用AI聊天与智能路线问答服务'
 const MAP_ROUTE_PLANNING_FEATURE_KEY = 'map.route.planning'
 const MAP_POI_PRIMARY_ACTION_FEATURE_KEY = 'map.poi.primary-action'
-const SECRET_POINT_BY_MAP_POINT_ID = JYL_SECRET_POINTS.reduce((accumulator, point) => {
-  const mapPointId = String(point?.mapPointId || '').trim()
-
-  if (mapPointId) {
-    accumulator[mapPointId] = point
-  }
-
-  return accumulator
-}, {})
 let SOURCE_ROUTE_POLYLINES = []
 let ALL_ROUTE_DISPLAY_POINTS = []
 let ALL_AUDIO_POI_POINTS = []
@@ -2079,15 +2064,13 @@ function buildPoiPopupData(point, options = {}) {
     arrived = false,
     audioPlaying = false,
     navigationActive = false,
-    audioLocked = false,
-    secretMeta = null
+    audioLocked = false
   } = options
   const primaryMetric = buildPopupPrimaryMetric(point)
   const secondaryMetric = buildPopupSecondaryMetric(point)
   const typeLabel = getPointTypeLabel(point)
   const isScenicPoint = point.type === 'scenic'
   const showAudioAction = isScenicPoint
-  const hasSecretAction = !!secretMeta
   let primaryActionType = 'navigate'
   let primaryActionText = '到这去'
   let showSecondaryAction = isScenicPoint
@@ -2137,12 +2120,6 @@ function buildPoiPopupData(point, options = {}) {
     audioActionType: showAudioAction ? 'playaudio' : 'noop',
     audioActionText: audioLocked ? '解锁讲解' : (audioPlaying ? '继续讲解' : '播放讲解'),
     audioPlaying: !!audioPlaying,
-    showSecretAction: hasSecretAction,
-    secretActionType: hasSecretAction ? 'checkin' : 'noop',
-    secretActionText: hasSecretAction ? (secretMeta.collected ? '查看暗号' : '去收集暗号') : '',
-    secretCodeName: secretMeta?.secretCodeName || '',
-    secretThemeTag: secretMeta?.themeTag || '',
-    secretCollected: !!secretMeta?.collected,
     arrived
   }
 }
@@ -2786,22 +2763,6 @@ function buildAudioPlaybackPageUrl(point) {
   return `${GUIDE_MAP_PAGE}?poiId=${encodeURIComponent(pointId)}&action=playaudio`
 }
 
-function buildCheckInPageUrl(point, secretMeta = null) {
-  const query = []
-  const mapPointId = String(point?.id || point?.markerId || '').trim()
-  const secretId = String(secretMeta?.id || '').trim()
-
-  if (mapPointId) {
-    query.push(`mapPointId=${encodeURIComponent(mapPointId)}`)
-  }
-
-  if (secretId) {
-    query.push(`secretId=${encodeURIComponent(secretId)}`)
-  }
-
-  return `/pages/check-in/check-in${query.length ? `?${query.join('&')}` : ''}`
-}
-
 function collectRouteViewportPoints(route) {
   if (!route) {
     return []
@@ -3147,8 +3108,6 @@ Page({
     showAudioPlayer: true,
     navigationAudioMode: 'full',
     currentAudioPoi: buildAudioPoi(DEFAULT_ENTRY_POINT) || ALL_AUDIO_POI_POINTS[0] || null,
-    userScore: 85,
-    userRankPercent: 75,
     showAudioProgress: true,
     audioPoiList: ALL_AUDIO_POI_POINTS,
     showAudioListDrawer: false,
@@ -3404,27 +3363,10 @@ Page({
     })
   },
 
-  resolveSecretMetaForPoint(point) {
-    if (!point) {
-      return null
-    }
-
-    const linkedSecretPoint = SECRET_POINT_BY_MAP_POINT_ID[String(point.id || point.markerId || '').trim()]
-    if (!linkedSecretPoint) {
-      return null
-    }
-
-    return {
-      ...linkedSecretPoint,
-      collected: isPointChecked(linkedSecretPoint.id)
-    }
-  },
-
   buildPointPopupData(point, options = {}) {
     return buildPoiPopupData(point, {
       ...options,
-      audioLocked: point?.type === 'scenic' && !this.hasVipAccess(),
-      secretMeta: this.resolveSecretMetaForPoint(point)
+      audioLocked: point?.type === 'scenic' && !this.hasVipAccess()
     })
   },
 
@@ -5778,11 +5720,6 @@ Page({
       return
     }
 
-    if (actionType === 'checkin') {
-      this.onCheckinPoi(popupData)
-      return
-    }
-
     this.handlePopupAudioAction(popupData)
   },
 
@@ -5926,26 +5863,6 @@ Page({
     const actionType = popupData?.secondaryActionType || ''
 
     this.handlePoiPopupAction(actionType, popupData)
-  },
-
-  onCheckinPoi(popupData = this.data.currentPopupData) {
-    if (!popupData) {
-      return
-    }
-
-    const point = getDisplayPointById(popupData.id || popupData.markerId)
-    const secretMeta = point ? this.resolveSecretMetaForPoint(point) : null
-
-    if (!point || !secretMeta) {
-      wx.showToast({
-        title: '该点位暂未接入暗号收集',
-        icon: 'none',
-        duration: 1600
-      })
-      return
-    }
-
-    navigateToPage(buildCheckInPageUrl(point, secretMeta))
   },
 
   onNavigatePoi() {

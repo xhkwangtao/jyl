@@ -29,30 +29,6 @@
       <text class="status-text">{{statusText}}</text>
     </view>
     
-    <!-- 积分区域 -->
-    <view class="score-area">
-      <!-- 积分背景 -->
-      <view class="score-background"></view>
-      
-      <!-- 积分标题 -->
-      <text class="score-label">{{scoreLabel}}</text>
-      
-      <!-- 积分数值 -->
-      <text class="score-value">{{userScore}}</text>
-      
-      <!-- 排名文字 -->
-      <text class="rank-text">{{rankTextPrefix}}{{userRankPercent}}{{rankTextSuffix}}</text>
-      
-      <!-- 表情头像（积分区域） -->
-      <view class="score-avatar">
-        <image
-          class="emoji-avatar"
-          src="/images/icons/question-start.svg"
-          mode="aspectFit"
-        />
-      </view>
-    </view>
-    
     <!-- 播放控制区域 -->
     <view class="control-area">
       <!-- 控制背景 -->

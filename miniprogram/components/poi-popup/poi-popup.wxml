@@ -57,24 +57,10 @@
         <view class="chip-row">
           <text class="popup-chip" wx:if="{{currentPopupData.themeTag}}">{{currentPopupData.themeTag}}</text>
           <text class="popup-stay" wx:if="{{currentPopupData.stayText}}">{{currentPopupData.stayText}}</text>
-          <text
-            wx:if="{{currentPopupData.showSecretAction && currentPopupData.secretCodeName}}"
-            class="popup-chip popup-chip-secret {{currentPopupData.secretCollected ? 'popup-chip-secret-collected' : ''}}"
-          >
-            {{currentPopupData.secretCodeName}}
-          </text>
         </view>
 
         <text class="popup-description" wx:if="{{currentPopupData.description}}">{{currentPopupData.description}}</text>
         <text class="popup-guide-tip" wx:if="{{currentPopupData.guideTip}}">{{currentPopupData.guideTip}}</text>
-
-        <view
-          wx:if="{{currentPopupData.showSecretAction}}"
-          class="secret-action {{currentPopupData.secretCollected ? 'secret-action-collected' : ''}}"
-          bindtap="handleSecretAction"
-        >
-          <text class="secret-action-text">{{currentPopupData.secretActionText}}</text>
-        </view>
       </view>
     </view>
   </view>

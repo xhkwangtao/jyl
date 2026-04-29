@@ -235,7 +235,7 @@ page {
 
 /* 播放状态文字区域 */
 .status-text-area {
-  width: 210rpx; /* 105px * 2 */
+  right: 60rpx;
   height: 68rpx; /* 34px * 2 */
   position: absolute;
   left: 216rpx; /* 108px * 2 */
@@ -244,7 +244,9 @@ page {
   border-radius: 200rpx;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  padding: 0 26rpx;
+  box-sizing: border-box;
 }
 
 .status-text {
@@ -253,108 +255,15 @@ page {
   font-family: 'Asap Condensed', sans-serif;
   font-weight: 400;
   line-height: 20rpx;
-  text-align: center;
-}
-
-/* 积分区域 */
-.score-area {
-  position: absolute;
-  left: 442rpx; /* 221px * 2 */
-  top: 114rpx; /* 57px * 2 */
-  width: 222rpx; /* 111px * 2 */
-  height: 146rpx; /* 73px * 2 */
-}
-
-.score-background {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(0deg, var(--text-color-white) 0%, var(--primary-color) 100%);
-  border-radius: 30rpx;
-}
-
-.score-label {
-  position: absolute;
-  left: 92rpx; /* 从54rpx调整到92rpx，为avatar留出空间 */
-  top: 8rpx; /* 从4rpx调整到8rpx，微调垂直位置 */
-  color: black;
-  font-size: 24rpx; /* 12px * 2 */
-  font-family: 'Alibaba PuHuiTi', sans-serif;
-  font-weight: 500;
-  line-height: 24rpx;
-}
-
-.score-value {
-  position: absolute;
-  left: 92rpx; /* 从54rpx调整到92rpx，与score-label左对齐 */
-  top: 40rpx; /* 从52rpx调整到40rpx，适当缩小间距 */
-  color: black;
-  font-size: 44rpx; /* 22px * 2 */
-  font-family: 'DIN', sans-serif;
-  font-weight: 700;
-  line-height: 38rpx;
-}
-
-.rank-text {
-  position: absolute;
-  left: 2rpx; /* 1px * 2 */
-  top: 104rpx; /* 52px * 2 */
-  color: #919191;
-  font-size: 20rpx; /* 10px * 2 */
-  font-family: 'Alibaba-PuHuiTi-Regular', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  font-weight: 400;
-  line-height: 19rpx;
-  text-align: center;
-  width: 100%;
-}
-
-/* 积分区域表情头像 */
-.score-avatar {
-  position: absolute;
-  left: 8rpx; /* 从2rpx调整到8rpx，增加左边距 */
-  top: 20rpx; /* 从24rpx调整到20rpx，微调垂直位置 */
-  width: 72rpx; /* 从60rpx调整到72rpx，适应80rpx图标 */
-  height: 72rpx; /* 从60rpx调整到72rpx，适应80rpx图标 */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.emoji-avatar {
-  width: 68rpx; /* 从80rpx调整到68rpx，适应容器 */
-  height: 68rpx; /* 从80rpx调整到68rpx，适应容器 */
-  transition: all 0.3s ease;
-}
-
-/* 积分区域头像的悬停效果（可选） */
-.score-avatar:active .emoji-avatar {
-  transform: scale(0.95);
-}
-
-/* 根据播放状态添加动态效果 */
-.audio-player-guide .score-avatar {
-  transition: all 0.3s ease;
-}
-
-/* 播放时给积分区域头像添加轻微动画 */
-.audio-player-guide .score-avatar {
-  animation: scoreAvatarPulse 3s ease-in-out infinite;
-}
-
-@keyframes scoreAvatarPulse {
-  0%, 100% { 
-    box-shadow: 0 4rpx 8rpx rgba(44, 237, 184, 0.3);
-  }
-  50% { 
-    box-shadow: 0 6rpx 12rpx rgba(44, 237, 184, 0.5);
-  }
+  text-align: left;
 }
 
 /* 播放控制区域 */
 .control-area {
   position: absolute;
   left: 216rpx; /* 108px * 2 */
+  right: 24rpx;
   top: 192rpx; /* 96px * 2 */
-  width: 210rpx; /* 105px * 2 */
   height: 68rpx; /* 34px * 2 */
 }
 
@@ -410,7 +319,7 @@ page {
 .audio-waves {
   position: absolute;
   left: 72rpx; /* 播放按钮右侧开始 */
-  right: 10rpx; /* 右侧留10rpx边距 */
+  right: 18rpx;
   top: 50%;
   transform: translateY(-50%);
   display: flex;

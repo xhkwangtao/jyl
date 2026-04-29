@@ -315,16 +315,6 @@
   font-weight: 600;
 }
 
-.popup-chip-secret {
-  background: rgba(237, 244, 195, 0.96);
-  color: #5b4f00;
-}
-
-.popup-chip-secret-collected {
-  background: rgba(210, 245, 222, 0.98);
-  color: #15603f;
-}
-
 .popup-stay {
   color: #3f4b53;
   font-size: 22rpx;
@@ -345,32 +335,6 @@
   color: #6a6a6a;
   font-size: 20rpx;
   line-height: 1.5;
-}
-
-.secret-action {
-  margin-top: 14rpx;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 56rpx;
-  padding: 0 22rpx;
-  border-radius: 999rpx;
-  background: rgba(24, 62, 78, 0.08);
-}
-
-.secret-action:active {
-  transform: scale(0.98);
-}
-
-.secret-action-collected {
-  background: rgba(26, 135, 84, 0.12);
-}
-
-.secret-action-text {
-  color: #0f3e49;
-  font-size: 22rpx;
-  line-height: 1;
-  font-weight: 600;
 }
 
 .buttons-container {

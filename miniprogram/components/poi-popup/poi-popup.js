@@ -92,10 +92,6 @@ Component({
 
     handleAudioAction() {
       this.emitButtonAction(this.data.currentPopupData?.audioActionType || this.properties.popupData?.audioActionType || '')
-    },
-
-    handleSecretAction() {
-      this.emitButtonAction(this.data.currentPopupData?.secretActionType || this.properties.popupData?.secretActionType || '')
     }
   }
 })

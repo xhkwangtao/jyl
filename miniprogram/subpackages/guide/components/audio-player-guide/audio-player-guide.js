@@ -50,14 +50,6 @@ Component({
       type: Object,
       value: null
     },
-    userScore: {
-      type: Number,
-      value: 85
-    },
-    userRankPercent: {
-      type: Number,
-      value: 75
-    },
     showProgress: {
       type: Boolean,
       value: true
@@ -70,9 +62,6 @@ Component({
     avatarSpriteStyle: buildAvatarSpriteStyle(GUIDE_AVATAR_SPRITE.idleFrameIndex),
     animationState: 'idle',
     statusText: '点击地图点位开始导览',
-    scoreLabel: '积分：',
-    rankTextPrefix: '您已超过 ',
-    rankTextSuffix: '% 的用户',
     chatButtonText: '问 AI',
     isPlaying: false,
     isMuted: false,
