@@ -8,6 +8,7 @@
     "ai-chat-header": "/components/ai-chat-header/ai-chat-header",
     "chat-message-list": "/components/chat-message-list/chat-message-list",
     "quick-questions": "/components/quick-questions/quick-questions",
-    "chat-input-bar": "/components/chat-input-bar/chat-input-bar"
+    "chat-input-bar": "/components/chat-input-bar/chat-input-bar",
+    "permission-guard": "/components/permission-guard/permission-guard"
   }
 }

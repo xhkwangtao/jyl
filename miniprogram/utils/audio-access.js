@@ -1,7 +1,7 @@
-const FEATURE_ACCESS_STORAGE_KEY = 'feature_access_state'
 const AUDIO_TRIAL_STORAGE_KEY = 'map_audio_trial_state'
 const AUDIO_FEATURE_KEY = 'map.audio.play'
 const AUDIO_FREE_TRIAL_LIMIT = 3
+const entitlementService = require('../services/entitlement-service')
 
 function readStorageObject(key) {
   try {
@@ -18,19 +18,6 @@ function writeStorageObject(key, value) {
   } catch (error) {
     // Ignore storage write failures in local mock flows.
   }
-}
-
-function normalizeBooleanMap(value) {
-  if (!value || typeof value !== 'object') {
-    return {}
-  }
-
-  return Object.keys(value).reduce((result, key) => {
-    if (key) {
-      result[key] = !!value[key]
-    }
-    return result
-  }, {})
 }
 
 function normalizePointId(pointId) {
@@ -52,24 +39,25 @@ function normalizePointIdList(list) {
   }, [])
 }
 
-function getFeatureAccessMap() {
-  return normalizeBooleanMap(readStorageObject(FEATURE_ACCESS_STORAGE_KEY))
-}
-
-function saveFeatureAccessMap(accessMap) {
-  writeStorageObject(FEATURE_ACCESS_STORAGE_KEY, normalizeBooleanMap(accessMap))
-}
-
 function isFeaturePaid(featureKey = AUDIO_FEATURE_KEY) {
-  const accessMap = getFeatureAccessMap()
-  return !!accessMap[featureKey]
+  return entitlementService.isFeatureAvailableSync(featureKey)
 }
 
 function setFeaturePaid(featureKey = AUDIO_FEATURE_KEY, paid = true) {
-  const accessMap = getFeatureAccessMap()
-  accessMap[featureKey] = !!paid
-  saveFeatureAccessMap(accessMap)
-  return !!accessMap[featureKey]
+  const normalizedFeatureKey = String(featureKey || '').trim()
+  if (!normalizedFeatureKey) {
+    return false
+  }
+
+  const nextPaid = !!paid
+  entitlementService.persistLocalFeatureAccess(normalizedFeatureKey, nextPaid)
+  const requiredEntitlement = entitlementService.getFeatureRequiredEntitlement(normalizedFeatureKey)
+
+  if (requiredEntitlement) {
+    entitlementService.persistLocalEntitlementAccess(requiredEntitlement, nextPaid)
+  }
+
+  return entitlementService.isFeatureAvailableSync(normalizedFeatureKey)
 }
 
 function getAudioTrialState() {

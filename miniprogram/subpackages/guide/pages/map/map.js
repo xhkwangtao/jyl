@@ -7,6 +7,9 @@ let JYL_ROUTE = localMapData.JYL_ROUTE
 let JYL_ROUTE_POLYLINES = localMapData.JYL_ROUTE_POLYLINES
 const mapRuntimeService = require('../../../../services/map-runtime-service')
 const {
+  PAID_FEATURE_KEYS
+} = require('../../../../services/entitlement-service')
+const {
   AUDIO_FEATURE_KEY,
   isFeaturePaid,
   setFeaturePaid
@@ -68,11 +71,11 @@ const AUTO_NEARBY_CROSS_POI_COOLDOWN_MS = 8000
 const AUTO_AUDIO_NEARBY_TOAST_DURATION_MS = 1800
 const AUDIO_PAYWALL_PRICE = 7.8
 const AUDIO_PAYWALL_THROTTLE_MS = 1200
-const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
-const AI_CHAT_PAYMENT_FEATURE_KEY = 'ai.chat.send-message'
+const AI_CHAT_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
+const AI_CHAT_PAYMENT_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
 const AI_CHAT_SUBSCRIBE_DESCRIPTION = '开通VIP后即可使用AI聊天与智能路线问答服务'
-const MAP_ROUTE_PLANNING_FEATURE_KEY = 'map.route.planning'
-const MAP_POI_PRIMARY_ACTION_FEATURE_KEY = 'map.poi.primary-action'
+const MAP_ROUTE_PLANNING_FEATURE_KEY = PAID_FEATURE_KEYS.MAP_ROUTE_PLANNING
+const MAP_NAVIGATION_START_FEATURE_KEY = PAID_FEATURE_KEYS.MAP_NAVIGATION_START
 let SOURCE_ROUTE_POLYLINES = []
 let ALL_ROUTE_DISPLAY_POINTS = []
 let ALL_AUDIO_POI_POINTS = []
@@ -3255,6 +3258,11 @@ Page({
     })
   },
 
+  onReady() {
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+    this.prefetchMapFeatureAccess()
+  },
+
   async loadPublishedMapRuntimeData() {
     const runtimeMapData = await mapRuntimeService.getPublishedMapRuntimeData()
     if (!runtimeMapData || typeof runtimeMapData !== 'object') {
@@ -3300,6 +3308,7 @@ Page({
   onShow() {
     this.pageVisible = true
     this.refreshAudioAccessState()
+    this.prefetchMapFeatureAccess()
     this.checkLocationPermission()
     this.checkPendingNavigationRequest()
     this.ensureCustomTileLayerVisible()
@@ -3332,10 +3341,44 @@ Page({
 
   refreshAudioAccessState() {
     this.setData({
-      audioAccessPaid: this.hasVipAccess()
+      audioAccessPaid: isFeaturePaid(AUDIO_FEATURE_KEY)
     }, () => {
       this.syncCurrentPopupDataWithAudioAccess()
     })
+  },
+
+  getPermissionGuard() {
+    if (this.permissionGuard) {
+      return this.permissionGuard
+    }
+
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+    return this.permissionGuard || null
+  },
+
+  async prefetchMapFeatureAccess() {
+    const permissionGuard = this.getPermissionGuard()
+    if (!permissionGuard) {
+      return
+    }
+
+    await Promise.allSettled([
+      permissionGuard.prefetchEntitlementList([
+        PAID_FEATURE_KEYS.VIP
+      ], {
+        ensureLogin: false
+      }),
+      permissionGuard.prefetchFeatureAccessList([
+        AUDIO_FEATURE_KEY,
+        AI_CHAT_PAYMENT_FEATURE_KEY,
+        MAP_ROUTE_PLANNING_FEATURE_KEY,
+        MAP_NAVIGATION_START_FEATURE_KEY
+      ], {
+        ensureLogin: false
+      })
+    ])
+
+    this.refreshAudioAccessState()
   },
 
   syncCurrentPopupDataWithAudioAccess(options = {}) {
@@ -3366,7 +3409,7 @@ Page({
   buildPointPopupData(point, options = {}) {
     return buildPoiPopupData(point, {
       ...options,
-      audioLocked: point?.type === 'scenic' && !this.hasVipAccess()
+      audioLocked: point?.type === 'scenic' && !isFeaturePaid(AUDIO_FEATURE_KEY)
     })
   },
 
@@ -3407,7 +3450,7 @@ Page({
 
     this.refreshAudioAccessState()
 
-    if (this.hasVipAccess()) {
+    if (isFeaturePaid(AUDIO_FEATURE_KEY)) {
       return true
     }
 
@@ -5881,7 +5924,7 @@ Page({
       return
     }
 
-    if (!this.requireMapVipAccess(MAP_POI_PRIMARY_ACTION_FEATURE_KEY, {
+    if (!this.requireMapVipAccess(MAP_NAVIGATION_START_FEATURE_KEY, {
       action: 'navigate',
       poiId: point.id || point.markerId || '',
       poiName: point.name || popupData.poiName || popupData.title || '',
@@ -6759,6 +6802,9 @@ Page({
     const nextPaid = !this.data.audioAccessPaid
     setFeaturePaid(AUDIO_FEATURE_KEY, nextPaid)
     setFeaturePaid(AI_CHAT_ACCESS_FEATURE_KEY, nextPaid)
+    setFeaturePaid(MAP_ROUTE_PLANNING_FEATURE_KEY, nextPaid)
+    setFeaturePaid(MAP_NAVIGATION_START_FEATURE_KEY, nextPaid)
+    setFeaturePaid(PAID_FEATURE_KEYS.VIP, nextPaid)
     this.refreshAudioAccessState()
 
     if (this.data.navigationActive) {
@@ -6833,7 +6879,7 @@ Page({
   },
 
   hasVipAccess() {
-    return isFeaturePaid(AI_CHAT_ACCESS_FEATURE_KEY)
+    return isFeaturePaid(PAID_FEATURE_KEYS.VIP)
   },
 
   buildAIChatSubscribeUrl(targetUrl = '') {
@@ -6853,7 +6899,7 @@ Page({
         productName: '智能路线规划权限',
         description: '使用智能路线规划功能需要VIP权限'
       },
-      [MAP_POI_PRIMARY_ACTION_FEATURE_KEY]: {
+      [MAP_NAVIGATION_START_FEATURE_KEY]: {
         featureName: '景点导航',
         productName: '地图互动权限',
         description: '继续使用地图互动功能需要VIP权限'
@@ -6871,7 +6917,7 @@ Page({
   },
 
   requireMapVipAccess(featureKey, context = {}) {
-    if (this.hasVipAccess()) {
+    if (isFeaturePaid(featureKey)) {
       return true
     }
 

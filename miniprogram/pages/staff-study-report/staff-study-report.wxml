@@ -1,6 +1,8 @@
 <page-meta page-style="{{pageStyle}}"></page-meta>
 
 <view class="staff-report-page" style="{{navBarHeightStyle}}">
+  <permission-guard id="permissionGuard"></permission-guard>
+
   <view class="background-layer">
     <image class="background-svg" src="/images/ai-chat-bg.svg" mode="aspectFill"></image>
   </view>

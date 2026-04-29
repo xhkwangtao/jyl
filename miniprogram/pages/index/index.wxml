@@ -1,4 +1,6 @@
 <view class="index-page">
+  <permission-guard id="permissionGuard"></permission-guard>
+
   <custom-status-bar
     user-name="{{statusUserName}}"
     avatar-src="{{statusUserAvatarSrc}}"

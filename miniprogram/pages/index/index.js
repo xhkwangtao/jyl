@@ -1,8 +1,5 @@
 const auth = require('../../utils/auth')
 const {
-  isFeaturePaid
-} = require('../../utils/audio-access.js')
-const {
   buildSecretCollectionState
 } = require('../../utils/secret-collection')
 const {
@@ -12,13 +9,15 @@ const {
 const {
   GUIDE_MAP_PAGE,
   GUIDE_AI_CHAT_PAGE,
-  GUIDE_AUDIO_LIST_PAGE,
-  GUIDE_SUBSCRIBE_PAGE
+  GUIDE_AUDIO_LIST_PAGE
 } = require('../../utils/guide-routes')
 const studyReportService = require('../../services/study-report-service')
+const {
+  PAID_FEATURE_KEYS
+} = require('../../services/entitlement-service')
 
-const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
-const AI_CHAT_PAYMENT_FEATURE_KEY = 'ai.chat.send-message'
+const AI_CHAT_PAYMENT_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
+const STUDY_REPORT_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE
 const AI_CHAT_SUBSCRIBE_DESCRIPTION = '开通VIP后即可使用AI聊天与智能问答服务'
 const AI_CHAT_SUCCESS_REDIRECT_URL = GUIDE_AI_CHAT_PAGE
 const CHECK_IN_CARD_TITLE = '守城认证中心'
@@ -61,6 +60,10 @@ Page({
     }
 
     this.initializePage()
+  },
+
+  onReady() {
+    this.permissionGuard = this.selectComponent('#permissionGuard')
   },
 
   onShow() {
@@ -237,16 +240,17 @@ Page({
     this.openMapPage()
   },
 
-  onCheckInTap() {
-    const currentUserProfile = auth.getCachedCurrentUserProfile()
-    const userInfo = auth.getUserInfo() || {}
-    const userType = String(
-      currentUserProfile?.user_type
-      || userInfo?.user_type
-      || ''
-    ).trim().toLowerCase()
+  async onCheckInTap() {
+    const permissionGuard = this.getPermissionGuard()
+    if (!permissionGuard) {
+      return
+    }
 
-    if (userType === 'staff') {
+    await permissionGuard.refreshCurrentUserProfile({
+      showLoginToast: true
+    })
+
+    if (permissionGuard.isStaffUser()) {
       wx.navigateTo({
         url: STAFF_STUDY_REPORT_PAGE,
         fail: () => {
@@ -255,6 +259,19 @@ Page({
           })
         }
       })
+      return
+    }
+
+    const studyReportAccessResult = await permissionGuard.ensureFeatureAccess({
+      featureKey: STUDY_REPORT_ACCESS_FEATURE_KEY,
+      featureName: 'AI研学报告',
+      productName: 'AI研学报告权益',
+      description: '生成专属AI研学报告需要开通权益',
+      successRedirect: '/pages/check-in/check-in',
+      showLoginToast: true
+    })
+
+    if (!studyReportAccessResult.allowed) {
       return
     }
 
@@ -298,12 +315,7 @@ Page({
     })
   },
 
-  onAIChatTap() {
-    if (!this.hasAIChatAccess()) {
-      this.redirectToAIChatSubscribe()
-      return
-    }
-
+  async onAIChatTap() {
     if (this.data.isLoggingIn) {
       this.pendingAIChatNavigation = true
 
@@ -316,12 +328,12 @@ Page({
       return
     }
 
-    this.navigateToAIChat()
+    await this.navigateToAIChat()
   },
 
-  navigateToAIChat() {
-    if (!this.hasAIChatAccess()) {
-      this.redirectToAIChatSubscribe()
+  async navigateToAIChat() {
+    const hasAccess = await this.ensureAIChatAccess()
+    if (!hasAccess) {
       return
     }
 
@@ -353,25 +365,31 @@ Page({
     })
   },
 
-  hasAIChatAccess() {
-    return isFeaturePaid(AI_CHAT_ACCESS_FEATURE_KEY)
+  getPermissionGuard() {
+    if (this.permissionGuard) {
+      return this.permissionGuard
+    }
+
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+    return this.permissionGuard || null
   },
 
-  buildAIChatSubscribeUrl() {
-    return `${GUIDE_SUBSCRIBE_PAGE}?feature=${encodeURIComponent(AI_CHAT_PAYMENT_FEATURE_KEY)}&featureName=${encodeURIComponent('AI智能对话')}&productName=${encodeURIComponent('AI聊天权限')}&description=${encodeURIComponent(AI_CHAT_SUBSCRIBE_DESCRIPTION)}&successRedirect=${encodeURIComponent(AI_CHAT_SUCCESS_REDIRECT_URL)}`
-  },
+  async ensureAIChatAccess() {
+    const permissionGuard = this.getPermissionGuard()
+    if (!permissionGuard) {
+      return false
+    }
 
-  redirectToAIChatSubscribe() {
-    const subscribeUrl = this.buildAIChatSubscribeUrl()
-
-    wx.navigateTo({
-      url: subscribeUrl,
-      fail: () => {
-        wx.redirectTo({
-          url: subscribeUrl
-        })
-      }
+    const accessResult = await permissionGuard.ensureFeatureAccess({
+      featureKey: AI_CHAT_PAYMENT_FEATURE_KEY,
+      featureName: 'AI智能对话',
+      productName: 'AI聊天权限',
+      description: AI_CHAT_SUBSCRIBE_DESCRIPTION,
+      successRedirect: AI_CHAT_SUCCESS_REDIRECT_URL,
+      showLoginToast: true
     })
+
+    return !!accessResult.allowed
   },
 
   async silentLogin() {

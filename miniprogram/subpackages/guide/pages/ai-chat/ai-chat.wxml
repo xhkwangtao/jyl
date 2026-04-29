@@ -1,3 +1,5 @@
+<permission-guard id="permissionGuard"></permission-guard>
+
 <view class="ai-chat-page" wx:if="{{pageReady}}">
   <view class="background-layer">
     <view class="background-decorations">

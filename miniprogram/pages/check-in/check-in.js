@@ -14,6 +14,9 @@ const {
 } = require('../../utils/guide-routes')
 const studyReportService = require('../../services/study-report-service')
 const {
+  PAID_FEATURE_KEYS
+} = require('../../services/entitlement-service')
+const {
   POSTER_CANVAS_WIDTH,
   POSTER_CANVAS_HEIGHT,
   POSTER_EXPORT_WIDTH,
@@ -23,6 +26,8 @@ const {
 
 const GENERATED_REPORT_PDF_FILE_NAME = '研学报告.pdf'
 const GENERATED_REPORT_PREVIEW_DIR_NAME = 'study-report-preview'
+const STAFF_STUDY_REPORT_PAGE = '/pages/staff-study-report/staff-study-report'
+const STUDY_REPORT_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE
 const CHECKIN_FILTER_OPTIONS = [
   { label: '全部', value: 'all' },
   { label: '已记录', value: 'checked' },
@@ -521,12 +526,64 @@ Page({
     this.resumePendingStudyReportPollingIfNeeded()
   },
 
+  onReady() {
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+    this.ensureEntryAccess()
+  },
+
   onShow() {
     this.refreshPageState()
     this.resumePendingStudyReportPollingIfNeeded()
   },
 
   noop() {},
+
+  getPermissionGuard() {
+    if (this.permissionGuard) {
+      return this.permissionGuard
+    }
+
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+    return this.permissionGuard || null
+  },
+
+  async ensureEntryAccess() {
+    if (this.entryAccessPromise) {
+      return this.entryAccessPromise
+    }
+
+    const permissionGuard = this.getPermissionGuard()
+    if (!permissionGuard) {
+      return null
+    }
+
+    this.entryAccessPromise = (async () => {
+      await permissionGuard.refreshCurrentUserProfile({
+        showLoginToast: true
+      })
+
+      if (permissionGuard.isStaffUser()) {
+        navigateToPage(STAFF_STUDY_REPORT_PAGE)
+        return {
+          allowed: false,
+          redirectedToStaffPage: true
+        }
+      }
+
+      return permissionGuard.ensureFeatureAccess({
+        featureKey: STUDY_REPORT_ACCESS_FEATURE_KEY,
+        featureName: 'AI研学报告',
+        productName: 'AI研学报告权益',
+        description: '生成专属AI研学报告需要开通权益',
+        successRedirect: '/pages/check-in/check-in',
+        showLoginToast: true
+      })
+    })().finally(() => {
+      this.entryAccessPromise = null
+    })
+
+    return this.entryAccessPromise
+  },
 
   getWorksheetEntryState() {
     const hasCachedReport = studyReportService.hasLatestReportRenderCache() || studyReportService.hasLatestPdfUrl()

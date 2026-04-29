@@ -11,6 +11,8 @@ const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000
 const WECHAT_LOGIN_PATH = '/client/users/wechat-login'
 const CURRENT_USER_PATH = '/client/users/me'
 const CURRENT_USER_CACHE_STORAGE_KEY = 'currentUserProfile'
+const FEATURE_ACCESS_CACHE_STORAGE_KEY = 'featureAccessCache'
+const ENTITLEMENT_CACHE_STORAGE_KEY = 'entitlementAccessCache'
 
 function getStorageValue(key) {
   try {
@@ -173,6 +175,8 @@ class Auth {
     wx.setStorageSync('userInfo', userInfo)
     wx.setStorageSync('clientUser', userInfo)
     wx.removeStorageSync(CURRENT_USER_CACHE_STORAGE_KEY)
+    wx.removeStorageSync(FEATURE_ACCESS_CACHE_STORAGE_KEY)
+    wx.removeStorageSync(ENTITLEMENT_CACHE_STORAGE_KEY)
 
     return {
       token: loginPayload.token,
@@ -288,6 +292,8 @@ class Auth {
     wx.removeStorageSync('clientUser')
     wx.removeStorageSync('loginTime')
     wx.removeStorageSync(CURRENT_USER_CACHE_STORAGE_KEY)
+    wx.removeStorageSync(FEATURE_ACCESS_CACHE_STORAGE_KEY)
+    wx.removeStorageSync(ENTITLEMENT_CACHE_STORAGE_KEY)
   }
 
   debugAuthStatus() {

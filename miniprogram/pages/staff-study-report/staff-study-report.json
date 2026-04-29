@@ -3,6 +3,7 @@
   "backgroundColor": "#eef3f5",
   "backgroundTextStyle": "dark",
   "usingComponents": {
-    "universal-navigation": "/components/universal-navigation/universal-navigation"
+    "universal-navigation": "/components/universal-navigation/universal-navigation",
+    "permission-guard": "/components/permission-guard/permission-guard"
   }
 }

@@ -5,6 +5,7 @@
   "usingComponents": {
     "custom-status-bar": "/components/custom-status-bar/custom-status-bar",
     "map-recommend-card": "/components/map-recommend-card/map-recommend-card",
-    "explanation-cards-container": "/components/explanation-card/explanation-cards-container"
+    "explanation-cards-container": "/components/explanation-card/explanation-cards-container",
+    "permission-guard": "/components/permission-guard/permission-guard"
   }
 }

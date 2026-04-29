@@ -1,9 +1,13 @@
 const auth = require('../../../../../utils/auth')
 const paymentService = require('../../../../../services/payment-service')
+const entitlementService = require('../../../../../services/entitlement-service')
 const { setFeaturePaid } = require('../../../../../utils/audio-access.js')
 const {
   GUIDE_MAP_PAGE
 } = require('../../../../../utils/guide-routes')
+const {
+  PAID_FEATURE_KEYS
+} = entitlementService
 
 const DEFAULT_PRICE = 7.8
 const DEFAULT_ORIGINAL_PRICE = 69
@@ -12,55 +16,47 @@ const DEFAULT_FEATURE_NAME = 'VIP尊享功能'
 const DEFAULT_DESCRIPTION = '已有98%游客选择，剩余名额不多'
 const REMOTE_HERO_IMAGE = 'https://hyg-cdn.flexai.cc/common/xiaoyingdongzuo.png'
 const LOCAL_HERO_IMAGE = '/images/ai-assistant-xiaoying.png'
-const VIP_ACCESS_FEATURE_KEY = 'vip'
-const AI_CHAT_FEATURE_KEYS = new Set([
-  'ai.chat.send-message',
-  'ai.chat.voice-send',
-  'ai.chat.voice-play'
-])
-const MAP_VIP_FEATURE_KEYS = new Set([
-  'map.audio.play',
-  'map.poi.primary-action',
-  'map.route.planning',
-  'map.navigation.start',
-  'map.photo.tutorial',
-  'map.checkin.action',
-  'map.tutorial.photo',
-  'map.checkin.poi',
-  'map.explore.poi',
-  'map.navigate.poi'
+const VIP_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.VIP
+const VIP_ENTITLED_FEATURE_KEYS = new Set([
+  PAID_FEATURE_KEYS.AI_CHAT,
+  PAID_FEATURE_KEYS.AI_CHAT_VOICE,
+  PAID_FEATURE_KEYS.MAP_AUDIO_PLAY,
+  PAID_FEATURE_KEYS.MAP_ROUTE_PLANNING,
+  PAID_FEATURE_KEYS.MAP_NAVIGATION_START,
+  PAID_FEATURE_KEYS.MAP_PHOTO_TUTORIAL,
+  PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE
 ])
 
 const FEATURE_CONFIG = {
-  'ai.chat.send-message': {
+  [PAID_FEATURE_KEYS.AI_CHAT]: {
     title: 'AI智能对话',
     description: '体验AI智能导览对话需要VIP权限'
   },
-  'ai.chat.voice-send': {
+  [PAID_FEATURE_KEYS.AI_CHAT_VOICE]: {
     title: 'AI语音对话',
     description: '体验AI语音对话功能需要VIP权限'
   },
-  'ai.chat.voice-play': {
-    title: 'AI语音播放',
-    description: '播放AI语音回复需要VIP权限'
-  },
-  'map.audio.play': {
+  [PAID_FEATURE_KEYS.MAP_AUDIO_PLAY]: {
     title: '景点语音讲解',
     description: '解锁景点语音讲解与沉浸式导览体验'
   },
-  'map.poi.primary-action': {
-    title: '地图互动功能',
-    description: '继续使用地图互动与点位浏览能力'
-  },
-  'map.route.planning': {
+  [PAID_FEATURE_KEYS.MAP_ROUTE_PLANNING]: {
     title: '智能路线规划',
     description: '解锁 AI 推荐路线与游览规划能力'
   },
-  'map.navigation.start': {
+  [PAID_FEATURE_KEYS.MAP_NAVIGATION_START]: {
     title: '景点导航',
     description: '解锁前往景点的智能导航能力'
   },
-  vip: {
+  [PAID_FEATURE_KEYS.MAP_PHOTO_TUTORIAL]: {
+    title: '拍照打卡指引',
+    description: '查看拍照打卡指引需要VIP权限'
+  },
+  [PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE]: {
+    title: 'AI研学报告',
+    description: '生成专属AI研学报告需要开通权益'
+  },
+  [PAID_FEATURE_KEYS.VIP]: {
     title: DEFAULT_FEATURE_NAME,
     description: '开通后即可体验小九的完整智能陪游服务'
   }
@@ -97,7 +93,7 @@ function formatAmount(amount) {
 }
 
 function grantPaidAccess(featureKey = '') {
-  const normalizedFeatureKey = String(featureKey || '').trim()
+  const normalizedFeatureKey = entitlementService.normalizeFeatureKey(featureKey)
 
   if (!normalizedFeatureKey) {
     return
@@ -107,8 +103,7 @@ function grantPaidAccess(featureKey = '') {
 
   if (
     normalizedFeatureKey === VIP_ACCESS_FEATURE_KEY
-    || AI_CHAT_FEATURE_KEYS.has(normalizedFeatureKey)
-    || MAP_VIP_FEATURE_KEYS.has(normalizedFeatureKey)
+    || VIP_ENTITLED_FEATURE_KEYS.has(normalizedFeatureKey)
   ) {
     setFeaturePaid(VIP_ACCESS_FEATURE_KEY, true)
   }
@@ -158,11 +153,13 @@ Page({
   },
 
   parseOptions(options = {}) {
-    const featureKey = safeDecode(options.feature) || 'vip'
+    const featureKey = entitlementService.normalizeFeatureKey(
+      safeDecode(options.feature) || VIP_ACCESS_FEATURE_KEY
+    ) || VIP_ACCESS_FEATURE_KEY
     const productCode = safeDecode(options.productCode)
       || safeDecode(options.product_code)
-      || 'vip'
-    const featureConfig = FEATURE_CONFIG[featureKey] || FEATURE_CONFIG.vip
+      || VIP_ACCESS_FEATURE_KEY
+    const featureConfig = FEATURE_CONFIG[featureKey] || FEATURE_CONFIG[VIP_ACCESS_FEATURE_KEY]
     const amount = Number(options.amount)
     const originalPrice = Number(options.originalPrice)
     const featureName = safeDecode(options.featureName)

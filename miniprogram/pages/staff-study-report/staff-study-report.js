@@ -246,6 +246,10 @@ Page({
     this.initializePage()
   },
 
+  onReady() {
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+  },
+
   async initializePage() {
     const hasLogin = await auth.checkAndAutoLogin(2500).catch(() => false)
 
@@ -257,23 +261,36 @@ Page({
       return
     }
 
-    try {
-      await auth.syncCurrentUserProfile()
-    } catch (error) {}
-
-    if (!this.isStaffUser()) {
-      wx.showToast({
-        title: '当前账号不是工作人员',
-        icon: 'none',
-        duration: 1800
+    const permissionGuard = this.getPermissionGuard()
+    if (permissionGuard) {
+      const staffAccessResult = await permissionGuard.ensureStaffUser({
+        redirectUrl: '/pages/check-in/check-in',
+        redirectDelayMs: 200,
+        showLoginToast: true
       })
 
-      setTimeout(() => {
-        wx.redirectTo({
-          url: '/pages/check-in/check-in'
+      if (!staffAccessResult.allowed) {
+        return
+      }
+    } else {
+      try {
+        await auth.syncCurrentUserProfile()
+      } catch (error) {}
+
+      if (!this.isStaffUser()) {
+        wx.showToast({
+          title: '当前账号不是工作人员',
+          icon: 'none',
+          duration: 1800
         })
-      }, 200)
-      return
+
+        setTimeout(() => {
+          wx.redirectTo({
+            url: '/pages/check-in/check-in'
+          })
+        }, 200)
+        return
+      }
     }
 
     await this.loadActiveStudyGroups()
@@ -284,6 +301,11 @@ Page({
   },
 
   isStaffUser() {
+    const permissionGuard = this.getPermissionGuard()
+    if (permissionGuard) {
+      return permissionGuard.isStaffUser()
+    }
+
     const currentUserProfile = auth.getCachedCurrentUserProfile()
     const userInfo = auth.getUserInfo() || {}
     const userType = String(
@@ -293,6 +315,15 @@ Page({
     ).trim().toLowerCase()
 
     return userType === 'staff'
+  },
+
+  getPermissionGuard() {
+    if (this.permissionGuard) {
+      return this.permissionGuard
+    }
+
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+    return this.permissionGuard || null
   },
 
   async loadActiveStudyGroups(preferredGroupId = 0) {

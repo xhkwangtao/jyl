@@ -11,6 +11,7 @@
     "poi-filter": "/components/poi-filter/poi-filter",
     "poi-popup": "/components/poi-popup/poi-popup",
     "poi-audio-list": "/components/poi-audio-list/poi-audio-list",
-    "intelligent-route-planner": "/components/intelligent-route-planner/intelligent-route-planner"
+    "intelligent-route-planner": "/components/intelligent-route-planner/intelligent-route-planner",
+    "permission-guard": "/components/permission-guard/permission-guard"
   }
 }

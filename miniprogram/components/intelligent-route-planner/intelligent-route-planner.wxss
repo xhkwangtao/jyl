@@ -29,6 +29,7 @@
   background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzUzIiBoZWlnaHQ9IjIwMSIgdmlld0JveD0iMCAwIDM1MyAyMDEiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xNTYuMDA0IDAuNUMxNjUuNTQzIDAuNTAwMTA2IDE3NC42ODEgNC4zMzg3OCAxODEuMzU3IDExLjE1MTRMMTg4LjY0NSAxOC41ODY5QzE5Ni4wNzQgMjYuMTY3MiAyMDYuMjQxIDMwLjQzODQgMjE2Ljg1NCAzMC40Mzg1SDMyOEMzNDEuNTMxIDMwLjQzODUgMzUyLjUgNDEuNDA3NyAzNTIuNSA1NC45Mzg1VjIwNy41QzM1Mi41IDIyMS4wMzEgMzQxLjUzMSAyMzIgMzI4IDIzMkgyNUMxMS40NjkgMjMyIDAuNSAyMjEuMDMxIDAuNSAyMDcuNVYyNUMwLjUgMTEuNDY5IDExLjQ2OSAwLjUgMjUgMC41SDE1Ni4wMDRaIiBmaWxsPSJ3aGl0ZSIgc3Ryb2tlPSIjRTVFNUU1Ii8+Cjwvc3ZnPgo=') no-repeat center;
   background-size: 100% 100%;
   box-shadow: 0 24rpx 64rpx rgba(15, 48, 61, 0.14);
+  z-index: 1;
 }
 
 .close-button {
@@ -94,12 +95,21 @@
 .route-cards-container {
   display: flex;
   gap: 8rpx;
+  margin-bottom: 76rpx;
   width: 100%;
   margin-top: 100rpx;
+  overflow: hidden;
+}
+
+.planner-ai-entry-shell {
+  position: absolute;
+  left: 30rpx;
+  right: 30rpx;
+  bottom: 20rpx;
+  z-index: 2;
 }
 
 .planner-ai-entry {
-  margin-top: 18rpx;
   height: 64rpx;
   border-radius: 999rpx;
   background: rgba(15, 62, 73, 0.08);
@@ -122,8 +132,8 @@
 .route-card {
   position: relative;
   flex: 1;
-  min-height: 170rpx;
-  max-height: 190rpx;
+  min-height: 140rpx;
+  max-height: 170rpx;
   padding: 16rpx 12rpx;
   border-radius: 20rpx;
   border: 4rpx solid transparent;
@@ -147,11 +157,11 @@
 }
 
 .theme-green {
-  background: linear-gradient(135deg, #2cedb8 0%, #d8fff0 100%);
+  background: linear-gradient(135deg, #2cedb8 0%, #d1ffe4 100%);
 }
 
 .theme-blue {
-  background: linear-gradient(135deg, #75cbff 0%, #d8f0ff 100%);
+  background: linear-gradient(135deg, #75cbff 0%, #d1f3ff 100%);
 }
 
 .selection-indicator {
@@ -324,6 +334,15 @@
   opacity: 0.7;
 }
 
+.route-card:active {
+  transform: scale(0.98);
+}
+
+.route-button:active,
+.planner-ai-entry:active {
+  opacity: 0.86;
+}
+
 @keyframes route-card-pulse {
   0%, 100% {
     transform: translateY(-2rpx) scale(1);
@@ -362,7 +381,14 @@
 
   .route-cards-container {
     margin-top: 80rpx;
+    margin-bottom: 70rpx;
     gap: 6rpx;
+  }
+
+  .planner-ai-entry-shell {
+    left: 20rpx;
+    right: 20rpx;
+    bottom: 14rpx;
   }
 
   .route-card {
@@ -402,8 +428,8 @@
 
 @media (min-width: 414px) {
   .route-planner-panel {
-    height: 420rpx;
-    max-height: 420rpx;
+    height: 430rpx;
+    max-height: 430rpx;
   }
 
   .route-title-section {
@@ -423,11 +449,16 @@
 
   .route-cards-container {
     margin-top: 120rpx;
+    margin-bottom: 82rpx;
   }
 
   .route-card {
-    min-height: 160rpx;
-    max-height: 190rpx;
+    min-height: 150rpx;
+    max-height: 180rpx;
+  }
+
+  .planner-ai-entry-shell {
+    bottom: 24rpx;
   }
 
   .route-stats {

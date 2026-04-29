@@ -1,4 +1,6 @@
+const auth = require('../../utils/auth')
 const { isFeaturePaid } = require('../../utils/audio-access')
+const entitlementService = require('../../services/entitlement-service')
 const {
   persistLandingContext,
   getLandingRedirectConfig,
@@ -111,7 +113,7 @@ Page({
       })
       : null
 
-    if (this.tryExecuteLandingConfig(remoteConfig, landingOptions)) {
+    if (await this.tryExecuteLandingConfig(remoteConfig, landingOptions)) {
       return
     }
 
@@ -125,7 +127,7 @@ Page({
 
       if (config && config.enabled && config.redirectUrl) {
         if (config.action === 'video') {
-          const isVip = this.isVipActive()
+          const isVip = await this.isVipActive()
           const viewCount = this.getVideoViewCount()
 
           if (!isVip && viewCount >= 3) {
@@ -162,13 +164,13 @@ Page({
     })
   },
 
-  tryExecuteLandingConfig(config, landingOptions = {}) {
+  async tryExecuteLandingConfig(config, landingOptions = {}) {
     if (!this.shouldUseLandingConfig(config, landingOptions)) {
       return false
     }
 
     if (config.action === 'video') {
-      const isVip = this.isVipActive()
+      const isVip = await this.isVipActive()
       const viewCount = this.getVideoViewCount()
 
       if (!isVip && viewCount >= 3) {
@@ -211,8 +213,19 @@ Page({
     return requestedSourceCode === responseSourceCode
   },
 
-  isVipActive() {
-    return isFeaturePaid(VIP_FEATURE_KEY)
+  async isVipActive() {
+    if (!auth.getToken()) {
+      return isFeaturePaid(VIP_FEATURE_KEY)
+    }
+
+    try {
+      const vipAccess = await entitlementService.checkEntitlement(VIP_FEATURE_KEY, {
+        maxAgeMs: 60 * 1000
+      })
+      return !!vipAccess?.available
+    } catch (error) {
+      return isFeaturePaid(VIP_FEATURE_KEY)
+    }
   },
 
   getVideoViewCount() {

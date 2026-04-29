@@ -1,5 +1,8 @@
 let messageSeed = 0
 const aiChatService = require('../../../../services/ai-chat-service')
+const {
+  PAID_FEATURE_KEYS
+} = require('../../../../services/entitlement-service')
 const StreamingPcmPlayer = require('../../../../utils/streaming-pcm-player')
 const {
   isFeaturePaid
@@ -11,10 +14,8 @@ const {
   GUIDE_SUBSCRIBE_PAGE
 } = require('../../../../utils/guide-routes')
 
-const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
-const AI_CHAT_TEXT_FEATURE_KEY = 'ai.chat.send-message'
-const AI_CHAT_VOICE_SEND_FEATURE_KEY = 'ai.chat.voice-send'
-const AI_CHAT_VOICE_PLAY_FEATURE_KEY = 'ai.chat.voice-play'
+const AI_CHAT_TEXT_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
+const AI_CHAT_VOICE_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT_VOICE
 
 const AI_CHAT_PAYWALL_CONFIG = {
   [AI_CHAT_TEXT_FEATURE_KEY]: {
@@ -22,15 +23,10 @@ const AI_CHAT_PAYWALL_CONFIG = {
     productName: 'AI聊天权限',
     description: '体验AI智能导览对话需要VIP权限'
   },
-  [AI_CHAT_VOICE_SEND_FEATURE_KEY]: {
+  [AI_CHAT_VOICE_FEATURE_KEY]: {
     featureName: 'AI语音对话',
     productName: 'AI语音聊天权限',
     description: '体验AI语音对话功能需要VIP权限'
-  },
-  [AI_CHAT_VOICE_PLAY_FEATURE_KEY]: {
-    featureName: 'AI语音播放',
-    productName: 'AI语音播放权限',
-    description: '播放AI语音回复需要VIP权限'
   }
 }
 
@@ -564,10 +560,16 @@ Page({
     this.destroyVoiceReplyPlayer()
   },
 
+  onReady() {
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+    this.prefetchAIChatAccess()
+  },
+
   onLoad(options = {}) {
     this.entryOptions = { ...options }
     const entryRouteInfo = this.resolveEntryRouteInfo(options)
     const presetMessage = safeDecodeURIComponent(options.message || '')
+    this.pendingPresetMessage = !entryRouteInfo ? presetMessage : ''
 
     this.initLayoutMetrics()
     this.setData({
@@ -586,6 +588,7 @@ Page({
           this.scrollToBottom()
 
           if (!entryRouteInfo && presetMessage && this.hasAIChatAccess()) {
+            this.pendingPresetMessage = ''
             this.sendMessage(presetMessage)
           }
         }, 80)
@@ -707,7 +710,7 @@ Page({
   },
 
   onPlayAudio(event) {
-    if (!this.ensureAIChatAccess(AI_CHAT_VOICE_PLAY_FEATURE_KEY)) {
+    if (!this.ensureAIChatAccess(AI_CHAT_VOICE_FEATURE_KEY)) {
       return
     }
 
@@ -778,7 +781,7 @@ Page({
     const detail = event.detail || {}
     const audioData = detail.audioData || ''
 
-    if (!this.ensureAIChatAccess(AI_CHAT_VOICE_SEND_FEATURE_KEY)) {
+    if (!this.ensureAIChatAccess(AI_CHAT_VOICE_FEATURE_KEY)) {
       return
     }
 
@@ -1242,11 +1245,11 @@ Page({
   },
 
   hasAIChatAccess() {
-    return isFeaturePaid(AI_CHAT_ACCESS_FEATURE_KEY)
+    return isFeaturePaid(AI_CHAT_TEXT_FEATURE_KEY)
   },
 
   ensureAIChatAccess(featureKey = AI_CHAT_TEXT_FEATURE_KEY) {
-    if (this.hasAIChatAccess()) {
+    if (isFeaturePaid(featureKey)) {
       return true
     }
 
@@ -1290,5 +1293,34 @@ Page({
         })
       }
     })
+  },
+
+  getPermissionGuard() {
+    if (this.permissionGuard) {
+      return this.permissionGuard
+    }
+
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+    return this.permissionGuard || null
+  },
+
+  async prefetchAIChatAccess() {
+    const permissionGuard = this.getPermissionGuard()
+    if (!permissionGuard) {
+      return
+    }
+
+    await permissionGuard.prefetchFeatureAccessList([
+      AI_CHAT_TEXT_FEATURE_KEY,
+      AI_CHAT_VOICE_FEATURE_KEY
+    ], {
+      ensureLogin: false
+    })
+
+    if (this.pendingPresetMessage && this.data.pageReady && this.hasAIChatAccess()) {
+      const presetMessage = this.pendingPresetMessage
+      this.pendingPresetMessage = ''
+      this.sendMessage(presetMessage)
+    }
   }
 })

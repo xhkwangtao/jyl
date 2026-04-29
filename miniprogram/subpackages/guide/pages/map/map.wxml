@@ -1,3 +1,5 @@
+<permission-guard id="permissionGuard"></permission-guard>
+
 <view class="map-page {{navigationActive ? 'navigation-mode' : ''}}">
   <universal-navigation
     title=""
