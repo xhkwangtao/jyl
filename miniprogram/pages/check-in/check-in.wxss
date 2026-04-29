@@ -71,7 +71,8 @@
 }
 
 .rules-card {
-  margin-top: 24rpx;
+  margin-top: 0;
+  margin-bottom: 24rpx;
   padding: 28rpx;
   background: rgba(255, 251, 246, 0.95);
 }

@@ -25,11 +25,35 @@
   background-color: rgba(0, 0, 0, 0.05);
 }
 
-.user-avatar {
+.user-avatar-shell {
+  position: relative;
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
+  overflow: hidden;
   background-color: #f0f0f0;
+  flex-shrink: 0;
+}
+
+.user-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.user-avatar-shell-ai {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.user-avatar-ai {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 100%;
+  margin-top: 12rpx;
+  transform: translate(-50%, -50%) scale(2.15);
+  transform-origin: center center;
 }
 
 .user-name {

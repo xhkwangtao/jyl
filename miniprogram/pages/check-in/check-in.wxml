@@ -19,16 +19,37 @@
   </view>
 
   <view class="content-layer">
+    <view class="rules-card" wx:if="{{!generatedReportReady}}">
+      <view class="section-head section-head-static">
+        <view>
+          <text class="section-title">研学流程</text>
+          <text class="section-caption">跟着下面的流程完成景点寻找、答题卡记录与研学报告生成。</text>
+        </view>
+      </view>
+
+      <view class="rule-list">
+        <view class="rule-item" wx:for="{{ruleList}}" wx:key="indexText">
+          <view class="rule-index-shell">
+            <text class="rule-index">{{item.indexText}}</text>
+          </view>
+          <view class="rule-copy">
+            <text class="rule-title">{{item.title}}</text>
+            <text class="rule-desc">{{item.desc}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <view class="hero-card">
       <view class="hero-copy">
-        <text class="hero-kicker">QR COLLECTION</text>
+        <text class="hero-kicker">SECRET HUNT</text>
         <text class="hero-title">{{heroTitle}}</text>
         <text class="hero-desc">{{heroDesc}}</text>
       </view>
 
       <view class="hero-progress-row">
         <view class="hero-progress-copy">
-          <text class="hero-progress-label">当前已收集</text>
+          <text class="hero-progress-label">当前已记录</text>
           <text class="hero-progress-value">{{displayCollectedCount}} / {{totalCount}}</text>
         </view>
         <text class="hero-progress-percent">{{displayProgressPercentText}}</text>
@@ -44,11 +65,11 @@
           <text class="stat-value">{{totalCount}}</text>
         </view>
         <view class="stat-card stat-card-checked">
-          <text class="stat-label">已收集</text>
+          <text class="stat-label">已记录</text>
           <text class="stat-value">{{displayCollectedCount}}</text>
         </view>
         <view class="stat-card">
-          <text class="stat-label">未收集</text>
+          <text class="stat-label">待寻找</text>
           <text class="stat-value">{{displayPendingCount}}</text>
         </view>
       </view>
@@ -62,8 +83,7 @@
         </view>
       </view>
 
-      <text class="scan-tip">{{scanTip}}</text>
-      <text class="manual-tip {{manualCollectEnabled ? 'manual-tip-testing' : 'manual-tip-live'}}">{{manualCollectTip}}</text>
+      <text class="scan-tip" wx:if="{{scanTip}}">{{scanTip}}</text>
     </view>
 
     <view class="generated-report-card" wx:if="{{generatedReportReady}}">
@@ -84,115 +104,15 @@
         </view>
       </view>
     </view>
-
-    <view class="rules-card">
-      <view class="section-head section-head-static">
-        <view>
-          <text class="section-title">研学流程</text>
-          <text class="section-caption">现在这页会明确展示已经拿到的暗号图案和剩余待收集的图案。</text>
-        </view>
-      </view>
-
-      <view class="rule-list">
-        <view class="rule-item" wx:for="{{ruleList}}" wx:key="indexText">
-          <view class="rule-index-shell">
-            <text class="rule-index">{{item.indexText}}</text>
-          </view>
-          <view class="rule-copy">
-            <text class="rule-title">{{item.title}}</text>
-            <text class="rule-desc">{{item.desc}}</text>
-          </view>
-        </view>
-      </view>
-    </view>
-
-    <view class="filter-shell">
-      <view
-        class="filter-chip {{currentFilter === item.value ? 'filter-chip-active' : ''}}"
-        wx:for="{{filterOptions}}"
-        wx:key="value"
-        data-value="{{item.value}}"
-        bindtap="onFilterTap"
-      >
-        <text class="filter-chip-text">{{item.label}}</text>
-      </view>
-    </view>
-
-    <view class="section-head">
-      <view>
-        <text class="section-title">全部暗号点</text>
-        <text class="section-caption">{{sectionCaption}}</text>
-      </view>
-      <text class="section-right">{{visibleCount}} 个结果</text>
-    </view>
-
-    <view class="spot-list" wx:if="{{visibleSecretList.length}}">
-      <view
-        class="spot-card {{item.collected ? 'spot-card-checked' : 'spot-card-pending'}} {{targetSecretId === item.id ? 'spot-card-focused' : ''}}"
-        wx:for="{{visibleSecretList}}"
-        wx:key="id"
-      >
-        <view class="spot-card-top">
-          <view class="spot-sequence">
-            <text class="spot-sequence-text">{{item.secretIndexText}}</text>
-          </view>
-
-          <view class="spot-copy">
-            <view class="spot-meta-row">
-              <text class="spot-tag spot-tag-{{item.themeTone}}">{{item.patternLabel}}</text>
-              <view class="spot-status {{item.collected ? 'spot-status-checked' : 'spot-status-pending'}}">
-                <text class="spot-status-text">{{item.statusText}}</text>
-              </view>
-            </view>
-
-            <text class="spot-title">{{item.name}}</text>
-
-            <view class="spot-location-row">
-              <image class="spot-location-icon" src="/images/poi-detail/location.svg" mode="widthFix"></image>
-              <text class="spot-location-text">{{item.pointLabel}} · {{item.patternLabel}}</text>
-            </view>
-
-            <text class="spot-desc">{{item.collectionHint}}</text>
-          </view>
-        </view>
-
-        <view class="spot-bottom-row">
-          <text class="spot-time {{item.collected ? 'spot-time-checked' : ''}}">{{item.timeText}}</text>
-
-          <view class="spot-actions">
-            <view
-              class="spot-action spot-action-ghost {{item.navigable ? '' : 'spot-action-disabled'}}"
-              data-map-id="{{item.mapPointId}}"
-              bindtap="onMapTap"
-            >
-              <text class="spot-action-text spot-action-text-ghost {{item.navigable ? '' : 'spot-action-text-disabled'}}">{{item.navigable ? '地图查看' : '暂无地图'}}</text>
-            </view>
-            <view
-              wx:if="{{manualCollectEnabled}}"
-              class="spot-action {{item.collected ? 'spot-action-test-secondary' : 'spot-action-test-primary'}}"
-              data-id="{{item.id}}"
-              bindtap="onToggleCheckin"
-            >
-              <text class="spot-action-text {{item.collected ? 'spot-action-text-test-secondary' : 'spot-action-text-test-primary'}}">{{item.collected ? '取消测试标记' : '测试标记收集'}}</text>
-            </view>
-          </view>
-        </view>
-      </view>
-    </view>
-
-    <view class="empty-state" wx:else>
-      <text class="empty-title">当前筛选下暂无暗号点</text>
-      <text class="empty-desc">切换筛选后可查看其它暗号的收集状态。</text>
-    </view>
   </view>
 
   <view class="worksheet-dialog-mask" wx:if="{{showWorksheetDialog}}">
     <view class="worksheet-dialog" catchtap="noop">
       <text class="worksheet-dialog-title">扫描答题卡</text>
-      <text class="worksheet-dialog-desc">请先填写学员编号和姓名，随后将直接打开摄像头拍摄答题卡。</text>
+      <text class="worksheet-dialog-desc">请先填写编号和姓名，随后打开摄像头拍摄已完成填写的答题卡。</text>
 
       <view class="worksheet-field">
-        <text class="worksheet-field-label">学员编号</text>
+        <text class="worksheet-field-label">编号</text>
         <input
           class="worksheet-field-input"
           placeholder="请输入编号"
@@ -204,7 +124,7 @@
       </view>
 
       <view class="worksheet-field">
-        <text class="worksheet-field-label">学员姓名</text>
+        <text class="worksheet-field-label">姓名</text>
         <input
           class="worksheet-field-input"
           placeholder="请输入姓名"

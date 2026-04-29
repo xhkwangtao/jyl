@@ -21,6 +21,13 @@ const AI_CHAT_ACCESS_FEATURE_KEY = 'vip'
 const AI_CHAT_PAYMENT_FEATURE_KEY = 'ai.chat.send-message'
 const AI_CHAT_SUBSCRIBE_DESCRIPTION = '开通VIP后即可使用AI聊天与智能问答服务'
 const AI_CHAT_SUCCESS_REDIRECT_URL = GUIDE_AI_CHAT_PAGE
+const CHECK_IN_CARD_TITLE = '守城认证中心'
+const CHECK_IN_CARD_DESCRIPTION = '提交你的边关答卷，生成专属AI研学报告\n看看六百年后，你将成为怎样的守城人。'
+const CHECK_IN_CARD_ACTION = '点击上传答题卡'
+const STATUS_BAR_GUEST_NAME = '游客'
+const STATUS_BAR_GUEST_AVATAR_SRC = '/images/icons/user.svg'
+const STATUS_BAR_USER_AVATAR_SRC = '/images/xiaojiu.png'
+const HOME_PHOTO_CARD_VIDEO_URL = 'https://jyl-cdn.flexai.cc/assets/video/e166e877ce3348e786489c122add3aef.mp4'
 
 Page({
   data: {
@@ -30,9 +37,14 @@ Page({
     dialogText: '小九带您告别走马观花，长城不仅是照片里的背景，历史不再是书本里的文字，触摸长城砖石、解锁历史，让快乐旅途藏满文化与知识的重量。',
     aiNameDisplay: ['小', '九'],
     aiRoleDisplay: ['A', 'I', '使', '者'],
-    checkInTitle: '研学暗号收集',
-    checkInDescription: '暗号点已整理完成\n到景点扫码后可逐个解锁图案',
-    checkInAction: '去收集',
+    statusUserName: STATUS_BAR_GUEST_NAME,
+    statusUserAvatarSrc: STATUS_BAR_GUEST_AVATAR_SRC,
+    checkInTitle: CHECK_IN_CARD_TITLE,
+    checkInDescription: CHECK_IN_CARD_DESCRIPTION,
+    checkInAction: CHECK_IN_CARD_ACTION,
+    featureVideoVisible: false,
+    featureVideoTitle: '边关重启',
+    featureVideoSrc: '',
     checkInTotalCount: 19,
     checkInCompletedCount: 0,
     checkInDisplayCompletedCount: 0
@@ -54,6 +66,7 @@ Page({
       return
     }
 
+    this.syncStatusBarUser()
     this.syncCheckInEntry()
     this.pendingAIChatNavigation = false
     this.setData({
@@ -62,11 +75,14 @@ Page({
 
     this.silentLogin()
       .then((hasLogin) => {
+        this.syncStatusBarUser()
+
         if (!hasLogin) {
           return
         }
 
         return this.syncLatestStudyReport().then(() => {
+          this.syncStatusBarUser()
           this.syncCheckInEntry()
         })
       })
@@ -85,8 +101,15 @@ Page({
   },
 
   onUnload() {
+    this.closeFeatureVideo({
+      updateState: false
+    })
     this.pendingAIChatNavigation = false
     this.pendingLandingRedirect = false
+  },
+
+  onHide() {
+    this.pauseFeatureVideo()
   },
 
   onPullDownRefresh() {
@@ -97,6 +120,7 @@ Page({
 
   initializePage() {
     this.initLayoutMetrics()
+    this.syncStatusBarUser()
     this.syncCheckInEntry()
   },
 
@@ -197,7 +221,7 @@ Page({
   },
 
   onPhotoSpotsTap() {
-    this.showUiOnlyToast('功能搭建中')
+    this.openFeatureVideo()
   },
 
   onMapPreviewTap() {
@@ -355,6 +379,67 @@ Page({
     }
   },
 
+  syncStatusBarUser() {
+    const userInfo = auth.getUserInfo() || {}
+    const nickname = String(userInfo.nickname || userInfo.nickName || '').trim()
+    const hasLogin = auth.isLoggedIn()
+
+    this.setData({
+      statusUserName: hasLogin ? (nickname || STATUS_BAR_GUEST_NAME) : STATUS_BAR_GUEST_NAME,
+      statusUserAvatarSrc: hasLogin ? STATUS_BAR_USER_AVATAR_SRC : STATUS_BAR_GUEST_AVATAR_SRC
+    })
+  },
+
+  noop() {},
+
+  getFeatureVideoContext() {
+    if (!this.featureVideoContext) {
+      this.featureVideoContext = wx.createVideoContext('homeFeatureVideo')
+    }
+
+    return this.featureVideoContext
+  },
+
+  openFeatureVideo() {
+    this.setData({
+      featureVideoVisible: true,
+      featureVideoTitle: '边关重启',
+      featureVideoSrc: HOME_PHOTO_CARD_VIDEO_URL
+    }, () => {
+      setTimeout(() => {
+        try {
+          this.getFeatureVideoContext().play()
+        } catch (error) {}
+      }, 80)
+    })
+  },
+
+  pauseFeatureVideo() {
+    try {
+      this.getFeatureVideoContext().pause()
+    } catch (error) {}
+  },
+
+  closeFeatureVideo(options = {}) {
+    this.pauseFeatureVideo()
+
+    if (options.updateState === false) {
+      return
+    }
+
+    this.setData({
+      featureVideoVisible: false
+    })
+  },
+
+  onFeatureVideoMaskTap() {
+    this.closeFeatureVideo()
+  },
+
+  onFeatureVideoCloseTap() {
+    this.closeFeatureVideo()
+  },
+
   syncCheckInEntry() {
     const collectionState = buildSecretCollectionState()
     const totalCount = collectionState.totalCount
@@ -364,20 +449,10 @@ Page({
       fallbackCount: completedCount
     })
 
-    let checkInDescription = `${totalCount}枚暗号等待收集\n到指定景点扫码后解锁研学报告`
-    let checkInAction = '去收集'
-
-    if (completedCount > 0 && completedCount < totalCount) {
-      checkInDescription = `已收集 ${completedCount}/${totalCount} 枚暗号\n继续前往景点扫码解锁剩余图案`
-      checkInAction = '继续收集'
-    } else if (completedCount >= totalCount) {
-      checkInDescription = `${totalCount}枚暗号已全部收齐\n研学报告已进入可解锁状态`
-      checkInAction = '查看档案'
-    }
-
     this.setData({
-      checkInDescription,
-      checkInAction,
+      checkInTitle: CHECK_IN_CARD_TITLE,
+      checkInDescription: CHECK_IN_CARD_DESCRIPTION,
+      checkInAction: CHECK_IN_CARD_ACTION,
       checkInTotalCount: totalCount,
       checkInCompletedCount: completedCount,
       checkInDisplayCompletedCount: displayCompletedCount

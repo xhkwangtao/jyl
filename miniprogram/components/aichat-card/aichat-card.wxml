@@ -1,7 +1,7 @@
 <view class="aichat-card" bindtap="onCardTap">
   <view class="card-content">
     <text class="card-title">AI聊天</text>
-    <text class="card-description">随时回答您的&#10;各类问题</text>
+    <text class="card-description">随时回答您的各类问题</text>
   </view>
 
   <view class="ai-icon-container">

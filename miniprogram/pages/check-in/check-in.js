@@ -6,7 +6,6 @@ const {
   ENABLE_MANUAL_SECRET_COLLECTION_FOR_TESTING
 } = require('../../config/feature-flags')
 const {
-  SECRET_FILTER_OPTIONS,
   buildSecretCollectionState,
   filterSecretList
 } = require('../../utils/secret-collection')
@@ -24,32 +23,68 @@ const {
 
 const GENERATED_REPORT_PDF_FILE_NAME = '研学报告.pdf'
 const GENERATED_REPORT_PREVIEW_DIR_NAME = 'study-report-preview'
+const CHECKIN_FILTER_OPTIONS = [
+  { label: '全部', value: 'all' },
+  { label: '已记录', value: 'checked' },
+  { label: '待寻找', value: 'unchecked' }
+]
 
 const RULE_LIST = [
   {
     indexText: '01',
-    title: '到景点现场扫码',
-    desc: '学生到达布置了二维码的景点后，扫描对应二维码即可记录一枚暗号图案。'
+    title: '到景点寻找暗号',
+    desc: '到达对应景点后，留意现场线索，找到属于该点位的暗号图案。'
   },
   {
     indexText: '02',
-    title: '收集全部暗号',
-    desc: '每个二维码对应一枚暗号图案，只有把全部图案收齐，研学任务才算完成。'
+    title: '把暗号画到答题卡上',
+    desc: '将你找到的暗号画到答题卡对应位置，完成本次研学记录。'
   },
   {
     indexText: '03',
-    title: '解锁研学报告',
-    desc: '暗号图案全部解锁后，当前设备上的研学报告会进入可查看状态。'
+    title: '扫描答题卡生成报告',
+    desc: '游览结束后填写编号和姓名并拍摄答题卡，系统会识别内容并生成专属 AI 研学报告。'
   }
 ]
 
+function buildCheckinHeroCopy({
+  generatedReportReady = false
+} = {}) {
+  if (generatedReportReady) {
+    return {
+      heroTitle: '研学报告已生成',
+      heroDesc: '答题卡识别完成，可直接查看或保存本次专属 AI 研学报告。'
+    }
+  }
+
+  return {
+    heroTitle: '按景点寻找研学暗号',
+    heroDesc: '在景点找到暗号后，把图案画到答题卡上；游览结束后扫描答题卡，即可生成专属 AI 研学报告。'
+  }
+}
+
+function buildCheckinVisibleSecretList(secretList = []) {
+  return (secretList || []).map((item = {}) => {
+    const pointName = item.pointShortName || item.pointName || item.name || '对应景点'
+
+    return {
+      ...item,
+      statusText: item.collected ? '已记录' : '待寻找',
+      timeText: item.collected ? item.timeText : '到达景点后寻找暗号',
+      collectionHint: item.collected
+        ? `${item.secretCode || '该暗号'} 已记录在本次研学成果中`
+        : `前往 ${pointName} 寻找暗号，并画到答题卡对应位置`
+    }
+  })
+}
+
 function buildSectionCaption(currentFilter, collectedCount, pendingCount) {
   if (currentFilter === 'checked') {
-    return `当前展示 ${collectedCount} 枚已收集的暗号图案`
+    return `当前展示 ${collectedCount} 枚已记录的暗号图案`
   }
 
   if (currentFilter === 'unchecked') {
-    return `当前展示 ${pendingCount} 枚待收集的暗号图案`
+    return `当前展示 ${pendingCount} 枚待寻找的暗号图案`
   }
 
   return '当前已经按景区真实暗号点整理，共 19 枚暗号图案。'
@@ -120,11 +155,11 @@ function buildGeneratedReportDescText(studentName = '', studentCode = '') {
   const normalizedStudentCode = String(studentCode || '').trim()
 
   if (normalizedStudentName && normalizedStudentCode) {
-    return `学员 ${normalizedStudentName} · 编号 ${normalizedStudentCode}`
+    return `姓名 ${normalizedStudentName} · 编号 ${normalizedStudentCode}`
   }
 
   if (normalizedStudentName) {
-    return `学员 ${normalizedStudentName}`
+    return `姓名 ${normalizedStudentName}`
   }
 
   if (normalizedStudentCode) {
@@ -421,14 +456,14 @@ function buildWorksheetScanTip({
   hasRequested = false
 } = {}) {
   if (hasCachedReport) {
-    return '答题卡已扫描，研学报告已生成，可前往“我的档案”查看。'
+    return ''
   }
 
   if (hasRequested) {
     return '答题卡已提交，请勿重复扫描；稍后可在“我的档案”查看研学报告。'
   }
 
-  return '填写学员信息后拍摄答题卡，系统将自动识别并生成研学报告。'
+  return '完成答题卡后填写编号和姓名并拍摄上传，系统将自动识别并生成研学报告。'
 }
 
 Page({
@@ -437,7 +472,7 @@ Page({
     navFadeHeight: 50,
     navBackground: 'rgba(255,255,255,0)',
     navTheme: 'dark',
-    filterOptions: SECRET_FILTER_OPTIONS,
+    filterOptions: CHECKIN_FILTER_OPTIONS,
     currentFilter: 'all',
     heroTitle: '',
     heroDesc: '',
@@ -456,11 +491,8 @@ Page({
     visibleSecretList: [],
     ruleList: RULE_LIST,
     targetSecretId: '',
-    scanTip: '填写学员信息后拍摄答题卡，系统将自动识别并生成研学报告。',
+    scanTip: '完成答题卡后填写编号和姓名并拍摄上传，系统将自动识别并生成研学报告。',
     manualCollectEnabled: ENABLE_MANUAL_SECRET_COLLECTION_FOR_TESTING,
-    manualCollectTip: ENABLE_MANUAL_SECRET_COLLECTION_FOR_TESTING
-      ? '当前为测试模式，列表中的“测试标记”按钮仅用于功能联调；正式使用时仍以现场收集和答题卡识别为准。'
-      : '正式模式下请通过现场收集与答题卡拍照生成报告，学生不能手动标记暗号。',
     showWorksheetDialog: false,
     worksheetStudentCode: '',
     worksheetStudentName: '',
@@ -521,7 +553,9 @@ Page({
   refreshPageState() {
     const collectionState = buildSecretCollectionState()
     const currentFilter = this.data.currentFilter || 'all'
-    const visibleSecretList = filterSecretList(collectionState.secretList, currentFilter)
+    const visibleSecretList = buildCheckinVisibleSecretList(
+      filterSecretList(collectionState.secretList, currentFilter)
+    )
     const targetSecret = this.resolveEntryTargetSecret(collectionState.secretList)
     const targetSecretId = targetSecret?.id || ''
     const worksheetEntryState = this.getWorksheetEntryState()
@@ -534,9 +568,15 @@ Page({
     const displayProgressPercent = collectionState.totalCount
       ? Math.round((displayCollectedCount / collectionState.totalCount) * 100)
       : 0
+    const heroCopy = buildCheckinHeroCopy({
+      totalCount: collectionState.totalCount,
+      displayCollectedCount,
+      generatedReportReady: generatedReportCardState.generatedReportReady
+    })
 
     this.setData({
       ...collectionState,
+      ...heroCopy,
       displayCollectedCount,
       displayPendingCount,
       displayProgressPercent,
@@ -1392,7 +1432,7 @@ Page({
   onToggleCheckin(event) {
     if (!this.data.manualCollectEnabled) {
       wx.showToast({
-        title: '正式模式下仅支持扫码收集',
+        title: '正式模式下请以现场寻找和答题卡识别为准',
         icon: 'none',
         duration: 1600
       })

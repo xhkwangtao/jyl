@@ -1,7 +1,7 @@
 <view class="aiphoto-card" bindtap="onCardTap">
   <view class="card-content">
-    <text class="card-title">网红拍照</text>
-    <text class="card-description">智能定位最佳&#10;拍照位置</text>
+    <text class="card-title">边关重启</text>
+    <text class="card-description">当六百年边关再次开启，这一次，守城的人是你。</text>
   </view>
 
   <view class="camera-icon-container">

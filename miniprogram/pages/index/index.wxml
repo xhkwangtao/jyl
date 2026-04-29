@@ -1,5 +1,9 @@
 <view class="index-page">
-  <custom-status-bar bind:avatartap="onMyPageEntryTap" />
+  <custom-status-bar
+    user-name="{{statusUserName}}"
+    avatar-src="{{statusUserAvatarSrc}}"
+    bind:avatartap="onMyPageEntryTap"
+  />
 
   <view class="home-indicator"></view>
 
@@ -43,11 +47,32 @@
           </view>
         </view>
 
-        <view class="check-in-progress">
-          <text class="check-in-progress-label">已收集</text>
-          <text class="check-in-progress-value">{{checkInDisplayCompletedCount}}/{{checkInTotalCount}}</text>
+        <view class="check-in-visual">
+          <image class="check-in-visual-image" src="/images/check-in-card-dtk.png" mode="aspectFit"></image>
         </view>
       </view>
+    </view>
+  </view>
+
+  <view class="home-video-mask" wx:if="{{featureVideoVisible}}" bindtap="onFeatureVideoMaskTap">
+    <view class="home-video-panel" catchtap="noop">
+      <view class="home-video-header">
+        <text class="home-video-title">{{featureVideoTitle}}</text>
+        <view class="home-video-close" bindtap="onFeatureVideoCloseTap">
+          <text class="home-video-close-text">关闭</text>
+        </view>
+      </view>
+
+      <video
+        id="homeFeatureVideo"
+        class="home-video-player"
+        src="{{featureVideoSrc}}"
+        autoplay
+        controls
+        show-center-play-btn
+        enable-progress-gesture
+        objectFit="contain"
+      ></video>
     </view>
   </view>
 
