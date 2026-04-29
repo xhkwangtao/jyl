@@ -4,7 +4,7 @@ const orderService = require('../../services/order-service')
 const SUBSCRIBE_PAGE_ROOT = '/subpackages/guide/pages/payment/subscribe/subscribe'
 const STATUS_TABS = [
   { key: 'all', title: '全部', apiValue: '' },
-  { key: 'pending', title: '待支付', apiValue: 'pending' },
+  { key: 'pending', title: '待支付', apiValue: 'pending_payment' },
   { key: 'paid', title: '已完成', apiValue: 'paid' },
   { key: 'cancelled', title: '已取消', apiValue: 'cancelled' },
   { key: 'refunded', title: '已退款', apiValue: 'refunded' }

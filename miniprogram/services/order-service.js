@@ -1,16 +1,9 @@
 const request = require('../utils/request')
 
-const ORDER_API_PREFIX_STORAGE_KEY = 'jyl_order_api_prefix'
 const LOCAL_ORDER_STORAGE_KEY = 'jyl_local_payment_orders'
 const MAX_LOCAL_ORDER_COUNT = 40
 const DEFAULT_PAGE_SIZE = 10
-const ORDER_API_PREFIXES = [
-  '/client/orders',
-  '/orders',
-  '/client/payments/orders'
-]
-
-let cachedOrderApiPrefix = ''
+const ORDER_API_BASE_PATH = '/client/payments/orders'
 
 function getStorageValue(key) {
   try {
@@ -342,44 +335,11 @@ function buildLocalListResponse(params = {}, fallbackReason = '') {
   }
 }
 
-function resolveOrderApiPrefixes() {
-  if (!cachedOrderApiPrefix) {
-    const storedPrefix = normalizeString(getStorageValue(ORDER_API_PREFIX_STORAGE_KEY))
-    if (ORDER_API_PREFIXES.includes(storedPrefix)) {
-      cachedOrderApiPrefix = storedPrefix
-    }
-  }
-
-  if (!cachedOrderApiPrefix) {
-    return ORDER_API_PREFIXES.slice()
-  }
-
-  return [cachedOrderApiPrefix].concat(
-    ORDER_API_PREFIXES.filter((prefix) => prefix !== cachedOrderApiPrefix)
-  )
-}
-
 async function requestOrderApi({
   path = '',
   data = {}
 } = {}) {
-  const prefixList = resolveOrderApiPrefixes()
-  let lastError = null
-
-  for (let index = 0; index < prefixList.length; index += 1) {
-    const prefix = prefixList[index]
-
-    try {
-      const payload = await request.get(`${prefix}${path}`, data, { timeout: 5000 })
-      cachedOrderApiPrefix = prefix
-      setStorageValue(ORDER_API_PREFIX_STORAGE_KEY, prefix)
-      return payload
-    } catch (error) {
-      lastError = error
-    }
-  }
-
-  throw lastError || new Error('订单接口暂不可用')
+  return request.get(`${ORDER_API_BASE_PATH}${path}`, data, { timeout: 5000 })
 }
 
 function extractRemoteOrderList(payload = {}) {
@@ -476,12 +436,31 @@ function findLocalOrder({ orderId = null, orderNo = '' } = {}) {
     }) || null
 }
 
+function buildRemoteListQuery(params = {}) {
+  const page = Math.max(1, normalizeNumber(params.page, 1))
+  const limit = Math.max(1, normalizeNumber(params.page_size || params.pageSize || params.limit, DEFAULT_PAGE_SIZE))
+  const offset = Math.max(0, normalizeNumber(params.offset, (page - 1) * limit))
+  const status = normalizeString(params.status)
+
+  const query = {
+    offset,
+    limit
+  }
+
+  if (status) {
+    query.status = status
+  }
+
+  return query
+}
+
 class OrderService {
   async listOrders(params = {}) {
     try {
+      const remoteQuery = buildRemoteListQuery(params)
       const remotePayload = await requestOrderApi({
         path: '',
-        data: params
+        data: remoteQuery
       })
       const remoteOrders = extractRemoteOrderList(remotePayload)
         .map((item) => normalizeOrder(item))
@@ -506,9 +485,9 @@ class OrderService {
       return {
         source: 'remote',
         total: normalizeNumber(firstDefined(remotePayload, ['total']), mergedOrders.length),
-        page: Math.max(1, normalizeNumber(firstDefined(remotePayload, ['page']), params.page || 1)),
-        page_size: Math.max(1, normalizeNumber(firstDefined(remotePayload, ['page_size', 'pageSize']), params.page_size || params.pageSize || DEFAULT_PAGE_SIZE)),
-        has_more: !!firstDefined(remotePayload, ['has_more', 'hasMore']),
+        page: Math.max(1, normalizeNumber(params.page, 1)),
+        page_size: remoteQuery.limit,
+        has_more: remoteQuery.offset + remoteQuery.limit < normalizeNumber(firstDefined(remotePayload, ['total']), mergedOrders.length),
         orders: mergedOrders
       }
     } catch (error) {
@@ -560,6 +539,32 @@ class OrderService {
       return mergeOrderRecord(remoteOrder, findLocalOrder({ orderNo: normalizedOrderNo }))
     } catch (error) {
       const localOrder = findLocalOrder({ orderNo: normalizedOrderNo })
+      if (localOrder) {
+        return localOrder
+      }
+
+      throw error
+    }
+  }
+
+  async getOrderStatus(orderId) {
+    const normalizedOrderId = normalizeString(orderId)
+    if (!normalizedOrderId) {
+      return Promise.reject(new Error('缺少订单 ID'))
+    }
+
+    try {
+      const remotePayload = await requestOrderApi({
+        path: `/${encodeURIComponent(normalizedOrderId)}/status`
+      })
+      const remoteOrder = normalizeOrder(extractRemoteDetail(remotePayload))
+      if (!remoteOrder) {
+        throw new Error('未找到订单状态信息')
+      }
+
+      return mergeOrderRecord(remoteOrder, findLocalOrder({ orderId: normalizedOrderId }))
+    } catch (error) {
+      const localOrder = findLocalOrder({ orderId: normalizedOrderId })
       if (localOrder) {
         return localOrder
       }

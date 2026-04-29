@@ -142,6 +142,44 @@ Page({
     }
   },
 
+  async loadOrderStatus() {
+    if (this.data.loading) {
+      return
+    }
+
+    const orderId = String(this.data.orderId || '').trim()
+    if (!orderId) {
+      this.loadOrderDetail()
+      return
+    }
+
+    this.setData({
+      loading: true,
+      errorMessage: ''
+    })
+
+    try {
+      const orderStatusDetail = await orderService.getOrderStatus(orderId)
+      if (!orderStatusDetail) {
+        throw new Error('未找到订单状态信息')
+      }
+
+      this.setData({
+        order: this.decorateOrder(orderStatusDetail),
+        orderId: String(orderStatusDetail.orderId || orderId),
+        orderNo: String(orderStatusDetail.orderNo || this.data.orderNo || '')
+      })
+    } catch (error) {
+      this.setData({
+        errorMessage: error?.message || '刷新失败，请稍后重试'
+      })
+    } finally {
+      this.setData({
+        loading: false
+      })
+    }
+  },
+
   decorateOrder(order = {}) {
     const status = String(order.status || 'pending').trim() || 'pending'
     const quantity = Math.max(1, Number(order.quantity) || 1)
@@ -202,6 +240,11 @@ Page({
   },
 
   refreshOrder() {
+    if (this.data.orderId) {
+      this.loadOrderStatus()
+      return
+    }
+
     this.loadOrderDetail()
   },
 
