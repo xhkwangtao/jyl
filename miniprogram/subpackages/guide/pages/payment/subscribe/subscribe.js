@@ -16,8 +16,8 @@ const {
 const DEFAULT_PRICE = 7.8
 const DEFAULT_ORIGINAL_PRICE = 69
 const DEFAULT_CURRENCY = 'CNY'
-const DEFAULT_FEATURE_NAME = 'VIP尊享功能'
-const DEFAULT_DESCRIPTION = '已有98%游客选择，剩余名额不多'
+const DEFAULT_FEATURE_NAME = '研学道具'
+const DEFAULT_DESCRIPTION = '购买成功后请去游客中心索取研学道具'
 const REMOTE_HERO_IMAGE = 'https://hyg-cdn.flexai.cc/common/xiaoyingdongzuo.png'
 const LOCAL_HERO_IMAGE = '/images/ai-assistant-xiaoying.png'
 const VIP_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.VIP
@@ -62,7 +62,7 @@ const FEATURE_CONFIG = {
     },
     [PAID_FEATURE_KEYS.VIP]: {
         title: DEFAULT_FEATURE_NAME,
-        description: '开通后即可体验小九的完整智能陪游服务'
+        description: DEFAULT_DESCRIPTION
     }
 }
 
@@ -282,34 +282,35 @@ Page(withPageAnalytics('/subpackages/guide/pages/payment/subscribe/subscribe', {
     },
 
     showServiceAgreement() {
-        const content = `九眼楼AI伴游助手服务协议
+        const content = `九眼楼研学道具购买服务协议
 
 一、服务说明
-本协议是您与九眼楼AI伴游助手之间关于使用VIP会员服务的协议。购买VIP会员后，您将享有以下权益：
-• AI智能导游服务（景点讲解、路线规划）
-• 语音交互功能
-• 优先客服支持
+本协议是您与九眼楼景区之间关于购买研学道具服务的协议。购买成功后，您可凭订单信息前往游客中心索取对应研学道具。
+• 研学道具以页面展示内容为准
+• 支付完成后请凭订单信息领取
+• 如有疑问可咨询现场工作人员
 
 二、费用与支付
-• VIP会员费用以页面显示价格为准
-• 支付完成后会员权益立即生效
+• 研学道具费用以页面显示价格为准
+• 支付完成后订单立即生效
 • 如有优惠活动以实际支付页面为准
 
-三、服务期限
-• VIP会员服务期限为购买之日起24小时
-• 服务到期后部分功能将受限
+三、领取说明
+• 购买成功后请前往游客中心索取研学道具
+• 请在景区开放时间内完成领取
+• 如遇缺货或特殊情况，请以现场安排为准
 
 四、退款政策
-• 购买后如遇技术故障导致无法正常使用，可申请退款
+• 购买后如遇系统异常导致无法正常领取，可申请退款
 • 退款申请请联系客服，我们将在3-5个工作日内处理
 
 五、用户义务
-• 合理使用服务，不得恶意刷量或滥用
-• 保护账号安全，不得转让或共享
+• 妥善保管订单信息，便于现场核验领取
+• 请按景区要求有序领取和使用相关道具
 • 遵守相关法律法规和平台规则
 
 六、免责声明
-• 因不可抗力因素导致的服务中断，平台不承担责任
+• 因不可抗力因素导致暂时无法领取，平台不承担责任
 • 用户自身原因导致的损失，平台不承担责任
 
 七、服务变更
@@ -429,7 +430,7 @@ Page(withPageAnalytics('/subpackages/guide/pages/payment/subscribe/subscribe', {
             })
 
             wx.showToast({
-                title: `已开通${this.data.featureName}`,
+                title: '购买成功',
                 icon: 'success',
                 duration: 1400
             })

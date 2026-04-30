@@ -1,4 +1,4 @@
-<universal-navigation title="开通VIP" theme="light" backgroundColor="rgba(0, 0, 0, 0.3)" showHomeButton="{{true}}" showUserAvatar="{{false}}" useCapsuleStyle="{{true}}" useDefaultBack="{{true}}" bind:home="onGoHome" />
+<universal-navigation title="购买研学道具" theme="light" backgroundColor="rgba(0, 0, 0, 0.3)" showHomeButton="{{true}}" showUserAvatar="{{false}}" useCapsuleStyle="{{true}}" useDefaultBack="{{true}}" bind:home="onGoHome" />
 
 <view class="subscribe-page">
   <view class="background-gradient"></view>
@@ -14,9 +14,9 @@
   </view>
 
   <view class="title-section">
-    <text class="main-title">欢迎来到九眼楼</text>
-    <text class="subtitle">我是小九，您的专属智能导游，</text>
-    <text class="subtitle">有任何旅行问题都可以找我哦！</text>
+    <text class="main-title">购买研学道具</text>
+    <text class="subtitle">当前提供统一研学道具套装</text>
+    <text class="subtitle">支付完成后请前往游客中心领取</text>
   </view>
 
   <view class="ai-character-section">
@@ -28,18 +28,18 @@
     </view>
 
     <view class="feature-tags">
-      <view class="feature-tag tag-1">景点讲解</view>
-      <view class="feature-tag tag-2">AI聊天</view>
-      <view class="feature-tag tag-3">路线规划</view>
-      <view class="feature-tag tag-5">景点导航</view>
+      <view class="feature-tag tag-1">研学手册</view>
+      <view class="feature-tag tag-2">任务卡片</view>
+      <view class="feature-tag tag-3">集章打卡</view>
+      <view class="feature-tag tag-5">游客中心领取</view>
     </view>
   </view>
 
   <view class="purchase-card">
-    <view class="sale-badge">抢购中</view>
+    <view class="sale-badge">统一套装</view>
     <view class="card-content">
-      <text class="promotion-title">限时特惠·立即购买</text>
-      <text class="promotion-subtitle">已有98%游客选择，剩余名额不多</text>
+      <text class="promotion-title">研学道具统一套装</text>
+      <text class="promotion-subtitle">支付完成后凭订单前往游客中心领取</text>
       <view class="price-section">
         <text class="price-symbol">¥</text>
         <text class="price-value">{{displayAmount}}</text>
@@ -50,7 +50,8 @@
     </view>
   </view>
 
-  <button class="purchase-button" loading="{{loading}}" disabled="{{loading}}" bindtap="handlePay">立即购买</button>
+  <button class="purchase-button" loading="{{loading}}" disabled="{{loading}}" bindtap="handlePay">确认购买</button>
+  <view class="pickup-notice">购买成功后请去游客中心索取研学道具</view>
 
   <view class="agreement-section">
     <view class="agreement-checkbox-hitbox" bindtap="toggleAgreement">

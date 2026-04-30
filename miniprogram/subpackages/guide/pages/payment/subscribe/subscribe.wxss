@@ -410,6 +410,18 @@
   box-shadow: 0 4rpx 12rpx rgba(44, 237, 184, 0.5);
 }
 
+.pickup-notice {
+  position: absolute;
+  right: 48rpx;
+  bottom: 142rpx;
+  left: 48rpx;
+  color: #3c4b58;
+  font-size: 24rpx;
+  line-height: 36rpx;
+  text-align: center;
+  z-index: 15;
+}
+
 .agreement-section {
   position: fixed;
   right: 0;
@@ -503,7 +515,7 @@
 
 .payment-error {
   position: absolute;
-  bottom: 100rpx;
+  bottom: 180rpx;
   left: 50%;
   padding: 10rpx 20rpx;
   color: #ef4444;
