@@ -16,8 +16,8 @@ const {
 const DEFAULT_PRICE = 7.8
 const DEFAULT_ORIGINAL_PRICE = 69
 const DEFAULT_CURRENCY = 'CNY'
-const DEFAULT_FEATURE_NAME = 'VIP尊享功能'
-const DEFAULT_DESCRIPTION = '已有98%游客选择，剩余名额不多'
+const DEFAULT_FEATURE_NAME = '研学道具'
+const DEFAULT_DESCRIPTION = '购买成功后请前往游客中心索取您购买的研学道具'
 const REMOTE_HERO_IMAGE = 'https://hyg-cdn.flexai.cc/common/xiaoyingdongzuo.png'
 const LOCAL_HERO_IMAGE = '/images/ai-assistant-xiaoying.png'
 const VIP_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.VIP
@@ -33,36 +33,36 @@ const VIP_ENTITLED_FEATURE_KEYS = new Set([
 
 const FEATURE_CONFIG = {
     [PAID_FEATURE_KEYS.AI_CHAT]: {
-        title: 'AI智能对话',
-        description: '体验AI智能导览对话需要VIP权限'
+        title: DEFAULT_FEATURE_NAME,
+        description: DEFAULT_DESCRIPTION
     },
     [PAID_FEATURE_KEYS.AI_CHAT_VOICE]: {
-        title: 'AI语音对话',
-        description: '体验AI语音对话功能需要VIP权限'
+        title: DEFAULT_FEATURE_NAME,
+        description: DEFAULT_DESCRIPTION
     },
     [PAID_FEATURE_KEYS.MAP_AUDIO_PLAY]: {
-        title: '景点语音讲解',
-        description: '解锁景点语音讲解与沉浸式导览体验'
+        title: DEFAULT_FEATURE_NAME,
+        description: DEFAULT_DESCRIPTION
     },
     [PAID_FEATURE_KEYS.MAP_ROUTE_PLANNING]: {
-        title: '智能路线规划',
-        description: '解锁 AI 推荐路线与游览规划能力'
+        title: DEFAULT_FEATURE_NAME,
+        description: DEFAULT_DESCRIPTION
     },
     [PAID_FEATURE_KEYS.MAP_NAVIGATION_START]: {
-        title: '景点导航',
-        description: '解锁前往景点的智能导航能力'
+        title: DEFAULT_FEATURE_NAME,
+        description: DEFAULT_DESCRIPTION
     },
     [PAID_FEATURE_KEYS.MAP_PHOTO_TUTORIAL]: {
-        title: '拍照打卡指引',
-        description: '查看拍照打卡指引需要VIP权限'
+        title: DEFAULT_FEATURE_NAME,
+        description: DEFAULT_DESCRIPTION
     },
     [PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE]: {
-        title: 'AI研学报告',
-        description: '生成专属AI研学报告需要开通权益'
+        title: DEFAULT_FEATURE_NAME,
+        description: DEFAULT_DESCRIPTION
     },
     [PAID_FEATURE_KEYS.VIP]: {
         title: DEFAULT_FEATURE_NAME,
-        description: '开通后即可体验小九的完整智能陪游服务'
+        description: DEFAULT_DESCRIPTION
     }
 }
 
@@ -94,6 +94,19 @@ function formatAmount(amount) {
     }
 
     return numeric.toFixed(2)
+}
+
+function normalizeDisplayFeatureName(value) {
+    const text = String(value || '').trim()
+    if (!text) {
+        return DEFAULT_FEATURE_NAME
+    }
+
+    if (/vip/i.test(text) || text.includes('会员') || text.includes('权益')) {
+        return DEFAULT_FEATURE_NAME
+    }
+
+    return text
 }
 
 function grantPaidAccess(featureKey = '') {
@@ -172,10 +185,12 @@ Page(withPageAnalytics('/subpackages/guide/pages/payment/subscribe/subscribe', {
         const featureConfig = FEATURE_CONFIG[featureKey] || FEATURE_CONFIG[VIP_ACCESS_FEATURE_KEY]
         const amount = Number(options.amount)
         const originalPrice = Number(options.originalPrice)
-        const featureName = safeDecode(options.featureName)
+        const featureName = normalizeDisplayFeatureName(
+            safeDecode(options.featureName)
             || safeDecode(options.productName)
             || featureConfig.title
             || DEFAULT_FEATURE_NAME
+        )
         const description = safeDecode(options.description)
             || featureConfig.description
             || DEFAULT_DESCRIPTION
@@ -226,7 +241,7 @@ Page(withPageAnalytics('/subpackages/guide/pages/payment/subscribe/subscribe', {
             const pricePayload = await paymentService.getProductPrice(productCode)
             const currentAmount = centsToYuan(pricePayload.current_amount_cents)
             const originalAmount = centsToYuan(pricePayload.original_amount_cents)
-            const remoteProductName = safeDecode(pricePayload.product_name)
+            const remoteProductName = normalizeDisplayFeatureName(safeDecode(pricePayload.product_name))
             const remoteDescription = safeDecode(pricePayload.description)
             const currentFeatureName = String(this.data.featureName || '').trim()
             const currentDescription = String(this.data.description || '').trim()
@@ -282,43 +297,44 @@ Page(withPageAnalytics('/subpackages/guide/pages/payment/subscribe/subscribe', {
     },
 
     showServiceAgreement() {
-        const content = `九眼楼AI伴游助手服务协议
+        const content = `九眼楼研学道具购买须知
 
 一、服务说明
-本协议是您与九眼楼AI伴游助手之间关于使用VIP会员服务的协议。购买VIP会员后，您将享有以下权益：
-• AI智能导游服务（景点讲解、路线规划）
-• 语音交互功能
-• 优先客服支持
+本页面用于购买九眼楼研学道具。购买成功后，请前往游客中心索取您购买的研学道具。
+• 商品内容以页面展示信息为准
+• 每笔订单默认购买一套研学道具
+• 如现场发放规则调整，以景区实际通知为准
 
 二、费用与支付
-• VIP会员费用以页面显示价格为准
-• 支付完成后会员权益立即生效
+• 研学道具费用以页面显示价格为准
+• 支付完成后订单即生效
 • 如有优惠活动以实际支付页面为准
 
-三、服务期限
-• VIP会员服务期限为购买之日起24小时
-• 服务到期后部分功能将受限
+三、领取说明
+• 购买成功后请前往游客中心领取
+• 领取时请出示订单信息或支付记录
+• 如遇特殊情况，请联系现场工作人员
 
 四、退款政策
-• 购买后如遇技术故障导致无法正常使用，可申请退款
-• 退款申请请联系客服，我们将在3-5个工作日内处理
+• 如因系统异常导致重复支付或无法下单，可联系客服处理
+• 其他情况以景区现场规则和平台规则为准
 
 五、用户义务
-• 合理使用服务，不得恶意刷量或滥用
+• 请妥善保管订单信息，便于现场领取核验
 • 保护账号安全，不得转让或共享
 • 遵守相关法律法规和平台规则
 
 六、免责声明
-• 因不可抗力因素导致的服务中断，平台不承担责任
+• 因不可抗力或现场运营安排调整导致的发放变化，请以景区通知为准
 • 用户自身原因导致的损失，平台不承担责任
 
 七、服务变更
-平台有权在法律允许范围内调整服务内容，重大变更将提前通知用户。
+平台有权在法律允许范围内调整商品说明与领取规则，重大变更将提前通知用户。
 
 联系我们：如有疑问请联系客服`
 
         wx.showModal({
-            title: '服务协议',
+            title: '购买须知',
             content,
             showCancel: true,
             cancelText: '返回',
@@ -392,7 +408,7 @@ Page(withPageAnalytics('/subpackages/guide/pages/payment/subscribe/subscribe', {
 
         if (!this.data.agreed) {
             wx.showToast({
-                title: '请先同意服务协议和隐私政策',
+                title: '请先同意购买须知和隐私政策',
                 icon: 'none',
                 duration: 2000
             })
@@ -429,7 +445,7 @@ Page(withPageAnalytics('/subpackages/guide/pages/payment/subscribe/subscribe', {
             })
 
             wx.showToast({
-                title: `已开通${this.data.featureName}`,
+                title: '购买成功',
                 icon: 'success',
                 duration: 1400
             })

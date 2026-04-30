@@ -13,8 +13,8 @@
   <rect x="10" y="20" width="100" height="80" rx="12" ry="12" fill="url(#vipGradient)" filter="url(#shadow)"/>
   <rect x="12" y="22" width="96" height="76" rx="10" ry="10" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
 
-  <text x="60" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">VIP</text>
-  <text x="60" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="rgba(255,255,255,0.9)">会员</text>
+  <text x="60" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="white">研学</text>
+  <text x="60" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="rgba(255,255,255,0.9)">道具</text>
 
   <polygon points="25,35 27,40 32,40 28,43 30,48 25,45 20,48 22,43 18,40 23,40" fill="rgba(255,255,255,0.6)"/>
   <polygon points="95,35 97,40 102,40 98,43 100,48 95,45 90,48 92,43 88,40 93,40" fill="rgba(255,255,255,0.6)"/>
