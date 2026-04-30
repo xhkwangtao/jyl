@@ -82,9 +82,9 @@ const GUIDE_MAP_VIEWPORT_STATE_KEY = 'guideMapViewportState'
 const VIEWPORT_COORDINATE_EPSILON = 0.000005
 const AI_CHAT_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
 const AI_CHAT_PAYMENT_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
-const AI_CHAT_SUBSCRIBE_DESCRIPTION = '开通VIP后即可使用AI聊天与智能路线问答服务'
 const MAP_ROUTE_PLANNING_FEATURE_KEY = PAID_FEATURE_KEYS.MAP_ROUTE_PLANNING
 const MAP_NAVIGATION_START_FEATURE_KEY = PAID_FEATURE_KEYS.MAP_NAVIGATION_START
+const FEATURE_REQUIRES_TEACHING_TOOL_TOAST = '该功能需要配合研学教具使用'
 let SOURCE_ROUTE_POLYLINES = []
 let ALL_ROUTE_DISPLAY_POINTS = []
 let ALL_AUDIO_POI_POINTS = []
@@ -3418,6 +3418,23 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
     this.refreshAudioAccessState()
   },
 
+  async ensureMapFeatureAccess(featureKey = '') {
+    const permissionGuard = this.getPermissionGuard()
+    if (!permissionGuard) {
+      return false
+    }
+
+    const accessResult = await permissionGuard.ensureFeatureAccess({
+      featureKey,
+      showLoginToast: true,
+      redirectOnDenied: false,
+      showDeniedToast: true,
+      deniedToastTitle: FEATURE_REQUIRES_TEACHING_TOOL_TOAST
+    })
+
+    return !!accessResult.allowed
+  },
+
   syncCurrentPopupDataWithAudioAccess(options = {}) {
     const popupData = this.data.currentPopupData
     if (!popupData) {
@@ -6134,7 +6151,7 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
     this.handlePoiPopupAction(actionType, popupData)
   },
 
-  onNavigatePoi() {
+  async onNavigatePoi() {
     const popupData = this.data.currentPopupData
     if (!popupData) {
       return
@@ -6150,12 +6167,7 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
       return
     }
 
-    if (!this.requireMapVipAccess(MAP_NAVIGATION_START_FEATURE_KEY, {
-      action: 'navigate',
-      poiId: point.id || point.markerId || '',
-      poiName: point.name || popupData.poiName || popupData.title || '',
-      successRedirect: buildPoiNavigationPageUrl(point)
-    })) {
+    if (!await this.ensureMapFeatureAccess(MAP_NAVIGATION_START_FEATURE_KEY)) {
       return
     }
 
@@ -7050,12 +7062,8 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
     })
   },
 
-  onIntelligentRoutePlanning() {
-    if (!this.requireMapVipAccess(MAP_ROUTE_PLANNING_FEATURE_KEY, {
-      action: 'intelligent_route_planning',
-      poiName: '智能路线规划',
-      successRedirect: `${GUIDE_MAP_PAGE}?showAIRoute=1`
-    })) {
+  async onIntelligentRoutePlanning() {
+    if (!await this.ensureMapFeatureAccess(MAP_ROUTE_PLANNING_FEATURE_KEY)) {
       return
     }
 
@@ -7106,74 +7114,22 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
     return this.selectedIntelligentRoute || null
   },
 
-  hasAIChatAccess() {
-    return isFeaturePaid(AI_CHAT_ACCESS_FEATURE_KEY)
-  },
-
-  hasVipAccess() {
-    return isFeaturePaid(PAID_FEATURE_KEYS.VIP)
-  },
-
-  buildAIChatSubscribeUrl(targetUrl = '') {
-    return `${GUIDE_SUBSCRIBE_PAGE}?feature=${encodeURIComponent(AI_CHAT_PAYMENT_FEATURE_KEY)}&featureName=${encodeURIComponent('AI智能对话')}&productName=${encodeURIComponent('AI聊天权限')}&description=${encodeURIComponent(AI_CHAT_SUBSCRIBE_DESCRIPTION)}${targetUrl ? `&successRedirect=${encodeURIComponent(targetUrl)}` : ''}`
-  },
-
-  redirectToAIChatSubscribe(targetUrl = '') {
-    const subscribeUrl = this.buildAIChatSubscribeUrl(targetUrl)
-
-    navigateToPage(subscribeUrl)
-  },
-
-  buildMapVipPaymentUrl(featureKey, context = {}) {
-    const metaByFeatureKey = {
-      [MAP_ROUTE_PLANNING_FEATURE_KEY]: {
-        featureName: '智能路线规划',
-        productName: '智能路线规划权限',
-        description: '使用智能路线规划功能需要VIP权限'
-      },
-      [MAP_NAVIGATION_START_FEATURE_KEY]: {
-        featureName: '景点导航',
-        productName: '地图互动权限',
-        description: '继续使用地图互动功能需要VIP权限'
-      }
-    }
-
-    const meta = metaByFeatureKey[featureKey] || {
-      featureName: 'VIP尊享功能',
-      productName: '地图互动权限',
-      description: '使用此功能需要VIP权限'
-    }
-    const successRedirect = String(context.successRedirect || '').trim()
-
-    return `${GUIDE_SUBSCRIBE_PAGE}?feature=${encodeURIComponent(featureKey)}&featureName=${encodeURIComponent(meta.featureName)}&productName=${encodeURIComponent(meta.productName)}&description=${encodeURIComponent(meta.description)}${successRedirect ? `&successRedirect=${encodeURIComponent(successRedirect)}` : ''}`
-  },
-
-  requireMapVipAccess(featureKey, context = {}) {
-    if (isFeaturePaid(featureKey)) {
-      return true
-    }
-
-    navigateToPage(this.buildMapVipPaymentUrl(featureKey, context))
-    return false
-  },
-
-  onOpenAIChat(event) {
+  async onOpenAIChat(event) {
     const detail = event?.detail || {}
     const route = this.resolveAIChatRoute(detail)
 
     if (route) {
-      const app = getApp()
       const routeInfo = buildRouteAIChatInfo(route, detail.message)
       const targetUrl = buildRouteAIChatPageUrl(route, detail.message)
 
+      if (!await this.ensureMapFeatureAccess(AI_CHAT_PAYMENT_FEATURE_KEY)) {
+        return
+      }
+
+      const app = getApp()
       if (routeInfo && app) {
         app.globalData = app.globalData || {}
         app.globalData.aiChatRouteInfo = routeInfo
-      }
-
-      if (!this.hasAIChatAccess()) {
-        this.redirectToAIChatSubscribe(targetUrl)
-        return
       }
 
       navigateToPage(targetUrl)
@@ -7182,8 +7138,7 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
 
     const targetUrl = buildDefaultAIChatPageUrl(detail.message)
 
-    if (!this.hasAIChatAccess()) {
-      this.redirectToAIChatSubscribe(targetUrl)
+    if (!await this.ensureMapFeatureAccess(AI_CHAT_PAYMENT_FEATURE_KEY)) {
       return
     }
 

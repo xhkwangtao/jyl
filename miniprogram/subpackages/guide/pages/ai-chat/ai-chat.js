@@ -20,26 +20,12 @@ const {
 } = require('../../../../utils/with-page-analytics')
 const {
   GUIDE_MAP_PAGE,
-  GUIDE_MAP_ROUTE,
-  GUIDE_AI_CHAT_PAGE,
-  GUIDE_SUBSCRIBE_PAGE
+  GUIDE_MAP_ROUTE
 } = require('../../../../utils/guide-routes')
 
 const AI_CHAT_TEXT_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
 const AI_CHAT_VOICE_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT_VOICE
-
-const AI_CHAT_PAYWALL_CONFIG = {
-  [AI_CHAT_TEXT_FEATURE_KEY]: {
-    featureName: 'AI智能对话',
-    productName: 'AI聊天权限',
-    description: '体验AI智能导览对话需要VIP权限'
-  },
-  [AI_CHAT_VOICE_FEATURE_KEY]: {
-    featureName: 'AI语音对话',
-    productName: 'AI语音聊天权限',
-    description: '体验AI语音对话功能需要VIP权限'
-  }
-}
+const FEATURE_REQUIRES_TEACHING_TOOL_TOAST = '该功能需要配合研学教具使用'
 
 const MOCK_MESSAGES = [
   createAIMessage(
@@ -1353,46 +1339,13 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
       return true
     }
 
-    this.navigateToVipPayment(featureKey)
-    return false
-  },
-
-  getCurrentPageUrl() {
-    const options = this.entryOptions || {}
-    const query = Object.keys(options).reduce((result, key) => {
-      const value = options[key]
-
-      if (value === undefined || value === null || value === '') {
-        return result
-      }
-
-      result.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(safeDecodeURIComponent(value)))}`)
-      return result
-    }, []).join('&')
-
-    return query ? `${GUIDE_AI_CHAT_PAGE}?${query}` : GUIDE_AI_CHAT_PAGE
-  },
-
-  navigateToVipPayment(featureKey = AI_CHAT_TEXT_FEATURE_KEY) {
-    const subscribeConfig = AI_CHAT_PAYWALL_CONFIG[featureKey] || AI_CHAT_PAYWALL_CONFIG[AI_CHAT_TEXT_FEATURE_KEY]
-    const app = getApp()
-    const successRedirectUrl = this.getCurrentPageUrl()
-
-    if (this.data.entryRouteInfo && app) {
-      app.globalData = app.globalData || {}
-      app.globalData.aiChatRouteInfo = this.data.entryRouteInfo
-    }
-
-    const subscribeUrl = `${GUIDE_SUBSCRIBE_PAGE}?feature=${encodeURIComponent(featureKey)}&featureName=${encodeURIComponent(subscribeConfig.featureName)}&productName=${encodeURIComponent(subscribeConfig.productName)}&description=${encodeURIComponent(subscribeConfig.description)}&successRedirect=${encodeURIComponent(successRedirectUrl)}`
-
-    wx.navigateTo({
-      url: subscribeUrl,
-      fail: () => {
-        wx.redirectTo({
-          url: subscribeUrl
-        })
-      }
+    wx.showToast({
+      title: FEATURE_REQUIRES_TEACHING_TOOL_TOAST,
+      icon: 'none',
+      duration: 1800
     })
+
+    return false
   },
 
   getPermissionGuard() {

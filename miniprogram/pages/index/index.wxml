@@ -1,5 +1,5 @@
 <view class="index-page">
-  <permission-guard id="permissionGuard"></permission-guard>
+  <permission-guard id="permissionGuard" bind:permissionrefresh="onPermissionRefresh"></permission-guard>
 
   <custom-status-bar
     user-name="{{statusUserName}}"

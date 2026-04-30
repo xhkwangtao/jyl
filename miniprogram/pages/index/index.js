@@ -19,9 +19,10 @@ const {
   GUIDE_AUDIO_LIST_PAGE
 } = require('../../utils/guide-routes')
 const studyReportService = require('../../services/study-report-service')
+const entitlementService = require('../../services/entitlement-service')
 const {
   PAID_FEATURE_KEYS
-} = require('../../services/entitlement-service')
+} = entitlementService
 const {
   checkCurrentLocationInScenicArea,
   buildScenicVideoAccessDeniedMessage
@@ -32,11 +33,11 @@ const {
 
 const AI_CHAT_PAYMENT_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
 const STUDY_REPORT_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.STUDY_REPORT_GENERATE
-const AI_CHAT_SUBSCRIBE_DESCRIPTION = '开通VIP后即可使用AI聊天与智能问答服务'
-const AI_CHAT_SUCCESS_REDIRECT_URL = GUIDE_AI_CHAT_PAGE
+const FEATURE_REQUIRES_TEACHING_TOOL_TOAST = '该功能需要配合研学教具使用'
 const CHECK_IN_CARD_TITLE = '守城认证中心'
 const CHECK_IN_CARD_DESCRIPTION = '提交你的边关答卷，生成专属AI研学报告\n看看六百年后，你将成为怎样的守城人。'
-const CHECK_IN_CARD_ACTION = '点击上传答题卡'
+const CHECK_IN_CARD_UNLOCKED_ACTION = '点击上传答题卡'
+const CHECK_IN_CARD_LOCKED_ACTION = '获取研学教具'
 const STAFF_STUDY_REPORT_PAGE = '/pages/staff-study-report/staff-study-report'
 const STATUS_BAR_GUEST_NAME = '游客'
 const STATUS_BAR_GUEST_AVATAR_SRC = '/images/icons/user.svg'
@@ -56,7 +57,7 @@ Page(withPageAnalytics('/pages/index/index', {
     statusUserAvatarSrc: STATUS_BAR_GUEST_AVATAR_SRC,
     checkInTitle: CHECK_IN_CARD_TITLE,
     checkInDescription: CHECK_IN_CARD_DESCRIPTION,
-    checkInAction: CHECK_IN_CARD_ACTION,
+    checkInAction: CHECK_IN_CARD_LOCKED_ACTION,
     featureVideoVisible: false,
     featureVideoTitle: '边关重启',
     featureVideoSrc: '',
@@ -83,6 +84,7 @@ Page(withPageAnalytics('/pages/index/index', {
 
   onReady() {
     this.permissionGuard = this.selectComponent('#permissionGuard')
+    this.prefetchHomeFeatureAccess().catch(() => {})
   },
 
   onShow() {
@@ -103,11 +105,12 @@ Page(withPageAnalytics('/pages/index/index', {
         this.syncStatusBarUser()
 
         if (!hasLogin) {
-          return
+          return this.prefetchHomeFeatureAccess()
         }
 
         return this.syncCurrentUserProfile()
           .then(() => this.syncLatestStudyReport())
+          .then(() => this.prefetchHomeFeatureAccess())
           .then(() => {
             this.syncStatusBarUser()
             this.syncCheckInEntry()
@@ -145,9 +148,12 @@ Page(withPageAnalytics('/pages/index/index', {
       this.syncCurrentUserProfile(),
       this.syncLatestStudyReport()
     ]).finally(() => {
-      this.syncStatusBarUser()
-      this.syncCheckInEntry()
-      wx.stopPullDownRefresh()
+      this.prefetchHomeFeatureAccess()
+        .finally(() => {
+          this.syncStatusBarUser()
+          this.syncCheckInEntry()
+          wx.stopPullDownRefresh()
+        })
     })
   },
 
@@ -490,6 +496,26 @@ Page(withPageAnalytics('/pages/index/index', {
     return this.permissionGuard || null
   },
 
+  async prefetchHomeFeatureAccess() {
+    const permissionGuard = this.getPermissionGuard()
+
+    if (!permissionGuard) {
+      this.syncCheckInEntry()
+      return
+    }
+
+    try {
+      await permissionGuard.prefetchFeatureAccessList([
+        AI_CHAT_PAYMENT_FEATURE_KEY,
+        STUDY_REPORT_ACCESS_FEATURE_KEY
+      ], {
+        ensureLogin: false
+      })
+    } finally {
+      this.syncCheckInEntry()
+    }
+  },
+
   async ensureAIChatAccess() {
     const permissionGuard = this.getPermissionGuard()
     if (!permissionGuard) {
@@ -498,11 +524,10 @@ Page(withPageAnalytics('/pages/index/index', {
 
     const accessResult = await permissionGuard.ensureFeatureAccess({
       featureKey: AI_CHAT_PAYMENT_FEATURE_KEY,
-      featureName: 'AI智能对话',
-      productName: 'AI聊天权限',
-      description: AI_CHAT_SUBSCRIBE_DESCRIPTION,
-      successRedirect: AI_CHAT_SUCCESS_REDIRECT_URL,
-      showLoginToast: true
+      showLoginToast: true,
+      redirectOnDenied: false,
+      showDeniedToast: true,
+      deniedToastTitle: FEATURE_REQUIRES_TEACHING_TOOL_TOAST
     })
 
     return !!accessResult.allowed
@@ -623,6 +648,10 @@ Page(withPageAnalytics('/pages/index/index', {
     this.closeFeatureVideo()
   },
 
+  onPermissionRefresh() {
+    this.syncCheckInEntry()
+  },
+
   syncCheckInEntry() {
     const collectionState = buildSecretCollectionState()
     const totalCount = collectionState.totalCount
@@ -631,11 +660,21 @@ Page(withPageAnalytics('/pages/index/index', {
       totalCount,
       fallbackCount: completedCount
     })
+    const permissionGuard = this.getPermissionGuard()
+    const hasStudyReportAccess = !!(
+      permissionGuard?.isStaffUser?.()
+      || (
+        auth.isLoggedIn()
+        && entitlementService.isFeatureAvailableSync(STUDY_REPORT_ACCESS_FEATURE_KEY)
+      )
+    )
 
     this.setData({
       checkInTitle: CHECK_IN_CARD_TITLE,
       checkInDescription: CHECK_IN_CARD_DESCRIPTION,
-      checkInAction: CHECK_IN_CARD_ACTION,
+      checkInAction: hasStudyReportAccess
+        ? CHECK_IN_CARD_UNLOCKED_ACTION
+        : CHECK_IN_CARD_LOCKED_ACTION,
       checkInTotalCount: totalCount,
       checkInCompletedCount: completedCount,
       checkInDisplayCompletedCount: displayCompletedCount
