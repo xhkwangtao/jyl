@@ -14,9 +14,9 @@ const ORDER_STATUS_TEXT = {
 }
 
 const VIP_STATUS_TEXT = {
-  active: '权益已开通',
-  processing: '权益激活中',
-  pending: '权益待激活'
+  active: '可领取',
+  processing: '准备中',
+  pending: '待领取'
 }
 
 function formatAmountFen(amountFen) {
@@ -50,6 +50,19 @@ function encodeQueryValue(value) {
   return encodeURIComponent(String(value === undefined || value === null ? '' : value))
 }
 
+function normalizeDisplayProductName(value) {
+  const text = String(value || '').trim()
+  if (!text) {
+    return '研学道具'
+  }
+
+  if (/vip/i.test(text) || text.includes('会员') || text.includes('权益')) {
+    return '研学道具'
+  }
+
+  return text
+}
+
 function navigateToPage(url) {
   wx.navigateTo({
     url,
@@ -64,7 +77,7 @@ function navigateToPage(url) {
 function buildSubscribeUrl(order = {}) {
   const productCode = String(order.productCode || 'vip').trim() || 'vip'
   const featureKey = String((order.metadata && order.metadata.feature_key) || productCode || 'vip').trim() || 'vip'
-  const productName = String(order.productName || 'VIP权益').trim() || 'VIP权益'
+  const productName = normalizeDisplayProductName(order.productName || '研学道具')
   const description = String((order.metadata && order.metadata.description) || '继续完成当前订单支付').trim() || '继续完成当前订单支付'
   const queryList = [
     `productCode=${encodeQueryValue(productCode)}`,
@@ -186,9 +199,10 @@ Page(withPageAnalytics('/pages/order-center/detail', {
   decorateOrder(order = {}) {
     const status = String(order.status || 'pending').trim() || 'pending'
     const quantity = Math.max(1, Number(order.quantity) || 1)
+    const productName = normalizeDisplayProductName(order.productName)
     const items = Array.isArray(order.items)
       ? order.items.map((item) => ({
-        title: item.title || order.productName || 'VIP权益',
+        title: normalizeDisplayProductName(item.title || productName || '研学道具'),
         quantity: Math.max(1, Number(item.quantity) || quantity),
         unitAmountText: formatAmountFen(item.unitAmountFen),
         totalAmountText: formatAmountFen(item.totalAmountFen)
@@ -205,6 +219,7 @@ Page(withPageAnalytics('/pages/order-center/detail', {
 
     return {
       ...order,
+      productName,
       status,
       statusText: ORDER_STATUS_TEXT[status] || status,
       vipStatusText: VIP_STATUS_TEXT[String(order.vipStatus || '').trim()] || '',

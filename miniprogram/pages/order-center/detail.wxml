@@ -54,7 +54,7 @@
           <text class="info-value">¥{{order.amountPayableText}}</text>
         </view>
         <view class="info-row" wx:if="{{order.vipStatusText}}">
-          <text class="info-label">权益状态</text>
+          <text class="info-label">领取状态</text>
           <text class="info-value info-value-highlight">{{order.vipStatusText}}</text>
         </view>
         <view class="info-row">
@@ -70,7 +70,7 @@
           <text class="info-value">{{order.paidAtText}}</text>
         </view>
         <view class="info-row" wx:if="{{order.vipExpiresAtText}}">
-          <text class="info-label">权益到期</text>
+          <text class="info-label">领取截止</text>
           <text class="info-value">{{order.vipExpiresAtText}}</text>
         </view>
       </view>
