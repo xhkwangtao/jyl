@@ -6,9 +6,12 @@ const TILE_OVERLAY_MAX_CONCURRENT_LOADS = 4
 const TILE_OVERLAY_RETRY_LIMIT = 2
 const TILE_OVERLAY_RETRY_DELAY_MS = 120
 const TILE_PREFETCH_CONCURRENCY = 2
-const TILE_PREFETCH_DELAY_MS = 180
+const TILE_PREFETCH_DELAY_MS = 80
 const TILE_PREFETCH_ZOOM_OFFSETS = [1, -1]
 const TILE_PREFETCH_MAX_TILES_PER_ZOOM = 18
+const TILE_PREFETCH_MAX_TILES_PER_RING = 24
+const TILE_PREFETCH_SAME_ZOOM_RING_MULTIPLIERS = [0.4, 0.8]
+const TILE_PREFETCH_SAME_ZOOM_MAX_BUFFER_RATIO = 0.18
 const TILE_RETENTION_BUFFER_MULTIPLIER = 2
 const TILE_RETENTION_MAX_BUFFER_RATIO = 0.45
 const TILE_OVERLAY_CACHE_SIZE_MULTIPLIER = 2.2
@@ -195,6 +198,7 @@ Component({
     attached() {
       this._activeTiles = new Map()
       this._activeTileMeta = new Map()
+      this._restorableTileMeta = new Map()
       this._failedTiles = new Map()
       this._tileLocalPathCache = new Map()
       this._tileSourceReadyPromises = new Map()
@@ -224,6 +228,7 @@ Component({
     detached() {
       this.clearAllTiles()
       this._activeTileMeta.clear()
+      this._restorableTileMeta.clear()
       this._tileLocalPathCache.clear()
       this._tileSourceReadyPromises.clear()
       this._tileImageInfoPathCache.clear()
@@ -268,6 +273,10 @@ Component({
         y: Number.isFinite(Number(tile?.y)) ? Number(tile.y) : previousMeta.y,
         z: Number.isFinite(Number(tile?.z)) ? Number(tile.z) : previousMeta.z,
         bounds: tile?.bounds || previousMeta.bounds || null,
+        runtimeSrc: normalizeStringValue(tile?.runtimeSrc) || previousMeta.runtimeSrc || '',
+        sourceCandidates: Array.isArray(tile?.sourceCandidates) && tile.sourceCandidates.length
+          ? tile.sourceCandidates.slice()
+          : (Array.isArray(previousMeta.sourceCandidates) ? previousMeta.sourceCandidates.slice() : []),
         createdAt: previousMeta.createdAt || now,
         lastTouchedAt: now,
         lastVisibleAt: options.visible ? now : (previousMeta.lastVisibleAt || 0)
@@ -612,7 +621,7 @@ Component({
         lastUpdateTime: now
       })
 
-      const requiredTiles = this.calculateVisibleTiles()
+      const requiredTiles = this.prioritizeVisibleTiles(this.calculateVisibleTiles())
       const requiredTileSignature = requiredTiles.map((tile) => tile.stringId).join('|')
       const requiredTileUrlSet = new Set(requiredTiles.map((tile) => tile.url))
       const requiredTileIdSet = new Set(requiredTiles.map((tile) => tile.stringId))
@@ -704,7 +713,7 @@ Component({
       this.loadTilesDirectly(tilesToLoad, updateRequestId)
         .then(({ loadedTiles = [], failedTiles = [] } = {}) => {
           if (updateRequestId !== this._tileUpdateRequestId) {
-            this.removeOverlayEntries(loadedTiles.map((tile) => tile.overlayId || tile.id))
+            this.reconcileStaleLoadedTiles(loadedTiles)
             return
           }
 
@@ -755,6 +764,41 @@ Component({
         })
     },
 
+    prioritizeVisibleTiles(tiles = []) {
+      if (!Array.isArray(tiles) || tiles.length <= 1) {
+        return Array.isArray(tiles) ? tiles.slice() : []
+      }
+
+      let tileXTotal = 0
+      let tileYTotal = 0
+
+      tiles.forEach((tile) => {
+        tileXTotal += Number(tile?.x)
+        tileYTotal += Number(tile?.y)
+      })
+
+      const centerTileX = tileXTotal / tiles.length
+      const centerTileY = tileYTotal / tiles.length
+
+      return tiles
+        .slice()
+        .sort((left, right) => {
+          const leftDistance = Math.abs(Number(left?.x) - centerTileX) + Math.abs(Number(left?.y) - centerTileY)
+          const rightDistance = Math.abs(Number(right?.x) - centerTileX) + Math.abs(Number(right?.y) - centerTileY)
+          if (leftDistance !== rightDistance) {
+            return leftDistance - rightDistance
+          }
+
+          const leftY = Number(left?.y)
+          const rightY = Number(right?.y)
+          if (leftY !== rightY) {
+            return leftY - rightY
+          }
+
+          return Number(left?.x) - Number(right?.x)
+        })
+    },
+
     removeOverlayEntries(overlayEntries) {
       const mapCtx = this.properties.mapCtx
       if (!mapCtx || typeof mapCtx.removeGroundOverlay !== 'function') {
@@ -773,6 +817,42 @@ Component({
           fail: () => {}
         })
       })
+    },
+
+    reconcileStaleLoadedTiles(loadedTiles = []) {
+      if (!Array.isArray(loadedTiles) || !loadedTiles.length) {
+        return
+      }
+
+      const requiredTileUrlSet = new Set(this.calculateVisibleTiles().map((tile) => tile.url))
+      const retainedTileUrlSet = new Set(this.calculateRetainedTiles().map((tile) => tile.url))
+      const reusableTileUrlSet = new Set([
+        ...requiredTileUrlSet,
+        ...retainedTileUrlSet
+      ])
+      const removableOverlayIds = []
+
+      loadedTiles.forEach((tile) => {
+        const sourceUrl = normalizeStringValue(tile?.url)
+        const overlayId = Number(tile?.overlayId || tile?.id)
+
+        if (!sourceUrl || !Number.isFinite(overlayId)) {
+          return
+        }
+
+        if (!reusableTileUrlSet.has(sourceUrl)) {
+          removableOverlayIds.push(overlayId)
+          return
+        }
+
+        this.upsertActiveTileEntry(tile, {
+          visible: requiredTileUrlSet.has(sourceUrl)
+        })
+      })
+
+      if (removableOverlayIds.length) {
+        this.removeOverlayEntries(removableOverlayIds)
+      }
     },
 
     getMiniProgramFileSystemManager() {
@@ -980,15 +1060,30 @@ Component({
         return Promise.resolve([])
       }
 
-      const localStagePromise = shouldCacheTileLocally(sourceUrl)
-        ? this.resolveTileRuntimeSrc(tile).catch(() => sourceUrl)
-        : Promise.resolve(sourceUrl)
+      if (!shouldCacheTileLocally(sourceUrl)) {
+        return Promise.resolve([sourceUrl])
+      }
 
-      return localStagePromise
+      const cachedSourceCandidates = this.buildSnapshotSourceCandidates(sourceUrl, tile?.sourceCandidates)
+      const hasReadyLocalCandidate = cachedSourceCandidates.some((candidate) => candidate && candidate !== sourceUrl)
+      if (hasReadyLocalCandidate) {
+        return Promise.resolve(cachedSourceCandidates)
+      }
+
+      if (isRemoteTileUrl(sourceUrl)) {
+        this.warmTileSourceCacheInBackground(tile)
+        return Promise.resolve([sourceUrl])
+      }
+
+      return this.resolveTileRuntimeSrc(tile)
         .then((stagedPath) => Array.from(new Set([
           normalizeStringValue(stagedPath),
           sourceUrl
         ].filter(Boolean))))
+    },
+
+    warmTileSourceCacheInBackground(tile) {
+      this.resolveTileRuntimeSrc(tile).catch(() => {})
     },
 
     normalizeTileSourceCandidates(sourceCandidates) {
@@ -1261,6 +1356,7 @@ Component({
 
       this._activeTiles.clear()
       this._activeTileMeta.clear()
+      this._restorableTileMeta.clear()
       this._failedTiles.clear()
       this._lastVisibleTileSignature = ''
       this.setData({
@@ -1269,10 +1365,194 @@ Component({
       })
     },
 
+    buildSnapshotSourceCandidates(sourceUrl, explicitSourceCandidates = []) {
+      const normalizedSourceUrl = normalizeStringValue(sourceUrl)
+      if (!normalizedSourceUrl) {
+        return []
+      }
+
+      const normalizedExplicitCandidates = Array.isArray(explicitSourceCandidates)
+        ? explicitSourceCandidates.map((item) => normalizeStringValue(item)).filter(Boolean)
+        : []
+
+      return Array.from(new Set([
+        ...normalizedExplicitCandidates,
+        normalizeStringValue(this._tileLocalPathCache.get(normalizedSourceUrl)),
+        normalizeStringValue(this._tileImageInfoPathCache.get(normalizedSourceUrl)),
+        normalizedSourceUrl
+      ].filter(Boolean)))
+    },
+
+    captureVisibleTileSnapshot() {
+      const visibleTiles = Array.isArray(this.calculateVisibleTiles?.())
+        ? this.calculateVisibleTiles()
+        : []
+
+      if (!visibleTiles.length) {
+        return null
+      }
+
+      const snapshotTiles = visibleTiles
+        .map((visibleTile) => {
+          const sourceUrl = normalizeStringValue(visibleTile?.url)
+          if (!sourceUrl) {
+            return null
+          }
+
+          const activeTileMeta = this._activeTileMeta.get(sourceUrl) || {}
+          const sourceCandidates = this.buildSnapshotSourceCandidates(
+            sourceUrl,
+            activeTileMeta.sourceCandidates || visibleTile?.sourceCandidates
+          )
+
+          if (!sourceCandidates.length) {
+            return null
+          }
+
+          return {
+            url: sourceUrl,
+            stringId: visibleTile?.stringId || activeTileMeta.stringId || '',
+            x: Number.isFinite(Number(visibleTile?.x)) ? Number(visibleTile.x) : activeTileMeta.x,
+            y: Number.isFinite(Number(visibleTile?.y)) ? Number(visibleTile.y) : activeTileMeta.y,
+            z: Number.isFinite(Number(visibleTile?.z)) ? Number(visibleTile.z) : activeTileMeta.z,
+            bounds: visibleTile?.bounds || activeTileMeta.bounds || null,
+            sourceCandidates
+          }
+        })
+        .filter((tile) => tile && tile.bounds)
+
+      if (!snapshotTiles.length) {
+        return null
+      }
+
+      return {
+        capturedAt: Date.now(),
+        tiles: snapshotTiles
+      }
+    },
+
+    primeRestorableTileSnapshot(snapshot) {
+      const snapshotTiles = Array.isArray(snapshot?.tiles) ? snapshot.tiles : []
+      this._restorableTileMeta = new Map()
+
+      snapshotTiles.forEach((tile) => {
+        const sourceUrl = normalizeStringValue(tile?.url)
+        if (!sourceUrl || !tile?.bounds) {
+          return
+        }
+
+        const sourceCandidates = this.buildSnapshotSourceCandidates(sourceUrl, tile?.sourceCandidates)
+        if (!sourceCandidates.length) {
+          return
+        }
+
+        const localCandidate = sourceCandidates.find((candidate) => isWxFileUrl(candidate))
+        if (localCandidate) {
+          this._tileLocalPathCache.set(sourceUrl, localCandidate)
+        }
+
+        this._restorableTileMeta.set(sourceUrl, {
+          ...tile,
+          url: sourceUrl,
+          sourceCandidates
+        })
+      })
+    },
+
+    invalidateNativeOverlays(options = {}) {
+      const preserveActiveTileSnapshot = !!options.preserveActiveTileSnapshot
+      this._tileUpdateRequestId += 1
+      this._tilePrefetchRequestId += 1
+      this._pendingTilePrefetchRequestId = 0
+      this._isTileUpdateInFlight = false
+      this._needsFollowUpTileUpdate = false
+      if (preserveActiveTileSnapshot) {
+        this.primeRestorableTileSnapshot(this.captureVisibleTileSnapshot())
+      } else {
+        this._restorableTileMeta.clear()
+      }
+      this._activeTiles.clear()
+      this._activeTileMeta.clear()
+      this._failedTiles.clear()
+      this._lastVisibleTileSignature = ''
+      this.setLoadingState(false)
+      this.setData({
+        currentTileCount: 0,
+        isLoading: false
+      })
+    },
+
+    restoreNativeOverlaysFromCache() {
+      const mapCtx = this.properties.mapCtx
+      if (
+        !mapCtx
+        || typeof mapCtx.addGroundOverlay !== 'function'
+        || !(this._restorableTileMeta instanceof Map)
+        || this._restorableTileMeta.size <= 0
+      ) {
+        return Promise.resolve({
+          restoredTiles: [],
+          failedTiles: []
+        })
+      }
+
+      const tileConfig = this.getResolvedTileConfig()
+      const cachedTiles = Array.from(this._restorableTileMeta.values())
+        .filter((tileMeta) => {
+          return normalizeStringValue(tileMeta?.url) && tileMeta?.bounds
+        })
+        .map((tileMeta) => {
+          const sourceCandidates = this.buildSnapshotSourceCandidates(tileMeta.url, tileMeta.sourceCandidates)
+          return {
+            ...tileMeta,
+            overlayId: this.createOverlayInstanceId(),
+            runtimeSrc: sourceCandidates[0] || '',
+            sourceCandidates
+          }
+        })
+
+      if (!cachedTiles.length) {
+        return Promise.resolve({
+          restoredTiles: [],
+          failedTiles: []
+        })
+      }
+
+      const restoredTiles = []
+      const failedTiles = []
+      let cursor = 0
+      const workerCount = Math.max(1, Math.min(TILE_OVERLAY_MAX_CONCURRENT_LOADS, cachedTiles.length))
+
+      return Promise.all(Array.from({ length: workerCount }, async () => {
+        while (cursor < cachedTiles.length) {
+          const currentIndex = cursor
+          cursor += 1
+          const tile = cachedTiles[currentIndex]
+
+          try {
+            await this.addGroundOverlayWithRetry(mapCtx, tile, tileConfig)
+            restoredTiles.push(tile)
+            this.upsertActiveTileEntry(tile, {
+              visible: true
+            })
+          } catch (error) {
+            failedTiles.push({
+              ...tile,
+              error
+            })
+          }
+        }
+      })).then(() => ({
+        restoredTiles,
+        failedTiles
+      }))
+    },
+
     calculateVisibleTiles() {
       const zoom = this.getZoomLevel()
       return this.calculateTilesForZoom(zoom, {
-        bounds: this.getCurrentBounds()
+        bounds: this.getCurrentBounds(),
+        bufferRatio: 0
       })
     },
 
@@ -1600,7 +1880,36 @@ Component({
       )
 
       const prefetchTiles = []
-      const appendedSourceUrls = new Set()
+      const appendedSourceUrls = new Set(
+        visibleTiles
+          .map((tile) => normalizeStringValue(tile?.url))
+          .filter(Boolean)
+      )
+
+      TILE_PREFETCH_SAME_ZOOM_RING_MULTIPLIERS.forEach((multiplier) => {
+        const ringBufferRatio = Math.min(
+          this.getZoomAdaptiveConfig(currentZoom).bufferRatio * multiplier,
+          TILE_PREFETCH_SAME_ZOOM_MAX_BUFFER_RATIO
+        )
+        const ringTiles = this.prioritizeVisibleTiles(this.calculateTilesForZoom(currentZoom, {
+          bounds,
+          bufferRatio: ringBufferRatio
+        }))
+          .filter((tile) => {
+            const sourceUrl = normalizeStringValue(tile?.url)
+            return sourceUrl && !appendedSourceUrls.has(sourceUrl)
+          })
+
+        this.pickTilePrefetchCandidates(ringTiles, TILE_PREFETCH_MAX_TILES_PER_RING).forEach((tile) => {
+          const sourceUrl = normalizeStringValue(tile?.url)
+          if (!sourceUrl || appendedSourceUrls.has(sourceUrl)) {
+            return
+          }
+
+          appendedSourceUrls.add(sourceUrl)
+          prefetchTiles.push(tile)
+        })
+      })
 
       TILE_PREFETCH_ZOOM_OFFSETS.forEach((zoomOffset) => {
         const targetZoom = currentZoom + zoomOffset
