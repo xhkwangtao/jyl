@@ -18,6 +18,9 @@ const {
   resolvePoiSourceCodeToMarkerId
 } = require('../../../../utils/poi-source-code.js')
 const {
+  shouldFocusViewportOnPointSelection
+} = require('../../../../utils/map-point-selection')
+const {
   GUIDE_MAP_PAGE,
   GUIDE_AI_CHAT_PAGE,
   GUIDE_AUDIO_LIST_PAGE,
@@ -5654,7 +5657,9 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
 
   onMarkerTap(event) {
     const markerId = event?.detail?.markerId
-    this.focusPointById(markerId)
+    this.focusPointById(markerId, {
+      focusViewport: shouldFocusViewportOnPointSelection('markerTap')
+    })
   },
 
   onPOITap() {},
