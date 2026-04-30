@@ -14,10 +14,11 @@ class StreamingPcmPlayer {
 
     const pcmBuffer = wx.base64ToArrayBuffer(audioData)
     const floatData = this.bufferToFloat32(pcmBuffer)
+    const bufferSampleRate = this.resolveBufferSampleRate(sampleRate)
     const audioBuffer = this.audioContext.createBuffer(
       1,
       floatData.length,
-      this.audioContext.sampleRate || sampleRate
+      bufferSampleRate
     )
     audioBuffer.getChannelData(0).set(floatData)
     this.history.push({ audioData, sampleRate, chunkIndex })
@@ -61,6 +62,20 @@ class StreamingPcmPlayer {
       throw new Error('当前环境不支持流式语音播放')
     }
     this.audioContext = wx.createWebAudioContext()
+  }
+
+  resolveBufferSampleRate(sampleRate) {
+    const normalizedSampleRate = Number(sampleRate)
+    if (Number.isFinite(normalizedSampleRate) && normalizedSampleRate > 0) {
+      return normalizedSampleRate
+    }
+
+    const contextSampleRate = Number(this.audioContext && this.audioContext.sampleRate)
+    if (Number.isFinite(contextSampleRate) && contextSampleRate > 0) {
+      return contextSampleRate
+    }
+
+    return 16000
   }
 
   bufferToFloat32(arrayBuffer) {
