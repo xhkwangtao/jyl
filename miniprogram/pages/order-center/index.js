@@ -1,5 +1,9 @@
 const auth = require('../../utils/auth')
 const orderService = require('../../services/order-service')
+const greatwallConfigService = require('../../services/greatwall-config-service')
+const {
+  resolveOrderCenterAccessState
+} = require('../../utils/order-center-access')
 const {
   withPageAnalytics
 } = require('../../utils/with-page-analytics')
@@ -67,6 +71,17 @@ function navigateToPage(url) {
   })
 }
 
+function redirectToHomePage() {
+  wx.reLaunch({
+    url: '/pages/index/index',
+    fail: () => {
+      wx.redirectTo({
+        url: '/pages/index/index'
+      })
+    }
+  })
+}
+
 function buildSubscribeUrl(order = {}) {
   const productCode = String(order.productCode || 'vip').trim() || 'vip'
   const featureKey = String((order.metadata && order.metadata.feature_key) || productCode || 'vip').trim() || 'vip'
@@ -96,7 +111,12 @@ Page(withPageAnalytics('/pages/order-center/index', {
     fallbackSourceText: ''
   },
 
-  onLoad() {
+  async onLoad() {
+    const canAccessOrderCenter = await this.ensureOrderCenterAccess()
+    if (!canAccessOrderCenter) {
+      return
+    }
+
     this.ensureLoginAndLoad()
   },
 
@@ -104,6 +124,26 @@ Page(withPageAnalytics('/pages/order-center/index', {
     if (this.data.initialized && !this.data.loading) {
       this.loadOrders(true)
     }
+  },
+
+  async ensureOrderCenterAccess() {
+    const accessState = await resolveOrderCenterAccessState(greatwallConfigService)
+
+    if (accessState.allowPageAccess) {
+      return true
+    }
+
+    wx.showToast({
+      title: accessState.blockedMessage,
+      icon: 'none',
+      duration: 1800
+    })
+
+    setTimeout(() => {
+      redirectToHomePage()
+    }, 200)
+
+    return false
   },
 
   async ensureLoginAndLoad() {

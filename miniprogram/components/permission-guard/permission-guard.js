@@ -134,6 +134,10 @@ Component({
     },
 
     shouldRunPermissionAutoRefresh() {
+      if (entitlementService.shouldBypassPaywallSync()) {
+        return false
+      }
+
       return this.pageVisible !== false
         && !!auth.getToken()
         && (
@@ -170,6 +174,30 @@ Component({
 
       const featureKeyList = this.getTrackedFeatureKeyList()
       const entitlementKeyList = this.getTrackedEntitlementKeyList()
+
+      if (entitlementService.shouldBypassPaywallSync()) {
+        this.stopPermissionAutoRefresh()
+
+        const featureAccessMap = featureKeyList.reduce((result, featureKey) => {
+          result[featureKey] = entitlementService.buildGreatwallBypassFeatureAccess(featureKey)
+          return result
+        }, {})
+        const entitlementAccessMap = entitlementKeyList.reduce((result, entitlementKey) => {
+          result[entitlementKey] = entitlementService.buildGreatwallBypassEntitlementAccess(entitlementKey)
+          return result
+        }, {})
+
+        const detail = {
+          reason: normalizeText(options.reason) || 'manual',
+          featureKeyList,
+          entitlementKeyList,
+          featureAccessMap,
+          entitlementAccessMap
+        }
+
+        this.triggerEvent('permissionrefresh', detail)
+        return detail
+      }
 
       if ((!featureKeyList.length && !entitlementKeyList.length) || !auth.getToken()) {
         this.stopPermissionAutoRefresh()
@@ -275,6 +303,11 @@ Component({
 
     async checkEntitlement(entitlementKey = '', options = {}) {
       this.trackEntitlementKeys(entitlementKey)
+      const normalizedEntitlementKey = normalizeEntitlementKey(entitlementKey)
+
+      if (normalizedEntitlementKey && entitlementService.shouldBypassPaywallSync()) {
+        return entitlementService.buildGreatwallBypassEntitlementAccess(normalizedEntitlementKey)
+      }
 
       const hasLogin = await this.ensureLogin({
         ...options,
@@ -295,6 +328,11 @@ Component({
 
     async checkFeatureAccess(featureKey = '', options = {}) {
       this.trackFeatureKeys(featureKey)
+      const normalizedFeatureKey = normalizeFeatureKey(featureKey)
+
+      if (normalizedFeatureKey && entitlementService.shouldBypassPaywallSync()) {
+        return entitlementService.buildGreatwallBypassFeatureAccess(normalizedFeatureKey)
+      }
 
       const hasLogin = await this.ensureLogin({
         ...options,
@@ -474,6 +512,10 @@ Component({
     async prefetchFeatureAccessList(featureKeyList = [], options = {}) {
       this.trackFeatureKeys(featureKeyList)
 
+      if (entitlementService.shouldBypassPaywallSync()) {
+        return entitlementService.prefetchFeatureAccessList(featureKeyList, options)
+      }
+
       if (options.ensureLogin !== false && !auth.getToken()) {
         const hasLogin = await this.ensureLogin({
           ...options,
@@ -495,6 +537,10 @@ Component({
 
     async prefetchEntitlementList(entitlementKeyList = [], options = {}) {
       this.trackEntitlementKeys(entitlementKeyList)
+
+      if (entitlementService.shouldBypassPaywallSync()) {
+        return entitlementService.prefetchEntitlementList(entitlementKeyList, options)
+      }
 
       if (options.ensureLogin !== false && !auth.getToken()) {
         const hasLogin = await this.ensureLogin({

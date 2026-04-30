@@ -5,6 +5,10 @@ const {
   buildAiOfficerState
 } = require('../../utils/ai-officer')
 const studyReportService = require('../../services/study-report-service')
+const greatwallConfigService = require('../../services/greatwall-config-service')
+const {
+  resolveOrderCenterAccessState
+} = require('../../utils/order-center-access')
 const {
   withPageAnalytics
 } = require('../../utils/with-page-analytics')
@@ -299,6 +303,7 @@ Page(withPageAnalytics('/pages/my-page/my-page', {
     reportTitle: '',
     reportDesc: '',
     reportActionText: '去收集暗号',
+    showOrderCenterEntry: false,
     themeSummaryList: [],
     secretList: [],
     collectedSecretList: [],
@@ -316,10 +321,12 @@ Page(withPageAnalytics('/pages/my-page/my-page', {
       navBarHeightStyle: `--nav-bar-height: ${navBarHeight}px; --page-safe-bottom: ${safeAreaBottom}px;`
     })
 
+    this.syncOrderCenterEntryVisibility()
     this.refreshSecretState()
   },
 
   onShow() {
+    this.syncOrderCenterEntryVisibility()
     this.refreshSecretState()
   },
 
@@ -388,6 +395,25 @@ Page(withPageAnalytics('/pages/my-page/my-page', {
       pendingSecretList: reportDrivenSecretList.filter((item) => !item.collected),
       ...buildAiOfficerState(reportDrivenSecretList)
     })
+  },
+
+  syncOrderCenterEntryVisibility() {
+    this.orderCenterVisibilityRequestId = (this.orderCenterVisibilityRequestId || 0) + 1
+    const requestId = this.orderCenterVisibilityRequestId
+
+    resolveOrderCenterAccessState(greatwallConfigService).then((accessState) => {
+      if (requestId !== this.orderCenterVisibilityRequestId) {
+        return
+      }
+
+      if (accessState.showEntry === this.data.showOrderCenterEntry) {
+        return
+      }
+
+      this.setData({
+        showOrderCenterEntry: accessState.showEntry
+      })
+    }).catch(() => {})
   },
 
   triggerPendingSecretUnlockAnimationById(secretId) {

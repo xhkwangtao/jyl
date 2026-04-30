@@ -1,5 +1,6 @@
 const auth = require('../utils/auth')
 const request = require('../utils/request')
+const greatwallConfigService = require('./greatwall-config-service')
 
 const FEATURE_ACCESS_CACHE_STORAGE_KEY = 'featureAccessCache'
 const ENTITLEMENT_CACHE_STORAGE_KEY = 'entitlementAccessCache'
@@ -126,9 +127,58 @@ function normalizeAccessPayload(payload = {}, options = {}) {
   }
 }
 
+function buildGreatwallBypassEntitlementPayload(entitlementKey = '') {
+  const normalizedEntitlementKey = normalizeKey(entitlementKey)
+
+  return normalizeAccessPayload({
+    available: true,
+    status: 'active',
+    entitlement_key: normalizedEntitlementKey,
+    access_source: 'greatwall_disabled'
+  }, {
+    key: normalizedEntitlementKey
+  })
+}
+
+function buildGreatwallBypassFeaturePayload(featureKey = '') {
+  const normalizedFeatureKey = normalizeFeatureKey(featureKey)
+  const requiredEntitlement = normalizeKey(
+    FEATURE_REQUIRED_ENTITLEMENT_MAP[normalizedFeatureKey] || normalizedFeatureKey
+  )
+
+  return normalizeAccessPayload({
+    available: true,
+    status: 'active',
+    feature_key: normalizedFeatureKey,
+    entitlement_key: requiredEntitlement,
+    required_entitlement: requiredEntitlement,
+    feature_name: normalizedFeatureKey,
+    access_source: 'greatwall_disabled'
+  }, {
+    key: normalizedFeatureKey,
+    isFeature: true
+  })
+}
+
 class EntitlementService {
   normalizeFeatureKey(featureKey = '') {
     return normalizeFeatureKey(featureKey)
+  }
+
+  isGreatwallEnabledSync() {
+    return greatwallConfigService.isGreatwallEnabledSync()
+  }
+
+  shouldBypassPaywallSync() {
+    return greatwallConfigService.shouldBypassPaywallSync()
+  }
+
+  buildGreatwallBypassEntitlementAccess(entitlementKey = '') {
+    return buildGreatwallBypassEntitlementPayload(entitlementKey)
+  }
+
+  buildGreatwallBypassFeatureAccess(featureKey = '') {
+    return buildGreatwallBypassFeaturePayload(featureKey)
   }
 
   getFeatureRequiredEntitlement(featureKey = '') {
@@ -235,11 +285,19 @@ class EntitlementService {
   }
 
   isEntitlementAvailableSync(entitlementKey = '', options = {}) {
+    if (this.shouldBypassPaywallSync()) {
+      return true
+    }
+
     const record = this.getCachedEntitlementAccess(entitlementKey)
     return isRecordActive(record, options.maxAgeMs)
   }
 
   isFeatureAvailableSync(featureKey = '', options = {}) {
+    if (this.shouldBypassPaywallSync()) {
+      return true
+    }
+
     const normalizedFeatureKey = normalizeFeatureKey(featureKey)
     const record = this.getCachedFeatureAccess(normalizedFeatureKey)
     if (isRecordActive(record, options.maxAgeMs)) {
@@ -266,6 +324,10 @@ class EntitlementService {
         reason: 'missing_entitlement_key',
         entitlement_key: ''
       }
+    }
+
+    if (this.shouldBypassPaywallSync()) {
+      return this.buildGreatwallBypassEntitlementAccess(normalizedEntitlementKey)
     }
 
     const cachedRecord = this.getCachedEntitlementAccess(normalizedEntitlementKey)
@@ -297,6 +359,10 @@ class EntitlementService {
         reason: 'missing_feature_key',
         feature_key: ''
       }
+    }
+
+    if (this.shouldBypassPaywallSync()) {
+      return this.buildGreatwallBypassFeatureAccess(normalizedFeatureKey)
     }
 
     const cachedRecord = this.getCachedFeatureAccess(normalizedFeatureKey)
