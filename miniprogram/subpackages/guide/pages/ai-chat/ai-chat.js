@@ -5,6 +5,14 @@ const {
 } = require('../../../../services/entitlement-service')
 const StreamingPcmPlayer = require('../../../../utils/streaming-pcm-player')
 const {
+  buildUserVoiceMessage,
+  buildAIVoicePlaceholderMessage,
+  appendVoiceChunkToMessage,
+  isVoiceMessage,
+  updateVoiceTranscript,
+  appendVoiceTranscript
+} = require('../../../../utils/ai-chat-voice-utils')
+const {
   isFeaturePaid
 } = require('../../../../utils/audio-access.js')
 const {
@@ -68,6 +76,21 @@ function createAIMessage(content) {
         }]
       : []
   }
+}
+
+function createUserVoiceMessage({ durationSeconds = 0, transcript = '' } = {}) {
+  return buildUserVoiceMessage({
+    id: buildMessageId('user'),
+    durationSeconds,
+    transcript
+  })
+}
+
+function createAIVoiceMessage() {
+  return buildAIVoicePlaceholderMessage({
+    id: buildMessageId('ai'),
+    avatar: '/images/xiaojiu.png'
+  })
 }
 
 function cloneSegments(message) {
@@ -789,11 +812,12 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
     }
 
     if (audioData) {
-      this.sendMessage('语音输入', {
+      this.sendMessage('', {
         skipAccessCheck: true,
         mode: 'voice',
         audioData,
-        audioFormat: detail.audioFormat || 'wav'
+        audioFormat: detail.audioFormat || 'wav',
+        durationSeconds: Number(detail.duration || 0) || 0
       })
       return
     }
@@ -842,6 +866,35 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
     }
   },
 
+  getChatInputBar() {
+    if (this.chatInputBar) {
+      return this.chatInputBar
+    }
+
+    this.chatInputBar = this.selectComponent('#chatInputBar')
+    return this.chatInputBar || null
+  },
+
+  onPageTouchEnd() {
+    const chatInputBar = this.getChatInputBar()
+    if (!chatInputBar || typeof chatInputBar.forceStopVoiceRecordingFromPage !== 'function') {
+      return
+    }
+
+    chatInputBar.forceStopVoiceRecordingFromPage()
+  },
+
+  onPageTouchCancel() {
+    const chatInputBar = this.getChatInputBar()
+    if (!chatInputBar || typeof chatInputBar.forceStopVoiceRecordingFromPage !== 'function') {
+      return
+    }
+
+    chatInputBar.forceStopVoiceRecordingFromPage({
+      discardResult: true
+    })
+  },
+
   sendMessage(message, options = {}) {
     if (this.data.isGenerating) {
       return
@@ -852,15 +905,22 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
       skipAccessCheck = false,
       mode = 'text',
       audioData = '',
-      audioFormat = 'wav'
+      audioFormat = 'wav',
+      durationSeconds = 0
     } = options
 
     if (!skipAccessCheck && !this.ensureAIChatAccess(featureKey)) {
       return
     }
 
-    const userMessage = createUserMessage(message)
-    const pendingAIMessage = createAIMessage('')
+    const userMessage = mode === 'voice'
+      ? createUserVoiceMessage({
+          durationSeconds
+        })
+      : createUserMessage(message)
+    const pendingAIMessage = mode === 'voice'
+      ? createAIVoiceMessage()
+      : createAIMessage('')
     const requestMessage = mode === 'voice' ? undefined : this.buildRequestMessage(message)
 
     this.setData({
@@ -871,6 +931,7 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
     })
 
     this.scrollToBottom()
+    this.destroyVoiceReplyPlayer()
     this.clearActiveStream(true)
 
     const streamHandlers = {
@@ -890,7 +951,7 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
           message: requestMessage,
           audioData,
           audioFormat,
-          outputMode: 'both',
+          outputMode: 'voice',
           onEvent: streamHandlers.onEvent,
           onComplete: streamHandlers.onComplete,
           onError: streamHandlers.onError
@@ -907,7 +968,8 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
       aiMessageId: pendingAIMessage.id,
       userMessageId: userMessage.id,
       requestTask,
-      finished: false
+      finished: false,
+      mode
     }
   },
 
@@ -1010,14 +1072,18 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
         return
       }
 
+      const userMessageId = this._activeStream.userMessageId
       const messageList = this.data.messageList.map((message) => {
-        if (message.id !== this._activeStream.userMessageId) {
+        if (message.id !== userMessageId) {
           return message
         }
-        return {
-          ...message,
-          content: transcript
-        }
+
+        return isVoiceMessage(message)
+          ? updateVoiceTranscript(message, transcript)
+          : {
+              ...message,
+              content: transcript
+            }
       })
       this.setData({
         messageList
@@ -1026,6 +1092,16 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
     }
 
     if (event.type === 'text') {
+      const currentAIMessage = this.data.messageList.find((item) => item.id === aiMessageId)
+      if (isVoiceMessage(currentAIMessage)) {
+        this.updateAIMessage(aiMessageId, (message) => appendVoiceTranscript(message, event.content || ''))
+        this.setData({
+          isAILoading: false
+        })
+        this.handlePostMessageRender()
+        return
+      }
+
       this.appendAIMessageSegment(aiMessageId, {
         type: 'text',
         content: event.content || ''
@@ -1078,14 +1154,14 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
       if (!audioData) {
         return
       }
-      this.updateAIMessage(aiMessageId, (message) => ({
-        ...message,
-        voiceChunks: (Array.isArray(message.voiceChunks) ? message.voiceChunks : []).concat({
-          audioData,
-          sampleRate: event.sampleRate || 16000,
-          chunkIndex: event.chunkIndex || 0
-        })
+      this.updateAIMessage(aiMessageId, (message) => appendVoiceChunkToMessage(message, {
+        audioData,
+        sampleRate: event.sampleRate || 16000,
+        chunkIndex: event.chunkIndex || 0
       }))
+      this.setData({
+        isAILoading: false
+      })
       this.appendVoiceReplyChunk({
         audioData,
         sampleRate: event.sampleRate || 16000,
@@ -1118,7 +1194,16 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
     }
 
     const currentAIMessage = this.data.messageList.find((item) => item.id === aiMessageId)
-    if (!hasRenderableSegments(currentAIMessage)) {
+    if (isVoiceMessage(currentAIMessage)) {
+      this.updateAIMessage(aiMessageId, (message) => ({
+        ...message,
+        voice: {
+          ...(message.voice || {}),
+          status: 'error',
+          isLive: false
+        }
+      }))
+    } else if (!hasRenderableSegments(currentAIMessage)) {
       this.appendAIMessageSegment(aiMessageId, {
         type: 'text',
         content: error?.message || 'AI 服务暂时不可用，请稍后再试。'
@@ -1145,14 +1230,26 @@ Page(withPageAnalytics('/subpackages/guide/pages/ai-chat/ai-chat', {
       return
     }
 
-    this.updateAIMessage(aiMessageId, (message) => resolveEmbeddedMediaComponents(message))
-
     const currentAIMessage = this.data.messageList.find((item) => item.id === aiMessageId)
-    if (!hasRenderableSegments(currentAIMessage)) {
-      this.appendAIMessageSegment(aiMessageId, {
-        type: 'text',
-        content: '暂时没有返回可展示的内容。'
-      })
+    if (isVoiceMessage(currentAIMessage)) {
+      this.updateAIMessage(aiMessageId, (message) => ({
+        ...message,
+        voice: {
+          ...(message.voice || {}),
+          status: 'completed',
+          isLive: false
+        }
+      }))
+    } else {
+      this.updateAIMessage(aiMessageId, (message) => resolveEmbeddedMediaComponents(message))
+
+      const nextAIMessage = this.data.messageList.find((item) => item.id === aiMessageId)
+      if (!hasRenderableSegments(nextAIMessage)) {
+        this.appendAIMessageSegment(aiMessageId, {
+          type: 'text',
+          content: '暂时没有返回可展示的内容。'
+        })
+      }
     }
 
     this.clearActiveStream(true)

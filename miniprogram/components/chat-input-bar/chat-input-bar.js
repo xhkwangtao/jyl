@@ -1,11 +1,21 @@
-const RECORD_PERMISSION_SCOPE = 'scope.record'
-const RECORD_PERMISSION_TOAST_TITLE = '麦克风权限已开启，请重新按住说话'
-const RECORD_PERMISSION_MODAL_TITLE = '需要麦克风权限'
-const RECORD_PERMISSION_MODAL_CONTENT = '语音提问需要使用麦克风，请在设置中允许后重试。'
+function getRecorderBusyError(error = {}) {
+  return String(error.errMsg || '').includes('is recording or paused')
+}
 
-function isPermissionDeniedError(error) {
-  const errorMessage = String(error?.errMsg || error?.message || '').trim()
-  return /auth deny|auth denied|authorize no response|permission/i.test(errorMessage)
+function getRecorderNotStartedError(error = {}) {
+  return String(error.errMsg || '').includes('recorder not start')
+}
+
+function getTouchPoint(event = {}) {
+  if (Array.isArray(event.touches) && event.touches.length) {
+    return event.touches[0]
+  }
+
+  if (Array.isArray(event.changedTouches) && event.changedTouches.length) {
+    return event.changedTouches[0]
+  }
+
+  return null
 }
 
 Component({
@@ -16,192 +26,89 @@ Component({
     },
     isGenerating: {
       type: Boolean,
-      value: false
+      value: false,
+      observer(newValue, oldValue) {
+        if (oldValue === true && newValue === false) {
+          this.setData({
+            isFocused: true
+          })
+        }
+      }
     }
   },
 
   data: {
     inputValue: '',
     isFocused: false,
+    isSending: false,
     isVoiceMode: false,
     isRecording: false,
-    recordingTime: 0,
-    isSending: false
+    recordingTime: 0
   },
 
   lifetimes: {
     attached() {
       this.initRecorderManager()
+      this.recordingPending = false
+      this._stopRequested = false
+      this._discardNextRecorderStop = false
+      this._recordingTimer = null
     },
 
     detached() {
-      this.clearRecordTimer()
-      this.teardownRecorderManager()
+      this.forceStopRecording({
+        silent: true
+      })
+      this.clearRecordingTimer()
     }
   },
 
   methods: {
     initRecorderManager() {
-      if (this._recorderManager || !wx || typeof wx.getRecorderManager !== 'function') {
+      if (this.recorderManager || !wx || typeof wx.getRecorderManager !== 'function') {
         return
       }
 
-      this._recorderManager = wx.getRecorderManager()
-      if (this._recorderManager && typeof this._recorderManager.onStop === 'function') {
-        this._recorderManager.onStop((result) => {
+      this.recorderManager = wx.getRecorderManager()
+
+      if (typeof this.recorderManager.onStart === 'function') {
+        this.recorderManager.onStart(() => {
+          this.handleRecorderStart()
+        })
+      }
+
+      if (typeof this.recorderManager.onStop === 'function') {
+        this.recorderManager.onStop((result) => {
           this.handleRecorderStop(result || {})
         })
       }
-      if (this._recorderManager && typeof this._recorderManager.onError === 'function') {
-        this._recorderManager.onError((error) => {
+
+      if (typeof this.recorderManager.onError === 'function') {
+        this.recorderManager.onError((error) => {
           this.handleRecorderError(error || {})
         })
       }
     },
 
-    teardownRecorderManager() {
-      this._recorderManager = null
-    },
-
-    getRecordPermissionState() {
-      if (!wx || typeof wx.getSetting !== 'function') {
-        return Promise.resolve(true)
-      }
-
-      return new Promise((resolve) => {
-        wx.getSetting({
-          success: ({ authSetting = {} }) => {
-            resolve(!!authSetting[RECORD_PERMISSION_SCOPE])
-          },
-          fail: () => {
-            resolve(true)
-          }
-        })
-      })
-    },
-
-    requestRecordPermission() {
-      if (!wx || typeof wx.authorize !== 'function') {
-        return Promise.resolve({
-          granted: false
-        })
-      }
-
-      return new Promise((resolve) => {
-        wx.authorize({
-          scope: RECORD_PERMISSION_SCOPE,
-          success: () => {
-            resolve({
-              granted: true
-            })
-          },
-          fail: (error) => {
-            resolve({
-              granted: false,
-              error
-            })
-          }
-        })
-      })
-    },
-
-    promptRecordPermissionSetting() {
-      if (!wx || typeof wx.showModal !== 'function') {
-        return
-      }
-
-      wx.showModal({
-        title: RECORD_PERMISSION_MODAL_TITLE,
-        content: RECORD_PERMISSION_MODAL_CONTENT,
-        confirmText: '去设置',
-        success: (modalResult) => {
-          if (!modalResult.confirm || !wx || typeof wx.openSetting !== 'function') {
-            return
-          }
-
-          wx.openSetting({
-            fail: () => {}
-          })
-        }
-      })
-    },
-
-    async ensureRecordPermission() {
-      const hasPermission = await this.getRecordPermissionState()
-      if (hasPermission) {
-        return true
-      }
-
-      const permissionResult = await this.requestRecordPermission()
-      if (permissionResult.granted) {
-        if (wx && typeof wx.showToast === 'function') {
-          wx.showToast({
-            title: RECORD_PERMISSION_TOAST_TITLE,
-            icon: 'none',
-            duration: 1800
-          })
-        }
-        return false
-      }
-
-      this.promptRecordPermissionSetting()
-      return false
-    },
-
-    startVoiceRecording() {
-      this.initRecorderManager()
-      if (!this._recorderManager || typeof this._recorderManager.start !== 'function') {
-        if (wx && typeof wx.showToast === 'function') {
-          wx.showToast({
-            title: '当前环境不支持录音',
-            icon: 'none',
-            duration: 1600
-          })
-        }
-        return
-      }
-
-      this.clearRecordTimer()
-      this.setData({
-        isRecording: true,
-        recordingTime: 0
-      })
-
-      if (typeof wx.vibrateShort === 'function') {
-        wx.vibrateShort({
-          type: 'light'
-        })
-      }
-
-      try {
-        this._recorderManager.start({
-          duration: 60000,
-          sampleRate: 16000,
-          numberOfChannels: 1,
-          encodeBitRate: 48000,
-          format: 'mp3'
-        })
-      } catch (error) {
-        this.handleRecorderError(error)
-        return
-      }
-
-      this._recordTimer = setInterval(() => {
-        this.setData({
-          recordingTime: this.data.recordingTime + 1
-        })
-      }, 1000)
-    },
-
     onInput(event) {
+      const value = event?.detail?.value || ''
       this.setData({
-        inputValue: event.detail.value || ''
+        inputValue: value
+      })
+
+      this.triggerEvent('input', {
+        value,
+        length: value.length
       })
     },
 
-    onFocus() {
+    onFocus(event = {}) {
       this.setData({
         isFocused: true
+      })
+
+      this.triggerEvent('focus', {
+        keyboardHeight: event?.detail?.height || 0
       })
     },
 
@@ -209,29 +116,22 @@ Component({
       this.setData({
         isFocused: false
       })
-    },
 
-    onModeChange() {
-      if (this.properties.isGenerating) {
-        return
-      }
-
-      if (typeof wx.vibrateShort === 'function') {
-        wx.vibrateShort({
-          type: 'light'
-        })
-      }
-
-      this.clearRecordTimer()
-      this.setData({
-        isVoiceMode: !this.data.isVoiceMode,
-        isRecording: false,
-        recordingTime: 0
+      this.triggerEvent('blur', {
+        value: this.data.inputValue
       })
     },
 
-    onTextConfirm() {
-      this.onSendTap()
+    setFocus() {
+      this.setData({
+        isFocused: true
+      })
+    },
+
+    clearFocus() {
+      this.setData({
+        isFocused: false
+      })
     },
 
     onSendTap() {
@@ -240,12 +140,7 @@ Component({
       }
 
       const message = this.data.inputValue.trim()
-
-      if (!message) {
-        return
-      }
-
-      if (this.data.isSending) {
+      if (!message || this.data.isSending) {
         return
       }
 
@@ -274,6 +169,10 @@ Component({
       }, 260)
     },
 
+    onTextConfirm() {
+      this.onSendTap()
+    },
+
     onStopTap() {
       this.triggerEvent('stopGeneration')
     },
@@ -282,76 +181,444 @@ Component({
       this.triggerEvent('add')
     },
 
-    async onVoiceStart() {
+    async onModeChange() {
+      if (this.properties.isGenerating) {
+        return
+      }
+
+      const currentMode = this.data.isVoiceMode
+      if (!currentMode) {
+        const hasPermission = await this.checkRecordingPermission()
+        if (!hasPermission) {
+          return
+        }
+      }
+
+      if (typeof wx.vibrateShort === 'function') {
+        wx.vibrateShort({
+          type: 'light'
+        })
+      }
+
+      if (currentMode) {
+        this.forceStopRecording({
+          silent: true
+        })
+      }
+
+      this.setData({
+        isVoiceMode: !currentMode
+      })
+
+      this.triggerEvent('modeChange', {
+        isVoiceMode: !currentMode,
+        hasRecordingPermission: !currentMode ? true : null
+      })
+    },
+
+    getSetting() {
+      return new Promise((resolve, reject) => {
+        wx.getSetting({
+          success: resolve,
+          fail: reject
+        })
+      })
+    },
+
+    getPermissionDescription(permission) {
+      if (permission === true) {
+        return '已授权'
+      }
+      if (permission === false) {
+        return '已拒绝'
+      }
+      return '未询问过'
+    },
+
+    authorize(scope) {
+      return new Promise((resolve, reject) => {
+        wx.authorize({
+          scope,
+          success: resolve,
+          fail: reject
+        })
+      })
+    },
+
+    async requestRecordingPermission() {
+      try {
+        await this.authorize('scope.record')
+
+        wx.showToast({
+          title: '录音权限已获取',
+          icon: 'success',
+          duration: 1500
+        })
+
+        return true
+      } catch (error) {
+        wx.showModal({
+          title: '需要录音权限',
+          content: '语音聊天功能需要录音权限。点击"允许"即可开启语音功能。',
+          confirmText: '重新申请',
+          cancelText: '暂不开启',
+          success: (result) => {
+            if (!result.confirm) {
+              return
+            }
+
+            wx.openSetting({
+              success: (settingResult) => {
+                if (settingResult?.authSetting?.['scope.record']) {
+                  wx.showToast({
+                    title: '权限已开启',
+                    icon: 'success'
+                  })
+                }
+              }
+            })
+          }
+        })
+
+        return false
+      }
+    },
+
+    showPermissionDeniedDialog() {
+      wx.showModal({
+        title: '需要录音权限',
+        content: '语音功能需要录音权限才能使用。请在设置中开启录音权限后重试。',
+        confirmText: '去设置',
+        cancelText: '取消',
+        success: (result) => {
+          if (!result.confirm) {
+            return
+          }
+
+          wx.openSetting({
+            success: (settingResult) => {
+              if (settingResult?.authSetting?.['scope.record']) {
+                wx.showToast({
+                  title: '权限已开启，请重新切换到语音模式',
+                  icon: 'success',
+                  duration: 2000
+                })
+              }
+            }
+          })
+        }
+      })
+    },
+
+    async checkRecordingPermission() {
+      try {
+        const settings = await this.getSetting()
+        const recordPermission = settings?.authSetting?.['scope.record']
+
+        if (recordPermission === true) {
+          return true
+        }
+
+        if (recordPermission === false) {
+          this.showPermissionDeniedDialog()
+          return false
+        }
+
+        return this.requestRecordingPermission()
+      } catch (error) {
+        return false
+      }
+    },
+
+    onVoiceStart() {
       if (this.properties.disabled || this.properties.isGenerating) {
         return
       }
 
-      const hasPermission = await this.ensureRecordPermission()
-      if (!hasPermission) {
-        return
-      }
+      wx.getSetting({
+        success: (result) => {
+          if (result?.authSetting?.['scope.record'] === false) {
+            wx.showModal({
+              title: '需要录音权限',
+              content: '请在设置中开启录音权限以便发送语音消息',
+              confirmText: '去设置',
+              success: (modalResult) => {
+                if (modalResult.confirm) {
+                  wx.openSetting()
+                }
+              }
+            })
+            return
+          }
 
-      this.startVoiceRecording()
-    },
-
-    onVoiceMove() {
-      return false
+          this.startRecording()
+        },
+        fail: () => {
+          this.startRecording()
+        }
+      })
     },
 
     onVoiceEnd() {
-      if (!this.data.isRecording) {
+      if (!this.data.isRecording && !this.recordingPending) {
         return
       }
 
-      const duration = Math.max(this.data.recordingTime, 1)
-
-      this.clearRecordTimer()
-      this.setData({
-        isRecording: false,
-        recordingTime: 0
-      })
-
-      this._pendingVoiceDuration = duration
-      if (this._recorderManager && typeof this._recorderManager.stop === 'function') {
-        this._recorderManager.stop()
-      }
+      this.stopRecording()
     },
 
     onVoiceCancel() {
-      this.clearRecordTimer()
-      this.setData({
-        isRecording: false,
-        recordingTime: 0
-      })
+      this.forceStopRecording()
     },
 
-    clearRecordTimer() {
-      if (this._recordTimer) {
-        clearInterval(this._recordTimer)
-        this._recordTimer = null
-      }
-    },
-
-    handleRecorderStop(result = {}) {
-      const tempFilePath = result.tempFilePath || ''
-      const duration = Math.max(
-        Math.round((Number(result.duration) || 0) / 1000),
-        this._pendingVoiceDuration || 1
-      )
-      this._pendingVoiceDuration = 0
-
-      if (!tempFilePath) {
-        this.handleRecorderError()
+    onVoiceMove(event = {}) {
+      if (!this.data.isRecording && !this.recordingPending) {
         return
       }
 
-      const fileSystem = wx && typeof wx.getFileSystemManager === 'function'
-        ? wx.getFileSystemManager()
-        : null
+      const touch = getTouchPoint(event)
+      if (!touch || !wx || typeof wx.createSelectorQuery !== 'function') {
+        return
+      }
 
+      const moveX = Number(touch.pageX ?? touch.clientX ?? 0)
+      const moveY = Number(touch.pageY ?? touch.clientY ?? 0)
+      const query = wx.createSelectorQuery().in(this)
+
+      query.select('.voice-input-button').boundingClientRect()
+      query.exec((result) => {
+        const rect = result && result[0]
+        if (!rect) {
+          return
+        }
+
+        const isOutOfBounds = moveX < rect.left || moveX > rect.right || moveY < rect.top || moveY > rect.bottom
+        if (isOutOfBounds) {
+          this.forceStopRecording()
+        }
+      })
+    },
+
+    forceStopVoiceRecordingFromPage(options = {}) {
+      if (options.discardResult === true) {
+        this.forceStopRecording({
+          silent: true
+        })
+        return
+      }
+
+      if (!this.data.isRecording && !this.recordingPending) {
+        return
+      }
+
+      this.stopRecording()
+    },
+
+    startRecording() {
+      if (this.data.isRecording || this.recordingPending) {
+        return
+      }
+
+      this.initRecorderManager()
+      if (!this.recorderManager || typeof this.recorderManager.start !== 'function') {
+        wx.showToast({
+          title: '当前环境不支持录音',
+          icon: 'none',
+          duration: 1600
+        })
+        return
+      }
+
+      this.recordingPending = true
+      this._stopRequested = false
+      this._discardNextRecorderStop = false
+      this.clearRecordingTimer()
+
+      this.setData({
+        isRecording: true,
+        recordingTime: 0
+      })
+
+      try {
+        this.recorderManager.start({
+          duration: 15000,
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          encodeBitRate: 96000,
+          format: 'mp3',
+          frameSize: 50
+        })
+      } catch (error) {
+        this.handleRecorderError(error)
+        return
+      }
+
+      if (typeof wx.vibrateShort === 'function') {
+        wx.vibrateShort({
+          type: 'light'
+        })
+      }
+    },
+
+    stopRecording() {
+      if (!this.data.isRecording && !this.recordingPending) {
+        return
+      }
+
+      this._stopRequested = true
+
+      if (this.recorderManager) {
+        try {
+          this.recorderManager.stop()
+        } catch (error) {
+          this.handleRecorderError(error)
+          return
+        }
+      }
+
+      this.setData({
+        isRecording: false
+      })
+      this.recordingPending = false
+      this.clearRecordingTimer()
+    },
+
+    forceStopRecording(options = {}) {
+      this._stopRequested = true
+      this._discardNextRecorderStop = true
+      this.recordingPending = false
+      this.setData({
+        isRecording: false
+      })
+      this.clearRecordingTimer()
+
+      if (this.recorderManager) {
+        try {
+          this.recorderManager.stop()
+        } catch (error) {
+          if (!options.silent) {
+            this.handleRecorderError(error)
+          }
+        }
+      }
+    },
+
+    handleRecorderStart() {
+      if (!this.data.isRecording) {
+        if (this.recorderManager) {
+          try {
+            this.recorderManager.stop()
+          } catch (error) {
+            this.handleRecorderError(error)
+          }
+        }
+
+        if (!this._stopRequested) {
+          this._discardNextRecorderStop = true
+        }
+        return
+      }
+
+      this.recordingPending = false
+      this.startRecordingTimer()
+    },
+
+    handleRecorderStop(result = {}) {
+      this.recordingPending = false
+      this._stopRequested = false
+      this.clearRecordingTimer()
+      this.setData({
+        isRecording: false
+      })
+
+      if (this._discardNextRecorderStop) {
+        this._discardNextRecorderStop = false
+        return
+      }
+
+      if (Number(result.duration || 0) < 1000) {
+        wx.showToast({
+          title: '录音时间太短',
+          icon: 'none',
+          duration: 2000
+        })
+        return
+      }
+
+      this.sendVoiceMessage(result)
+    },
+
+    handleRecorderError(error = {}) {
+      this.recordingPending = false
+      this._stopRequested = false
+      this._discardNextRecorderStop = false
+      this.clearRecordingTimer()
+      this.setData({
+        isRecording: false
+      })
+
+      if (getRecorderNotStartedError(error)) {
+        return
+      }
+
+      if (getRecorderBusyError(error)) {
+        this.forceStopRecording({
+          silent: true
+        })
+        wx.showToast({
+          title: '录音状态重置，请重新录制',
+          icon: 'none',
+          duration: 2000
+        })
+        return
+      }
+
+      wx.showToast({
+        title: '录音失败，请重试',
+        icon: 'none',
+        duration: 1600
+      })
+    },
+
+    startRecordingTimer() {
+      this.clearRecordingTimer()
+      this._recordingTimer = setInterval(() => {
+        const nextTime = this.data.recordingTime + 1
+        this.setData({
+          recordingTime: nextTime
+        })
+
+        if (nextTime >= 15) {
+          this.stopRecording()
+        }
+      }, 1000)
+    },
+
+    clearRecordingTimer() {
+      if (this._recordingTimer) {
+        clearInterval(this._recordingTimer)
+        this._recordingTimer = null
+      }
+    },
+
+    sendVoiceMessage(recordResult = {}) {
+      const tempFilePath = recordResult.tempFilePath || ''
+      if (!tempFilePath) {
+        wx.showToast({
+          title: '发送失败，请重试',
+          icon: 'none',
+          duration: 2000
+        })
+        return
+      }
+
+      const fileSystem = wx.getFileSystemManager ? wx.getFileSystemManager() : null
       if (!fileSystem || typeof fileSystem.readFile !== 'function') {
-        this.handleRecorderError()
+        wx.showToast({
+          title: '发送失败，请重试',
+          icon: 'none',
+          duration: 2000
+        })
         return
       }
 
@@ -359,44 +626,32 @@ Component({
         filePath: tempFilePath,
         encoding: 'base64',
         success: (fileResult) => {
-          const audioData = fileResult && fileResult.data ? String(fileResult.data) : ''
+          const audioData = String(fileResult?.data || '')
           if (!audioData) {
-            this.handleRecorderError()
+            wx.showToast({
+              title: '发送失败，请重试',
+              icon: 'none',
+              duration: 2000
+            })
             return
           }
 
           this.triggerEvent('voiceSend', {
-            duration,
+            tempFilePath,
+            duration: Math.max(1, Math.round((Number(recordResult.duration || 0) || 0) / 1000)),
+            fileSize: Number(recordResult.fileSize || 0) || 0,
             audioData,
             audioFormat: 'mp3'
           })
         },
         fail: () => {
-          this.handleRecorderError()
+          wx.showToast({
+            title: '发送失败，请重试',
+            icon: 'none',
+            duration: 2000
+          })
         }
       })
-    },
-
-    handleRecorderError(error = {}) {
-      this.clearRecordTimer()
-      this._pendingVoiceDuration = 0
-      this.setData({
-        isRecording: false,
-        recordingTime: 0
-      })
-
-      if (isPermissionDeniedError(error)) {
-        this.promptRecordPermissionSetting()
-        return
-      }
-
-      if (wx && typeof wx.showToast === 'function') {
-        wx.showToast({
-          title: '录音失败，请重试',
-          icon: 'none',
-          duration: 1600
-        })
-      }
     }
   }
 })

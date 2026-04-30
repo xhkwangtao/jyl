@@ -3,7 +3,33 @@
 
   <view class="content-wrapper">
     <view class="bubble-container">
-      <block wx:if="{{renderSegments && renderSegments.length}}">
+      <block wx:if="{{isVoiceMessage}}">
+        <view class="voice-message-shell">
+          <view class="voice-message-main" bind:tap="onPlayAudioTap">
+            <view class="voice-kicker-row">
+              <text class="voice-kicker">语音回复</text>
+            </view>
+            <view class="voice-play-row">
+              <view class="voice-wave">
+                <view class="voice-wave-bar voice-wave-bar-1"></view>
+                <view class="voice-wave-bar voice-wave-bar-2"></view>
+                <view class="voice-wave-bar voice-wave-bar-3"></view>
+              </view>
+              <view class="voice-meta">
+                <text class="voice-duration">{{voiceDurationText}}</text>
+                <text class="voice-status">{{voiceStatusText}}</text>
+              </view>
+            </view>
+          </view>
+
+          <view wx:if="{{hasVoiceTranscript}}" class="voice-transcript-card">
+            <text class="voice-transcript-label">字幕</text>
+            <text class="voice-transcript-text">{{voiceTranscript}}</text>
+          </view>
+        </view>
+      </block>
+
+      <block wx:elif="{{renderSegments && renderSegments.length}}">
         <block wx:for="{{renderSegments}}" wx:key="id" wx:for-index="segmentIndex">
           <rich-text
             wx:if="{{item.type === 'text'}}"
@@ -114,10 +140,10 @@
 
       <view class="toolbar">
         <view class="toolbar-left">
-          <view class="toolbar-button" bind:tap="onCopyTap">
+          <view wx:if="{{!isVoiceMessage || hasVoiceTranscript}}" class="toolbar-button" bind:tap="onCopyTap">
             <image class="toolbar-icon" src="/images/icons/butle-button-copy.svg" mode="aspectFit" />
           </view>
-          <view class="toolbar-button" bind:tap="onPlayAudioTap">
+          <view class="toolbar-button {{isVoiceMessage && !hasVoiceAudio ? 'toolbar-button-disabled' : ''}}" bind:tap="onPlayAudioTap">
             <image class="toolbar-icon" src="/images/icons/buble-button-play.svg" mode="aspectFit" />
           </view>
         </view>

@@ -3,8 +3,16 @@ const {
   checkCurrentLocationInScenicArea,
   buildScenicVideoAccessDeniedMessage
 } = require('../../utils/scenic-location')
+const {
+  isVoiceMessage,
+  formatVoiceDurationText
+} = require('../../utils/ai-chat-voice-utils')
 
 function buildRenderSegments(message) {
+  if (isVoiceMessage(message)) {
+    return []
+  }
+
   const segments = Array.isArray(message?.segments)
     ? message.segments
     : message?.content
@@ -23,6 +31,32 @@ function buildRenderSegments(message) {
   })
 }
 
+function buildVoiceState(message) {
+  const transcript = String(message?.voice?.transcript || message?.content || '')
+  const status = String(message?.voice?.status || '').trim().toLowerCase()
+  const hasVoiceAudio = Array.isArray(message?.voiceChunks) && message.voiceChunks.length > 0
+  let voiceStatusText = '等待语音'
+
+  if (status === 'loading') {
+    voiceStatusText = hasVoiceAudio ? '语音回复生成中' : '正在生成语音'
+  } else if (status === 'completed') {
+    voiceStatusText = hasVoiceAudio ? '点击播放语音' : '语音已生成'
+  } else if (status === 'error') {
+    voiceStatusText = '语音生成失败'
+  } else if (hasVoiceAudio) {
+    voiceStatusText = '点击播放语音'
+  }
+
+  return {
+    isVoiceMessage: true,
+    voiceDurationText: formatVoiceDurationText(message?.voice?.durationMs || 0),
+    voiceTranscript: transcript,
+    voiceStatusText,
+    hasVoiceTranscript: !!transcript,
+    hasVoiceAudio
+  }
+}
+
 Component({
   properties: {
     message: {
@@ -32,13 +66,35 @@ Component({
   },
 
   data: {
-    renderSegments: []
+    renderSegments: [],
+    isVoiceMessage: false,
+    voiceDurationText: '0秒',
+    voiceTranscript: '',
+    voiceStatusText: '',
+    hasVoiceTranscript: false,
+    hasVoiceAudio: false
   },
 
   observers: {
     message(message) {
+      const voice = isVoiceMessage(message)
+
+      if (voice) {
+        this.setData({
+          renderSegments: [],
+          ...buildVoiceState(message)
+        })
+        return
+      }
+
       this.setData({
-        renderSegments: buildRenderSegments(message)
+        renderSegments: buildRenderSegments(message),
+        isVoiceMessage: false,
+        voiceDurationText: '0秒',
+        voiceTranscript: '',
+        voiceStatusText: '',
+        hasVoiceTranscript: false,
+        hasVoiceAudio: false
       })
     }
   },

@@ -1,6 +1,11 @@
 <permission-guard id="permissionGuard"></permission-guard>
 
-<view class="ai-chat-page" wx:if="{{pageReady}}">
+<view
+  class="ai-chat-page"
+  wx:if="{{pageReady}}"
+  capture-bind:touchend="onPageTouchEnd"
+  capture-bind:touchcancel="onPageTouchCancel"
+>
   <view class="background-layer">
     <view class="background-decorations">
       <view class="pink-blur"></view>
@@ -91,6 +96,7 @@
       </view>
 
       <chat-input-bar
+        id="chatInputBar"
         disabled="{{false}}"
         isGenerating="{{isGenerating}}"
         bind:send="onSendMessage"

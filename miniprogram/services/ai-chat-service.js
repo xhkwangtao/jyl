@@ -103,6 +103,22 @@ function normalizeDurationText(textValue, value) {
   return /[^\d.\s]/.test(normalizedValue) ? normalizedValue : `${normalizedValue}秒`
 }
 
+function normalizeVoiceOutputMode(outputMode) {
+  const normalizedMode = String(outputMode || '').trim().toLowerCase()
+
+  if (normalizedMode === 'voice') {
+    // The client voice stream endpoint only accepts text/audio/both.
+    // "voice" is a legacy page-level semantic meaning "reply with audio".
+    return 'both'
+  }
+
+  if (normalizedMode === 'audio' || normalizedMode === 'both' || normalizedMode === 'text') {
+    return normalizedMode
+  }
+
+  return 'text'
+}
+
 function extractRoutePointNames(rawRouteCard = {}, routeData = {}) {
   const preferredPoints = Array.isArray(rawRouteCard.pointNamesPreview) && rawRouteCard.pointNamesPreview.length
     ? rawRouteCard.pointNamesPreview
@@ -420,7 +436,7 @@ class AIChatService {
       audio_data: audioData,
       audio_format: audioFormat,
       session_id: sessionId,
-      output_mode: outputMode
+      output_mode: normalizeVoiceOutputMode(outputMode)
     }
     if (message) {
       data.message = message

@@ -1,6 +1,17 @@
 <view class="user-message-container">
   <view class="content-wrapper">
-    <view class="bubble-container text-bubble" bind:tap="onBubbleTap">
+    <view wx:if="{{isVoiceMessage}}" class="bubble-container voice-bubble">
+      <view class="voice-row">
+        <view class="voice-wave">
+          <view class="voice-wave-bar voice-wave-bar-1"></view>
+          <view class="voice-wave-bar voice-wave-bar-2"></view>
+          <view class="voice-wave-bar voice-wave-bar-3"></view>
+        </view>
+        <text class="voice-duration">{{voiceDurationText}}</text>
+      </view>
+      <text wx:if="{{voiceTranscript}}" class="voice-transcript">{{voiceTranscript}}</text>
+    </view>
+    <view wx:else class="bubble-container text-bubble" bind:tap="onBubbleTap">
       <text class="message-text">{{message.content}}</text>
     </view>
   </view>

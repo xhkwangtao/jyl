@@ -1,13 +1,17 @@
 const assert = require('node:assert/strict')
+const fs = require('fs')
 
 const tests = []
 const componentModulePath = require.resolve('../../miniprogram/components/chat-input-bar/chat-input-bar.js')
+const componentWxmlPath = require.resolve('../../miniprogram/components/chat-input-bar/chat-input-bar.wxml')
+const componentWxssPath = require.resolve('../../miniprogram/components/chat-input-bar/chat-input-bar.wxss')
 
 function test(name, run) {
   tests.push({ name, run })
 }
 
 function createRecorderHarness() {
+  let startHandler = null
   let stopHandler = null
   let errorHandler = null
   const startCalls = []
@@ -15,6 +19,9 @@ function createRecorderHarness() {
 
   return {
     manager: {
+      onStart(handler) {
+        startHandler = handler
+      },
       onStop(handler) {
         stopHandler = handler
       },
@@ -26,6 +33,11 @@ function createRecorderHarness() {
       },
       stop() {
         stopCallCount += 1
+      }
+    },
+    triggerStart() {
+      if (typeof startHandler === 'function') {
+        startHandler()
       }
     },
     triggerStop(result = {}) {
@@ -49,7 +61,13 @@ function createRecorderHarness() {
 
 function createWxHarness({
   authSetting = {},
-  authorizeSucceeds = false
+  authorizeSucceeds = false,
+  voiceButtonRect = {
+    left: 100,
+    right: 300,
+    top: 100,
+    bottom: 180
+  }
 } = {}) {
   const recorder = createRecorderHarness()
   const calls = {
@@ -108,9 +126,38 @@ function createWxHarness({
     vibrateShort() {
       calls.vibrateShort += 1
     },
+    getSystemInfoSync() {
+      return {
+        windowWidth: 375
+      }
+    },
     getFileSystemManager() {
       return {
-        readFile() {}
+        readFile({ success }) {
+          if (typeof success === 'function') {
+            success({
+              data: Buffer.from('mock-voice-data').toString('base64')
+            })
+          }
+        }
+      }
+    },
+    createSelectorQuery() {
+      return {
+        in() {
+          return this
+        },
+        select() {
+          return this
+        },
+        boundingClientRect() {
+          return this
+        },
+        exec(callback) {
+          if (typeof callback === 'function') {
+            callback([voiceButtonRect])
+          }
+        }
       }
     }
   }
@@ -191,10 +238,9 @@ function createComponentInstance(componentDefinition, properties = {}) {
   }
 }
 
-test('onVoiceStart waits for microphone permission before starting recording', async () => {
+test('onModeChange requests microphone permission before switching into voice mode', async () => {
   const {
     wxMock,
-    recorder,
     calls
   } = createWxHarness({
     authSetting: {},
@@ -207,24 +253,32 @@ test('onVoiceStart waits for microphone permission before starting recording', a
     assert.ok(componentDefinition, 'expected chat-input-bar component definition to load')
 
     const { instance } = createComponentInstance(componentDefinition)
-    await instance.onVoiceStart()
+    await instance.onModeChange()
 
     assert.equal(calls.getSetting, 1)
     assert.equal(calls.authorize, 1)
-    assert.equal(recorder.startCalls.length, 0)
     assert.equal(
       calls.showToast[calls.showToast.length - 1]?.title,
-      '麦克风权限已开启，请重新按住说话'
+      '录音权限已获取'
     )
+    assert.equal(instance.data.isVoiceMode, true)
   } finally {
     runtime.restore()
   }
 })
 
-test('onVoiceStart opens settings guidance when microphone permission is denied', async () => {
+test('voice mode markup no longer injects a recording hint block above the button', () => {
+  const wxml = fs.readFileSync(componentWxmlPath, 'utf8')
+
+  assert.equal(
+    wxml.includes('voice-cancel-hint'),
+    false
+  )
+})
+
+test('onModeChange opens settings guidance when microphone permission is denied', async () => {
   const {
     wxMock,
-    recorder,
     calls
   } = createWxHarness({
     authSetting: {},
@@ -237,20 +291,20 @@ test('onVoiceStart opens settings guidance when microphone permission is denied'
     assert.ok(componentDefinition, 'expected chat-input-bar component definition to load')
 
     const { instance } = createComponentInstance(componentDefinition)
-    await instance.onVoiceStart()
+    await instance.onModeChange()
 
     assert.equal(calls.getSetting, 1)
     assert.equal(calls.authorize, 1)
-    assert.equal(recorder.startCalls.length, 0)
     assert.equal(calls.showModal.length, 1)
-    assert.equal(calls.showModal[0].title, '需要麦克风权限')
+    assert.equal(calls.showModal[0].title, '需要录音权限')
     assert.equal(calls.openSetting, 1)
+    assert.equal(instance.data.isVoiceMode, false)
   } finally {
     runtime.restore()
   }
 })
 
-test('onVoiceStart still starts recording immediately after permission is granted', async () => {
+test('onVoiceStart starts recording immediately once voice mode is available', async () => {
   const {
     wxMock,
     recorder,
@@ -267,13 +321,230 @@ test('onVoiceStart still starts recording immediately after permission is grante
     assert.ok(componentDefinition, 'expected chat-input-bar component definition to load')
 
     const { instance } = createComponentInstance(componentDefinition)
+    await instance.onModeChange()
     await instance.onVoiceStart()
 
-    assert.equal(calls.getSetting, 1)
+    assert.equal(calls.getSetting >= 2, true)
     assert.equal(calls.authorize, 0)
     assert.equal(recorder.startCalls.length, 1)
     assert.equal(instance.data.isRecording, true)
-    instance.clearRecordTimer()
+    instance.clearRecordingTimer()
+  } finally {
+    runtime.restore()
+  }
+})
+
+test('onVoiceMove force stops the recording when the finger leaves the button bounds', async () => {
+  const {
+    wxMock,
+    recorder
+  } = createWxHarness({
+    authSetting: {
+      'scope.record': true
+    }
+  })
+  const runtime = loadComponentDefinition(wxMock)
+
+  try {
+    const { componentDefinition } = runtime
+    assert.ok(componentDefinition, 'expected chat-input-bar component definition to load')
+
+    const { instance } = createComponentInstance(componentDefinition)
+    await instance.onModeChange()
+    await instance.onVoiceStart()
+    recorder.triggerStart()
+
+    instance.onVoiceMove({
+      touches: [{
+        pageX: 20,
+        pageY: 20
+      }]
+    })
+
+    assert.equal(instance.data.isRecording, false)
+    assert.equal(recorder.stopCallCount, 1)
+  } finally {
+    runtime.restore()
+  }
+})
+
+test('onVoiceCancel stops an active recording immediately', async () => {
+  const {
+    wxMock,
+    recorder
+  } = createWxHarness({
+    authSetting: {
+      'scope.record': true
+    }
+  })
+  const runtime = loadComponentDefinition(wxMock)
+
+  try {
+    const { componentDefinition } = runtime
+    assert.ok(componentDefinition, 'expected chat-input-bar component definition to load')
+
+    const { instance } = createComponentInstance(componentDefinition)
+    await instance.onModeChange()
+    await instance.onVoiceStart()
+
+    assert.equal(instance.data.isRecording, true)
+    assert.equal(recorder.stopCallCount, 0)
+
+    instance.onVoiceCancel()
+
+    assert.equal(instance.data.isRecording, false)
+    assert.equal(recorder.stopCallCount, 1)
+  } finally {
+    runtime.restore()
+  }
+})
+
+test('forceStopVoiceRecordingFromPage stops an active recording when release is caught by the page fallback', async () => {
+  const {
+    wxMock,
+    recorder
+  } = createWxHarness({
+    authSetting: {
+      'scope.record': true
+    }
+  })
+  const runtime = loadComponentDefinition(wxMock)
+
+  try {
+    const { componentDefinition } = runtime
+    assert.ok(componentDefinition, 'expected chat-input-bar component definition to load')
+
+    const { instance } = createComponentInstance(componentDefinition)
+    await instance.onModeChange()
+    await instance.onVoiceStart()
+
+    assert.equal(instance.data.isRecording, true)
+    assert.equal(recorder.stopCallCount, 0)
+
+    instance.forceStopVoiceRecordingFromPage()
+
+    assert.equal(instance.data.isRecording, false)
+    assert.equal(recorder.stopCallCount, 1)
+  } finally {
+    runtime.restore()
+  }
+})
+
+test('onVoiceEnd still sends voice when release happens before recorder onStart callback arrives', async () => {
+  const {
+    wxMock,
+    recorder
+  } = createWxHarness({
+    authSetting: {
+      'scope.record': true
+    }
+  })
+  const runtime = loadComponentDefinition(wxMock)
+
+  try {
+    const { componentDefinition } = runtime
+    assert.ok(componentDefinition, 'expected chat-input-bar component definition to load')
+
+    const {
+      instance,
+      triggeredEvents
+    } = createComponentInstance(componentDefinition)
+    await instance.onModeChange()
+    await instance.onVoiceStart()
+
+    instance.onVoiceEnd()
+    recorder.triggerStart()
+    recorder.triggerStop({
+      tempFilePath: '/tmp/release-before-start.mp3',
+      duration: 1800
+    })
+
+    assert.equal(
+      triggeredEvents.some((event) => event.name === 'voiceSend'),
+      true
+    )
+  } finally {
+    runtime.restore()
+  }
+})
+
+test('onVoiceMove cancellation prevents the follow-up recorder stop from sending voice data', async () => {
+  const {
+    wxMock,
+    recorder
+  } = createWxHarness({
+    authSetting: {
+      'scope.record': true
+    }
+  })
+  const runtime = loadComponentDefinition(wxMock)
+
+  try {
+    const { componentDefinition } = runtime
+    assert.ok(componentDefinition, 'expected chat-input-bar component definition to load')
+
+    const {
+      instance,
+      triggeredEvents
+    } = createComponentInstance(componentDefinition)
+    await instance.onModeChange()
+    await instance.onVoiceStart()
+    recorder.triggerStart()
+
+    instance.onVoiceMove({
+      touches: [{
+        pageX: 20,
+        pageY: 20
+      }]
+    })
+    recorder.triggerStop({
+      tempFilePath: '/tmp/out-of-bounds.mp3',
+      duration: 1800
+    })
+
+    assert.equal(instance.data.isRecording, false)
+    assert.equal(recorder.stopCallCount, 1)
+    assert.equal(
+      triggeredEvents.some((event) => event.name === 'voiceSend'),
+      false
+    )
+  } finally {
+    runtime.restore()
+  }
+})
+
+test('handleRecorderStop ignores cancelled recordings instead of sending voice data', async () => {
+  const {
+    wxMock,
+    recorder
+  } = createWxHarness({
+    authSetting: {
+      'scope.record': true
+    }
+  })
+  const runtime = loadComponentDefinition(wxMock)
+
+  try {
+    const { componentDefinition } = runtime
+    assert.ok(componentDefinition, 'expected chat-input-bar component definition to load')
+
+    const {
+      instance,
+      triggeredEvents
+    } = createComponentInstance(componentDefinition)
+    await instance.onModeChange()
+    await instance.onVoiceStart()
+
+    instance.onVoiceCancel()
+    recorder.triggerStop({
+      tempFilePath: '/tmp/cancelled.mp3',
+      duration: 1200
+    })
+
+    assert.equal(
+      triggeredEvents.some((event) => event.name === 'voiceSend'),
+      false
+    )
   } finally {
     runtime.restore()
   }
