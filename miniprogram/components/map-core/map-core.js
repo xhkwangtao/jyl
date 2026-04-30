@@ -32,6 +32,10 @@ Component({
       type: Array,
       value: []
     },
+    boundaryLimit: {
+      type: Object,
+      value: null
+    },
     allowedZooms: {
       type: Array,
       value: []

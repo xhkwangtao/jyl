@@ -77,6 +77,9 @@ const AUTO_NEARBY_CROSS_POI_COOLDOWN_MS = 8000
 const AUTO_AUDIO_NEARBY_TOAST_DURATION_MS = 1800
 const AUDIO_PAYWALL_PRICE = 7.8
 const AUDIO_PAYWALL_THROTTLE_MS = 1200
+const GUIDE_MAP_TILE_OVERLAY_SNAPSHOT_KEY = 'guideMapTileOverlaySnapshot'
+const GUIDE_MAP_VIEWPORT_STATE_KEY = 'guideMapViewportState'
+const VIEWPORT_COORDINATE_EPSILON = 0.000005
 const AI_CHAT_ACCESS_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
 const AI_CHAT_PAYMENT_FEATURE_KEY = PAID_FEATURE_KEYS.AI_CHAT
 const AI_CHAT_SUBSCRIBE_DESCRIPTION = '开通VIP后即可使用AI聊天与智能路线问答服务'
@@ -321,6 +324,14 @@ function normalizeBooleanValue(value, defaultValue = false) {
 function toFiniteCoordinateValue(value) {
   const numericValue = Number(value)
   return Number.isFinite(numericValue) ? numericValue : null
+}
+
+function hasMeaningfulCoordinateDelta(currentValue, nextValue, epsilon = VIEWPORT_COORDINATE_EPSILON) {
+  if (!Number.isFinite(Number(currentValue)) || !Number.isFinite(Number(nextValue))) {
+    return false
+  }
+
+  return Math.abs(Number(currentValue) - Number(nextValue)) > epsilon
 }
 
 function buildCenter(points) {
@@ -3211,10 +3222,16 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
     this.hasDirectEntryTarget = hasDirectEntryTarget
     this.pageOptions = pageOptions
     const effectiveAllowedZooms = this.getEffectiveAllowedZooms()
-    const defaultMapScale = this.getDefaultMapScale()
+    const initialViewportState = this.getPreferredInitialViewportState()
+    const defaultMapScale = initialViewportState.scale
+    this.runtimeViewportState = {
+      ...initialViewportState
+    }
     this.setData({
       navigationBarTotalHeight,
       mapCtx: null,
+      longitude: initialViewportState.longitude,
+      latitude: initialViewportState.latitude,
       scale: defaultMapScale,
       allowedZooms: effectiveAllowedZooms,
       showTileOverlay: false,
@@ -3235,9 +3252,8 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
             this.setData({
               showTileOverlay: true
             }, () => {
-              this.refreshGroundTileOverlayViewport({
-                immediate: true
-              })
+              this.syncGroundTileOverlayAfterMount()
+                .catch(() => {})
             })
           }
         })
@@ -3281,18 +3297,28 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
 
     const currentFilter = this.data.currentPoiFilter || 'all'
     const currentPoint = getDefaultAudioPoi(currentFilter)
-    const nextCenter = DEFAULT_OUTSIDE_SCENIC_CENTER || DEFAULT_SCENIC_CENTER
+    const nextViewportState = this.hasDirectEntryTarget
+      ? {
+        longitude: DEFAULT_OUTSIDE_SCENIC_CENTER.longitude,
+        latitude: DEFAULT_OUTSIDE_SCENIC_CENTER.latitude,
+        scale: this.getDefaultMapScale()
+      }
+      : this.getCurrentViewportState()
     const poiDataSourceState = runtimeMapData === localMapData
       ? buildPoiDataSourceState('local', {
         detailText: '接口失败，已使用本地数据'
       })
       : buildPoiDataSourceState('remote')
 
+    this.runtimeViewportState = {
+      ...nextViewportState
+    }
+
     this.setData({
       ...poiDataSourceState,
-      longitude: nextCenter.longitude,
-      latitude: nextCenter.latitude,
-      scale: this.getDefaultMapScale(),
+      longitude: nextViewportState.longitude,
+      latitude: nextViewportState.latitude,
+      scale: nextViewportState.scale,
       tileMapBounds: DEFAULT_GROUND_TILE_OVERLAY_BOUNDS,
       mapBoundaryLimit: buildGroundTileCoverageMapBounds(this.groundTileOverlayConfig) || DEFAULT_MAP_BOUNDARY_LIMIT,
       maskPolygons: buildGroundTileOutsideMaskPolygons(this.groundTileOverlayConfig, {
@@ -3318,7 +3344,10 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
     this.checkLocationPermission()
     this.checkPendingNavigationRequest()
     this.ensureCustomTileLayerVisible()
-    this.refreshGroundTileOverlayViewport()
+    const tileOverlayRestorePromise = this.syncGroundTileOverlayAfterMount()
+    if (tileOverlayRestorePromise && typeof tileOverlayRestorePromise.finally === 'function') {
+      tileOverlayRestorePromise.catch(() => {})
+    }
 
     if (this.data.audioPlaying) {
       this.requestKeepScreenOn('audio')
@@ -3333,6 +3362,8 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
 
   onHide() {
     this.pageVisible = false
+    this.persistGuideMapViewportState()
+    this.persistGroundTileOverlaySnapshot()
     this.stopNavigationTracking()
     this.stopAutoAudioTracking()
     this.setCustomTileLayerVisibility(false)
@@ -3484,6 +3515,8 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
 
   onUnload() {
     this.pageVisible = false
+    this.persistGuideMapViewportState()
+    this.persistGroundTileOverlaySnapshot()
     this.stopNavigationTracking()
     this.stopAutoAudioTracking()
     this.removeCustomTileLayer()
@@ -3561,28 +3594,11 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
       })
     }
 
-    if (this.isGroundTileOverlayEnabled()) {
-      setTimeout(() => {
-        const tileOverlay = this.selectComponent('#tileOverlay')
-        if (!tileOverlay) {
-          return
-        }
-
-        tileOverlay.properties.mapCtx = this.mapCtx
-        tileOverlay.currentScale = this.data.scale
-
-        if (typeof tileOverlay.initTileOverlay === 'function') {
-          tileOverlay.initTileOverlay()
-        }
-      }, 120)
-    }
-
     this.ensureCustomTileLayerReady()
       .catch(() => {})
 
-    this.refreshGroundTileOverlayViewport({
-      immediate: true
-    })
+    this.syncGroundTileOverlayAfterMount()
+      .catch(() => {})
 
     if (this.pendingViewportFocus) {
       const pendingViewportFocus = this.pendingViewportFocus
@@ -3593,6 +3609,159 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
 
   isGroundTileOverlayEnabled() {
     return !!this.groundTileOverlayConfig?.enabled
+  },
+
+  getGuideMapAppInstance() {
+    if (typeof getApp !== 'function') {
+      return null
+    }
+
+    try {
+      return getApp()
+    } catch (error) {
+      return null
+    }
+  },
+
+  getPersistedGroundTileOverlaySnapshot() {
+    const app = this.getGuideMapAppInstance()
+    return app?.globalData?.[GUIDE_MAP_TILE_OVERLAY_SNAPSHOT_KEY] || null
+  },
+
+  normalizeGuideMapViewportState(viewportState) {
+    const longitude = toFiniteCoordinateValue(viewportState?.longitude)
+    const latitude = toFiniteCoordinateValue(viewportState?.latitude)
+    const rawScale = Number(viewportState?.scale)
+    const scale = Number.isFinite(rawScale) ? this.clampScaleToAllowedZooms(rawScale) : null
+
+    if (longitude === null || latitude === null || !Number.isFinite(scale)) {
+      return null
+    }
+
+    return {
+      longitude,
+      latitude,
+      scale
+    }
+  },
+
+  getPersistedGuideMapViewportState() {
+    const app = this.getGuideMapAppInstance()
+    return this.normalizeGuideMapViewportState(app?.globalData?.[GUIDE_MAP_VIEWPORT_STATE_KEY])
+  },
+
+  setPersistedGuideMapViewportState(viewportState) {
+    const app = this.getGuideMapAppInstance()
+    if (!app) {
+      return
+    }
+
+    app.globalData = app.globalData || {}
+    const normalizedViewportState = this.normalizeGuideMapViewportState(viewportState)
+    if (normalizedViewportState) {
+      app.globalData[GUIDE_MAP_VIEWPORT_STATE_KEY] = normalizedViewportState
+      return
+    }
+
+    delete app.globalData[GUIDE_MAP_VIEWPORT_STATE_KEY]
+  },
+
+  getPreferredInitialViewportState() {
+    const persistedViewportState = !this.hasDirectEntryTarget
+      ? this.getPersistedGuideMapViewportState()
+      : null
+
+    if (persistedViewportState) {
+      return persistedViewportState
+    }
+
+    return {
+      longitude: DEFAULT_OUTSIDE_SCENIC_CENTER.longitude,
+      latitude: DEFAULT_OUTSIDE_SCENIC_CENTER.latitude,
+      scale: this.getDefaultMapScale()
+    }
+  },
+
+  persistGuideMapViewportState() {
+    const viewportState = this.getCurrentViewportState()
+    this.setPersistedGuideMapViewportState(viewportState)
+    return viewportState
+  },
+
+  setPersistedGroundTileOverlaySnapshot(snapshot) {
+    const app = this.getGuideMapAppInstance()
+    if (!app) {
+      return
+    }
+
+    app.globalData = app.globalData || {}
+
+    if (snapshot?.tiles?.length) {
+      app.globalData[GUIDE_MAP_TILE_OVERLAY_SNAPSHOT_KEY] = snapshot
+      return
+    }
+
+    delete app.globalData[GUIDE_MAP_TILE_OVERLAY_SNAPSHOT_KEY]
+  },
+
+  persistGroundTileOverlaySnapshot() {
+    if (!this.isGroundTileOverlayEnabled()) {
+      return null
+    }
+
+    const tileOverlay = this.selectComponent('#tileOverlay')
+    if (!tileOverlay || typeof tileOverlay.captureVisibleTileSnapshot !== 'function') {
+      return null
+    }
+
+    const snapshot = tileOverlay.captureVisibleTileSnapshot()
+    this.setPersistedGroundTileOverlaySnapshot(snapshot)
+    return snapshot
+  },
+
+  restorePersistedGroundTileOverlaySnapshot() {
+    if (!this.isGroundTileOverlayEnabled()) {
+      return Promise.resolve(false)
+    }
+
+    const tileOverlay = this.selectComponent('#tileOverlay')
+    const snapshot = this.getPersistedGroundTileOverlaySnapshot()
+    if (
+      !tileOverlay
+      || !this.mapCtx
+      || !snapshot?.tiles?.length
+      || typeof tileOverlay.restoreNativeOverlaysFromCache !== 'function'
+    ) {
+      return Promise.resolve(false)
+    }
+
+    if (tileOverlay.properties && typeof tileOverlay.properties === 'object') {
+      tileOverlay.properties.mapCtx = this.mapCtx
+    } else {
+      tileOverlay.mapCtx = this.mapCtx
+    }
+    if (typeof tileOverlay.invalidateNativeOverlays === 'function') {
+      tileOverlay.invalidateNativeOverlays({
+        preserveActiveTileSnapshot: true
+      })
+    }
+    if (typeof tileOverlay.primeRestorableTileSnapshot === 'function') {
+      tileOverlay.primeRestorableTileSnapshot(snapshot)
+    }
+
+    return tileOverlay.restoreNativeOverlaysFromCache()
+      .then(() => true)
+      .catch(() => false)
+  },
+
+  syncGroundTileOverlayAfterMount() {
+    return this.restorePersistedGroundTileOverlaySnapshot()
+      .catch(() => false)
+      .finally(() => {
+        this.refreshGroundTileOverlayViewport({
+          immediate: true
+        })
+      })
   },
 
   ensureGroundTilePackagesLoaded() {
@@ -3669,17 +3838,48 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
         return
       }
 
-      tileOverlay.properties.mapCtx = this.mapCtx
-      tileOverlay.currentScale = typeof scale === 'number'
-        ? this.clampScaleToAllowedZooms(scale)
-        : this.data.scale
+      const applyOverlayViewportRefresh = (resolvedScale = null) => {
+        const currentViewportState = this.getCurrentViewportState()
+        const nextScale = typeof resolvedScale === 'number'
+          ? this.clampScaleToAllowedZooms(resolvedScale)
+          : currentViewportState.scale
 
-      this.mapCtx.getRegion({
-        success: (regionResult) => {
-          tileOverlay.updateBounds(regionResult)
-        },
-        fail: () => {}
-      })
+        tileOverlay.properties.mapCtx = this.mapCtx
+        tileOverlay.currentScale = nextScale
+
+        if (nextScale !== currentViewportState.scale) {
+          this.runtimeViewportState = {
+            ...currentViewportState,
+            scale: nextScale
+          }
+        }
+
+        this.mapCtx.getRegion({
+          success: (regionResult) => {
+            tileOverlay.updateBounds(regionResult)
+          },
+          fail: () => {}
+        })
+      }
+
+      if (typeof scale === 'number') {
+        applyOverlayViewportRefresh(scale)
+        return
+      }
+
+      if (typeof this.mapCtx.getScale === 'function') {
+        this.mapCtx.getScale({
+          success: (scaleResult = {}) => {
+            applyOverlayViewportRefresh(scaleResult.scale)
+          },
+          fail: () => {
+            applyOverlayViewportRefresh()
+          }
+        })
+        return
+      }
+
+      applyOverlayViewportRefresh()
     }
 
     if (immediate) {
@@ -4180,16 +4380,29 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
 
   getDefaultMapScale() {
     const allowedZooms = this.getEffectiveAllowedZooms()
+    if (allowedZooms.length >= 2 && this.isGroundTileOverlayEnabled()) {
+      return allowedZooms[allowedZooms.length - 2]
+    }
+
     return allowedZooms[allowedZooms.length - 1] || DEFAULT_ENTRY_SCALE
   },
 
   getCurrentViewportState() {
+    const runtimeViewportState = this.runtimeViewportState || {}
+    const runtimeLongitude = toFiniteCoordinateValue(runtimeViewportState.longitude)
+    const runtimeLatitude = toFiniteCoordinateValue(runtimeViewportState.latitude)
+    const runtimeScale = Number(runtimeViewportState.scale)
+
     return {
-      longitude: typeof this.data.longitude === 'number' ? this.data.longitude : DEFAULT_OUTSIDE_SCENIC_CENTER.longitude,
-      latitude: typeof this.data.latitude === 'number' ? this.data.latitude : DEFAULT_OUTSIDE_SCENIC_CENTER.latitude,
-      scale: this.clampScaleToAllowedZooms(
-        typeof this.data.scale === 'number' ? this.data.scale : this.getDefaultMapScale()
-      )
+      longitude: runtimeLongitude !== null
+        ? runtimeLongitude
+        : (typeof this.data.longitude === 'number' ? this.data.longitude : DEFAULT_OUTSIDE_SCENIC_CENTER.longitude),
+      latitude: runtimeLatitude !== null
+        ? runtimeLatitude
+        : (typeof this.data.latitude === 'number' ? this.data.latitude : DEFAULT_OUTSIDE_SCENIC_CENTER.latitude),
+      scale: this.clampScaleToAllowedZooms(Number.isFinite(runtimeScale)
+        ? runtimeScale
+        : (typeof this.data.scale === 'number' ? this.data.scale : this.getDefaultMapScale()))
     }
   },
 
@@ -4203,24 +4416,31 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
       ? this.clampScaleToAllowedZooms(options.scale)
       : null
     const applyViewportState = (center = null) => {
-      const nextData = {}
+      const currentViewportState = this.getCurrentViewportState()
       const nextLongitude = toFiniteCoordinateValue(center?.longitude)
       const nextLatitude = toFiniteCoordinateValue(center?.latitude)
+      const nextViewportState = {
+        ...currentViewportState
+      }
+      let hasViewportChange = false
 
-      if (nextLongitude !== null && nextLongitude !== this.data.longitude) {
-        nextData.longitude = nextLongitude
+      if (nextLongitude !== null && hasMeaningfulCoordinateDelta(currentViewportState.longitude, nextLongitude)) {
+        nextViewportState.longitude = nextLongitude
+        hasViewportChange = true
       }
 
-      if (nextLatitude !== null && nextLatitude !== this.data.latitude) {
-        nextData.latitude = nextLatitude
+      if (nextLatitude !== null && hasMeaningfulCoordinateDelta(currentViewportState.latitude, nextLatitude)) {
+        nextViewportState.latitude = nextLatitude
+        hasViewportChange = true
       }
 
-      if (typeof nextScale === 'number' && nextScale !== this.data.scale) {
-        nextData.scale = nextScale
+      if (typeof nextScale === 'number' && nextScale !== currentViewportState.scale) {
+        nextViewportState.scale = nextScale
+        hasViewportChange = true
       }
 
-      if (Object.keys(nextData).length) {
-        this.setData(nextData)
+      if (hasViewportChange) {
+        this.runtimeViewportState = nextViewportState
       }
     }
 
@@ -4258,6 +4478,11 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
     }
 
     this.hasAppliedInitialUserViewport = true
+    this.runtimeViewportState = {
+      longitude,
+      latitude,
+      scale: this.getDefaultMapScale()
+    }
     this.setData({
       longitude,
       latitude,
@@ -4311,14 +4536,7 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
     })
   },
 
-  onScaleUpdate(event) {
-    const nextScale = this.clampScaleToAllowedZooms(event?.detail?.scale)
-    if (typeof nextScale === 'number' && nextScale !== this.data.scale) {
-      this.setData({
-        scale: nextScale
-      })
-    }
-  },
+  onScaleUpdate() {},
 
   focusIncludePoints(includePoints, options = {}) {
     if (!Array.isArray(includePoints) || includePoints.length < 2) {
@@ -6192,6 +6410,11 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
         return
       }
 
+      this.runtimeViewportState = {
+        longitude: request.coordinate.longitude,
+        latitude: request.coordinate.latitude,
+        scale: this.data.scale || this.getDefaultMapScale()
+      }
       this.setData({
         longitude: request.coordinate.longitude,
         latitude: request.coordinate.latitude,
@@ -6313,10 +6536,11 @@ Page(withPageAnalytics('/subpackages/guide/pages/map/map', {
       return this.data.preNavigationState
     }
 
+    const viewportState = this.getCurrentViewportState()
     const preNavigationState = {
-      longitude: this.data.longitude,
-      latitude: this.data.latitude,
-      scale: this.data.scale,
+      longitude: viewportState.longitude,
+      latitude: viewportState.latitude,
+      scale: viewportState.scale,
       showLocation: this.data.showLocation,
       showAudioPlayer: this.data.showAudioPlayer,
       currentPoiFilter: this.data.currentPoiFilter,
