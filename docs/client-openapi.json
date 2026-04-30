@@ -75,6 +75,11 @@
         ],
         "summary": "Get Landing Page Config",
         "operationId": "get_landing_page_config_api_v1_client_landing_pages_config_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "s",
@@ -1487,6 +1492,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/greatwall": {
+      "get": {
+        "tags": [
+          "client-greatwall"
+        ],
+        "summary": "Get Greatwall Config",
+        "description": "读取小程序付费墙展示控制开关。该接口只返回配置值，不影响后端支付、权益或其他业务流程。",
+        "operationId": "get_greatwall_config_api_v1_client_greatwall_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GreatwallConfigRead"
                 }
               }
             }
@@ -3601,6 +3628,18 @@
           "recommended_product_code"
         ],
         "title": "EntitlementFeatureRead"
+      },
+      "GreatwallConfigRead": {
+        "properties": {
+          "greatwall": {
+            "type": "boolean",
+            "title": "Greatwall",
+            "description": "true 表示小程序端应显示付费墙；false 表示小程序端不显示付费墙。",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "GreatwallConfigRead"
       },
       "HTTPValidationError": {
         "properties": {
