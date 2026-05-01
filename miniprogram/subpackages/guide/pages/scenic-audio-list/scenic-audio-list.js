@@ -4,6 +4,9 @@ const {
   buildScenicVideoAccessDeniedMessage
 } = require('../../../../utils/scenic-location')
 const {
+  buildScenicAudioAccessOptions
+} = require('../../../../utils/scenic-audio-access')
+const {
   withPageAnalytics
 } = require('../../../../utils/with-page-analytics')
 
@@ -304,8 +307,11 @@ Page(withPageAnalytics('/subpackages/guide/pages/scenic-audio-list/scenic-audio-
     this.setData({
       locationText: this.entryPoiName || '景点讲解'
     })
+  },
 
-    this.loadPoiList()
+  onReady() {
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+    this.ensurePageAccessAndLoad()
   },
 
   onShow() {
@@ -335,6 +341,44 @@ Page(withPageAnalytics('/subpackages/guide/pages/scenic-audio-list/scenic-audio-
       navBackground: nextBackground,
       navTheme: 'dark'
     })
+  },
+
+  getPermissionGuard() {
+    if (this.permissionGuard) {
+      return this.permissionGuard
+    }
+
+    this.permissionGuard = this.selectComponent('#permissionGuard')
+    return this.permissionGuard || null
+  },
+
+  async ensurePageAccessAndLoad() {
+    const permissionGuard = this.getPermissionGuard()
+    if (!permissionGuard) {
+      this.setData({
+        loading: false,
+        errorText: '权限组件加载失败，请稍后重试'
+      })
+      return
+    }
+
+    const accessResult = await permissionGuard.ensureFeatureAccess(
+      buildScenicAudioAccessOptions({
+        showLoginToast: true
+      })
+    )
+
+    if (!accessResult.allowed) {
+      if (accessResult.access?.reason === 'not_logged_in') {
+        this.setData({
+          loading: false,
+          errorText: '登录失败，请稍后重试'
+        })
+      }
+      return
+    }
+
+    this.loadPoiList()
   },
 
   async loadPoiList() {

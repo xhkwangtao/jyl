@@ -1,4 +1,6 @@
 <view class="scenic-detail-page">
+  <permission-guard id="permissionGuard"></permission-guard>
+
   <view class="background-layer">
     <image class="background-svg" src="/images/ai-chat-bg.svg" mode="aspectFill"></image>
   </view>

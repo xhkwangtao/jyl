@@ -18,6 +18,9 @@ const {
   GUIDE_AI_CHAT_PAGE,
   GUIDE_AUDIO_LIST_PAGE
 } = require('../../utils/guide-routes')
+const {
+  buildScenicAudioAccessOptions
+} = require('../../utils/scenic-audio-access')
 const studyReportService = require('../../services/study-report-service')
 const {
   PAID_FEATURE_KEYS
@@ -325,7 +328,12 @@ Page(withPageAnalytics('/pages/index/index', {
     }
   },
 
-  onExplanationTap() {
+  async onExplanationTap() {
+    const hasAccess = await this.ensureScenicAudioAccess()
+    if (!hasAccess) {
+      return
+    }
+
     wx.navigateTo({
       url: GUIDE_AUDIO_LIST_PAGE,
       fail: () => {
@@ -334,6 +342,22 @@ Page(withPageAnalytics('/pages/index/index', {
         })
       }
     })
+  },
+
+  async ensureScenicAudioAccess() {
+    const permissionGuard = this.getPermissionGuard()
+    if (!permissionGuard) {
+      return false
+    }
+
+    const accessResult = await permissionGuard.ensureFeatureAccess(
+      buildScenicAudioAccessOptions({
+        successRedirect: GUIDE_AUDIO_LIST_PAGE,
+        showLoginToast: true
+      })
+    )
+
+    return !!accessResult.allowed
   },
 
   async onPhotoSpotsTap() {
